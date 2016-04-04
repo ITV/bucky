@@ -12,7 +12,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures {
   val testQueueName = "bucky-consumer-test"
   lazy val (testQueue, amqpClientConfig, rmqAdminHhttp) = IntegrationUtils.setUp(testQueueName)
 
-  test("Can consume messages from a (pre-existing) queue") {
+  ignore("Can consume messages from a (pre-existing) queue") {
     testQueue.purge()
 
     val handler = new StubHandler()
