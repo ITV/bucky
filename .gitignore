@@ -1,0 +1,30 @@
+*.class
+*.log
+
+# sbt specific
+dist/*
+target/
+lib_managed/
+src_managed/
+project/boot/
+project/plugins/project/
+lib/
+
+# Scala-IDE specific
+.scala_dependencies
+.idea/
+.idea_modules/
+.classpath
+.project
+.settings
+.cache
+
+.vagrant/
+.DS_Store
+
+*.sublime-project
+*.sublime-workspace
+.ensime
+.ensime_cache
+*.iml
+*.bk
