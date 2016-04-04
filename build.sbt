@@ -30,3 +30,6 @@ libraryDependencies ++= Seq(
   "itv.cps" %% "cps-utils" % commonPlatformServicesSharedVersion,
   "org.scalatest" %% "scalatest" % scalaTestVersion % "test,it",
   "org.mockito" % "mockito-core" % mockitoVersion)
+
+//grab some dependencies from on-premise artifactory for now, until they have been migrated over to artifactory-online
+resolvers += "ITV Libraries" at "http://cpp-artifactory.cpp.o.itv.net.uk:8081/artifactory/libs-release-local/"
