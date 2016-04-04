@@ -31,7 +31,7 @@ libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % scalaTestVersion % "test,it",
   "org.mockito" % "mockito-core" % mockitoVersion)
 
-assemblyJarName in assembly <<= (name, version, scalaVersion) map { (name, version, scalaVersion) => name + "_2.11-" + version + ".jar" }
-
 //grab some dependencies from on-premise artifactory for now, until they have been migrated over to artifactory-online
 resolvers += "ITV Libraries" at "http://cpp-artifactory.cpp.o.itv.net.uk:8081/artifactory/libs-release-local/"
+
+publishTo := Some("Artifactory Realm" at "https://itvrepos.artifactoryonline.com/itvrepos/cd-scala-libs")
