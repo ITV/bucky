@@ -16,6 +16,8 @@ import scala.concurrent.duration._
 class PublisherIntegrationTest extends FunSuite with ScalaFutures {
 
   val testQueueName = "bucky-publisher-test"
+  val routingKey = RoutingKey(testQueueName)
+  val exchange = Exchange("")
   lazy val (testQueue, amqpClientConfig, rmqAdminHhttp) = IntegrationUtils.setUp(testQueueName)
 
   ignore("Can publish messages to a (pre-existing) queue") {
@@ -26,7 +28,7 @@ class PublisherIntegrationTest extends FunSuite with ScalaFutures {
       publish <- amqpClient.publisher()
     } {
       val body = Blob.from("Hello World!")
-      publish(PublishCommand(exchange = "", routingKey = testQueueName, MessageProperties.MINIMAL_PERSISTENT_BASIC, body)).asTry.futureValue shouldBe 'success
+      publish(PublishCommand(Exchange(""), routingKey, MessageProperties.MINIMAL_PERSISTENT_BASIC, body)).asTry.futureValue shouldBe 'success
 
       testQueue.getNextMessage().payload shouldBe body
     }
@@ -41,16 +43,16 @@ class PublisherIntegrationTest extends FunSuite with ScalaFutures {
       publish <- amqpClient.publisher()
     } {
       // Publish before failure
-      publish(PublishCommand(exchange = "", routingKey = testQueueName, MessageProperties.MINIMAL_PERSISTENT_BASIC, Blob.from("Before"))).asTry.futureValue shouldBe 'success
+      publish(PublishCommand(exchange, routingKey, MessageProperties.MINIMAL_PERSISTENT_BASIC, Blob.from("Before"))).asTry.futureValue shouldBe 'success
 
       killRabbitConnection()
 
       // Publish fails until connection is re-established
-      publish(PublishCommand(exchange = "", routingKey = testQueueName, MessageProperties.MINIMAL_PERSISTENT_BASIC, Blob.from("Immediately after"))).asTry.futureValue shouldBe 'failure
+      publish(PublishCommand(exchange, routingKey, MessageProperties.MINIMAL_PERSISTENT_BASIC, Blob.from("Immediately after"))).asTry.futureValue shouldBe 'failure
 
       // Publish succeeds once connection is re-established
       Thread.sleep(600L)
-      publish(PublishCommand(exchange = "", routingKey = testQueueName, MessageProperties.MINIMAL_PERSISTENT_BASIC, Blob.from("A while after"))).asTry.futureValue shouldBe 'success
+      publish(PublishCommand(exchange, routingKey, MessageProperties.MINIMAL_PERSISTENT_BASIC, Blob.from("A while after"))).asTry.futureValue shouldBe 'success
 
       testQueue.consumeAllMessages() should have size 2
     }

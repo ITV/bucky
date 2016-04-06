@@ -13,9 +13,13 @@ import scala.collection.convert.wrapAsScala.collectionAsScalaIterable
 import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.concurrent.{ExecutionContext, Promise}
 
-case class PublishCommand(exchange: String, routingKey: String, basicProperties: BasicProperties, body: Blob) {
-  def description = s"$exchange:$routingKey $body"
+case class PublishCommand(exchange: Exchange, routingKey: RoutingKey, basicProperties: BasicProperties, body: Blob) {
+  def description = s"${exchange.value}:${routingKey.value} $body"
 }
+
+case class RoutingKey(value: String)
+
+case class Exchange(value: String)
 
 sealed trait ConsumeAction
 
@@ -94,7 +98,7 @@ class AmqpClient(channelFactory: Lifecycle[Channel], consumerTag: ConsumerTag = 
         logger.debug("Publishing with delivery tag {}L to {}:{} {}", box(deliveryTag), cmd.exchange, cmd.routingKey, cmd.body)
         unconfirmedPublications.put(deliveryTag, promise)
         try {
-          channel.basicPublish(cmd.exchange, cmd.routingKey, false, false, cmd.basicProperties, cmd.body.content)
+          channel.basicPublish(cmd.exchange.value, cmd.routingKey.value, false, false, cmd.basicProperties, cmd.body.content)
         } catch {
           case exception: Exception =>
             logger.error(s"Failed to publish message with delivery tag ${deliveryTag}L to ${cmd.description}", exception)
