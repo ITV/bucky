@@ -8,7 +8,7 @@ import org.scalatest.Matchers._
 
 object IntegrationUtils {
 
-  def setUp(testQueueName: String) = {
+  def setUp(testQueueNames: String*) = {
     val config = ConfigFactory.load("bucky")
     val host = config.getString("rmq.host")
     val clientConfig = config.getConfig("rmq.client")
@@ -18,11 +18,12 @@ object IntegrationUtils {
 
     val rmqAdminHhttp = SyncHttpClient.forHost(rmqAdminConfig.hostname, rmqAdminConfig.port).withAuthentication(rmqAdminConfig.username, rmqAdminConfig.password)
 
-    rmqAdminHhttp.handle(PUT(UriBuilder / "api" / "queues" / "/" / testQueueName).body("application/json", Blob.from(
-      """{"auto_delete": "true", "durable": "true", "arguments": {"x-expires": 60000}}"""))) shouldBe 'successful
-
-    val testQueue = MessageQueue(testQueueName, rmqAdminConfig)
-    (testQueue, amqpClientConfig, rmqAdminHhttp)
+    val testQueues = testQueueNames.map { testQueueName =>
+      rmqAdminHhttp.handle(PUT(UriBuilder / "api" / "queues" / "/" / testQueueName).body("application/json", Blob.from(
+        """{"auto_delete": "true", "durable": "true", "arguments": {"x-expires": 60000}}"""))) shouldBe 'successful
+      MessageQueue(testQueueName, rmqAdminConfig)
+    }
+    (testQueues, amqpClientConfig, rmqAdminHhttp)
   }
   
 }

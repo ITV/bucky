@@ -11,7 +11,7 @@ import itv.utils.Blob
 
 import scala.collection.convert.wrapAsScala.collectionAsScalaIterable
 import scala.concurrent.duration.{Duration, FiniteDuration}
-import scala.concurrent.{ExecutionContext, Promise}
+import scala.concurrent.{ExecutionContext, Future, Promise}
 
 case class PublishCommand(exchange: Exchange, routingKey: RoutingKey, basicProperties: BasicProperties, body: Blob) {
   def description = s"${exchange.value}:${routingKey.value} $body"
@@ -62,7 +62,20 @@ class AmqpClient(channelFactory: Lifecycle[Channel], consumerTag: ConsumerTag = 
     }
   }
 
-  def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): Lifecycle[Publisher[PublishCommand]] = {
+  def publisher[T](underlying: Lifecycle[Publisher[PublishCommand]] = rawPublisher())(implicit executionContext: ExecutionContext, serializer: PublishCommandSerializer[T]): Lifecycle[Publisher[T]] =
+    for {
+      publisher <- underlying
+    } yield {
+      message: T =>
+        for {
+          publishCommand <- Future {
+            serializer.toPublishCommand(message)
+          }
+          _ <- publisher(publishCommand)
+        } yield ()
+    }
+
+  def rawPublisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): Lifecycle[Publisher[PublishCommand]] = {
     for {
       channel <- channelFactory
       publisherWrapper <- publisherWrapperLifecycle(timeout)

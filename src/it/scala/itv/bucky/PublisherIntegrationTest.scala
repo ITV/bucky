@@ -1,10 +1,8 @@
 package itv.bucky
 
 import com.rabbitmq.client.MessageProperties
-import com.typesafe.config.ConfigFactory
 import itv.bucky.TestUtils._
 import itv.contentdelivery.testutilities.json.JsonResult
-import itv.contentdelivery.testutilities.rmq.{BrokerConfig, MessageQueue}
 import itv.httpyroraptor._
 import itv.utils.Blob
 import org.scalatest.FunSuite
@@ -21,26 +19,26 @@ class PublisherIntegrationTest extends FunSuite with ScalaFutures {
   lazy val (testQueue, amqpClientConfig, rmqAdminHhttp) = IntegrationUtils.setUp(testQueueName)
 
   ignore("Can publish messages to a (pre-existing) queue") {
-    testQueue.purge()
+    testQueue.head.purge()
 
     for {
       amqpClient <- amqpClientConfig
-      publish <- amqpClient.publisher()
+      publish <- amqpClient.rawPublisher()
     } {
       val body = Blob.from("Hello World!")
       publish(PublishCommand(Exchange(""), routingKey, MessageProperties.MINIMAL_PERSISTENT_BASIC, body)).asTry.futureValue shouldBe 'success
 
-      testQueue.getNextMessage().payload shouldBe body
+      testQueue.head.getNextMessage().payload shouldBe body
     }
 
   }
 
   ignore("Publisher can recover from connection failure") {
-    testQueue.purge()
+    testQueue.head.purge()
 
     for {
       amqpClient <- amqpClientConfig.copy(networkRecoveryInterval = Some(500.millis))
-      publish <- amqpClient.publisher()
+      publish <- amqpClient.rawPublisher()
     } {
       // Publish before failure
       publish(PublishCommand(exchange, routingKey, MessageProperties.MINIMAL_PERSISTENT_BASIC, Blob.from("Before"))).asTry.futureValue shouldBe 'success
@@ -54,7 +52,7 @@ class PublisherIntegrationTest extends FunSuite with ScalaFutures {
       Thread.sleep(600L)
       publish(PublishCommand(exchange, routingKey, MessageProperties.MINIMAL_PERSISTENT_BASIC, Blob.from("A while after"))).asTry.futureValue shouldBe 'success
 
-      testQueue.consumeAllMessages() should have size 2
+      testQueue.head.consumeAllMessages() should have size 2
     }
 
   }

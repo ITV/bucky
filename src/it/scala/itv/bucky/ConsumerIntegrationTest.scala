@@ -13,7 +13,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures {
   lazy val (testQueue, amqpClientConfig, rmqAdminHhttp) = IntegrationUtils.setUp(testQueueName)
 
   ignore("Can consume messages from a (pre-existing) queue") {
-    testQueue.purge()
+    testQueue.head.purge()
 
     val handler = new StubHandler()
     for {
@@ -23,7 +23,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures {
       handler.receivedMessages shouldBe 'empty
 
       val msg = Blob from "Hello World!"
-      testQueue.publish(msg)
+      testQueue.head.publish(msg)
 
       eventually {
         handler.receivedMessages should have size 1
