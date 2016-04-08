@@ -7,7 +7,7 @@ import com.rabbitmq.client.AMQP.BasicProperties
 import com.rabbitmq.client._
 import com.typesafe.scalalogging.StrictLogging
 import itv.contentdelivery.lifecycle.{ExecutorLifecycles, Lifecycle, NoOpLifecycle}
-import itv.utils.Blob
+import itv.utils.{Blob, BlobUnmarshaller}
 
 import scala.collection.convert.wrapAsScala.collectionAsScalaIterable
 import scala.concurrent.duration.{Duration, FiniteDuration}
@@ -36,6 +36,17 @@ object ConsumerTag {
 }
 
 class AmqpClient(channelFactory: Lifecycle[Channel], consumerTag: ConsumerTag = ConsumerTag.pidAndHost) extends StrictLogging {
+
+  def genericConsumer[T](queueName: String, handler: Handler[T], exceptionalAction: ConsumeAction = DeadLetter, deserializationFailureAction: ConsumeAction = DeadLetter)(implicit executionContext: ExecutionContext, deserializer: BlobDeserializer[T]): Lifecycle[Unit] =
+    consumer(queueName, new Handler[Blob] {
+      override def apply(blob: Blob): Future[ConsumeAction] = deserializer(blob) match {
+        case DeserializerResult.Success(message) => handler(message)
+        case DeserializerResult.Failure(reason) => {
+          logger.error("Cannot deserialize: {} because: \"{}\" (will {})", blob, reason, deserializationFailureAction)
+          Future.successful(deserializationFailureAction)
+        }
+      }
+    }, exceptionalAction)
 
   def consumer(queueName: String, handler: Handler[Blob], exceptionalAction: ConsumeAction = DeadLetter)(implicit executionContext: ExecutionContext): Lifecycle[Unit] = {
     for {
