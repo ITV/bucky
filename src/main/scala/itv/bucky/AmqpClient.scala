@@ -7,7 +7,7 @@ import com.rabbitmq.client.AMQP.BasicProperties
 import com.rabbitmq.client._
 import com.typesafe.scalalogging.StrictLogging
 import itv.contentdelivery.lifecycle.{ExecutorLifecycles, Lifecycle, NoOpLifecycle}
-import itv.utils.{Blob, BlobUnmarshaller}
+import itv.utils.Blob
 
 import scala.collection.convert.wrapAsScala.collectionAsScalaIterable
 import scala.concurrent.duration.{Duration, FiniteDuration}
@@ -35,20 +35,16 @@ object ConsumerTag {
   val pidAndHost: ConsumerTag = ConsumerTag(ManagementFactory.getRuntimeMXBean.getName)
 }
 
-class AmqpClient(channelFactory: Lifecycle[Channel], consumerTag: ConsumerTag = ConsumerTag.pidAndHost) extends StrictLogging {
+trait AmqpClient {
+  def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS))(implicit executionContext: ExecutionContext): Lifecycle[Publisher[PublishCommand]]
 
-  def genericConsumer[T](queueName: String, handler: Handler[T], exceptionalAction: ConsumeAction = DeadLetter, deserializationFailureAction: ConsumeAction = DeadLetter)(implicit executionContext: ExecutionContext, deserializer: BlobDeserializer[T]): Lifecycle[Unit] =
-    consumer(queueName, new Handler[Blob] {
-      override def apply(blob: Blob): Future[ConsumeAction] = deserializer(blob) match {
-        case DeserializerResult.Success(message) => handler(message)
-        case DeserializerResult.Failure(reason) => {
-          logger.error("Cannot deserialize: {} because: \"{}\" (will {})", blob, reason, deserializationFailureAction)
-          Future.successful(deserializationFailureAction)
-        }
-      }
-    }, exceptionalAction)
+  def consumer(queueName: String, handler: Handler[Blob], exceptionalAction: ConsumeAction = DeadLetter)(implicit executionContext: ExecutionContext): Lifecycle[Unit]
+}
 
-  def consumer(queueName: String, handler: Handler[Blob], exceptionalAction: ConsumeAction = DeadLetter)(implicit executionContext: ExecutionContext): Lifecycle[Unit] = {
+
+class RawAmqpClient(channelFactory: Lifecycle[Channel], consumerTag: ConsumerTag = ConsumerTag.pidAndHost) extends AmqpClient with StrictLogging {
+
+  def consumer(queueName: String, handler: Handler[Blob], exceptionalAction: ConsumeAction = DeadLetter)(implicit executionContext: ExecutionContext): Lifecycle[Unit] =
     for {
       channel <- channelFactory
     } yield {
@@ -56,7 +52,7 @@ class AmqpClient(channelFactory: Lifecycle[Channel], consumerTag: ConsumerTag = 
         override def handleDelivery(consumerTag: String, envelope: Envelope, properties: BasicProperties, body: Array[Byte]): Unit = {
           val bodyBlob = Blob(body)
           logger.debug("Received delivery with tag {}L on {}: {}", box(envelope.getDeliveryTag), queueName, bodyBlob)
-          handler(Blob(body)).recover {
+          handler(bodyBlob).recover {
             case error =>
               logger.error(s"Unhandled exception processing delivery ${envelope.getDeliveryTag}L on $queueName", error)
               exceptionalAction
@@ -71,22 +67,8 @@ class AmqpClient(channelFactory: Lifecycle[Channel], consumerTag: ConsumerTag = 
         }
       })
     }
-  }
 
-  def publisher[T](underlying: Lifecycle[Publisher[PublishCommand]] = rawPublisher())(implicit executionContext: ExecutionContext, serializer: PublishCommandSerializer[T]): Lifecycle[Publisher[T]] =
-    for {
-      publisher <- underlying
-    } yield {
-      message: T =>
-        for {
-          publishCommand <- Future {
-            serializer.toPublishCommand(message)
-          }
-          _ <- publisher(publishCommand)
-        } yield ()
-    }
-
-  def rawPublisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): Lifecycle[Publisher[PublishCommand]] = {
+  def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS))(implicit executionContext: ExecutionContext): Lifecycle[Publisher[PublishCommand]] =
     for {
       channel <- channelFactory
       publisherWrapper <- publisherWrapperLifecycle(timeout)
@@ -132,8 +114,6 @@ class AmqpClient(channelFactory: Lifecycle[Channel], consumerTag: ConsumerTag = 
       })
     }
 
-  }
-
   // Unfortunately explicit boxing seems necessary due to Scala inferring logger varargs as being of type AnyRef*
   @inline private def box(x: AnyVal): AnyRef = x.asInstanceOf[AnyRef]
 
@@ -142,4 +122,31 @@ class AmqpClient(channelFactory: Lifecycle[Channel], consumerTag: ConsumerTag = 
       ExecutorLifecycles.singleThreadScheduledExecutor.map(ec => new TimeoutPublisher(_, finiteTimeout)(ec))
     case infinite => NoOpLifecycle(identity)
   }
+
+
+}
+
+
+object AmqpClient extends StrictLogging {
+  def publisherOf[T](publisher: Publisher[PublishCommand])(implicit executionContext: ExecutionContext, serializer: PublishCommandSerializer[T]): Publisher[T] = (message: T) =>
+    for {
+      publishCommand <- Future {
+        serializer.toPublishCommand(message)
+      }
+      _ <- publisher(publishCommand)
+    } yield ()
+
+
+  def handlerOf[T](handler: Handler[T], deserializationFailureAction: ConsumeAction = DeadLetter)(implicit ec: ExecutionContext, deserializer: BlobDeserializer[T]): Handler[Blob] =
+    new Handler[Blob] {
+      override def apply(blob: Blob): Future[ConsumeAction] = Future(deserializer(blob)).flatMap {
+        case DeserializerResult.Success(message) => handler(message)
+        case DeserializerResult.Failure(reason) =>
+          logger.error("Cannot deserialize: {} because: \"{}\" (will {})", blob, reason, deserializationFailureAction)
+          Future.successful(deserializationFailureAction)
+      }.recoverWith { case error: Throwable =>
+        logger.error("Cannot deserialize: {} because: \"{}\" (will {})", blob, error.getMessage, deserializationFailureAction, error)
+        Future.successful(deserializationFailureAction)
+      }
+    }
 }

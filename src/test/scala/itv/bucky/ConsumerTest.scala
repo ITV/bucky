@@ -1,15 +1,13 @@
 package itv.bucky
 
-import com.rabbitmq.client.MessageProperties
 import com.rabbitmq.client.impl.AMQImpl.Basic
 import itv.contentdelivery.lifecycle.{Lifecycle, NoOpLifecycle}
+import itv.contentdelivery.testutilities.SameThreadExecutionContext.implicitly
 import itv.utils.Blob
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 
-import scala.collection.mutable.ListBuffer
 import scala.concurrent.Future
-import itv.contentdelivery.testutilities.SameThreadExecutionContext.implicitly
 
 class ConsumerTest extends FunSuite {
 
@@ -17,7 +15,7 @@ class ConsumerTest extends FunSuite {
     val channel = new StubChannel()
     val client = createClient(channel)
 
-    val handler = new StubHandler()
+    val handler = new StubHandler[Blob]()
 
     Lifecycle.using(client.consumer("blah", handler)) { _ =>
       channel.consumers should have size 1
@@ -45,7 +43,7 @@ class ConsumerTest extends FunSuite {
     val channel = new StubChannel()
     val client = createClient(channel)
 
-    val handler = new StubHandler()
+    val handler = new StubHandler[Blob]()
 
     Lifecycle.using(client.consumer("blah", handler, exceptionalAction = DeadLetter)) { _ =>
       channel.consumers should have size 1
@@ -59,7 +57,7 @@ class ConsumerTest extends FunSuite {
     }
   }
 
-  private def createClient(channel: StubChannel): AmqpClient = {
-    new AmqpClient(NoOpLifecycle(channel), ConsumerTag("foo"))
+  private def createClient(channel: StubChannel): RawAmqpClient = {
+    new RawAmqpClient(NoOpLifecycle(channel), ConsumerTag("foo"))
   }
 }

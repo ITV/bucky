@@ -12,7 +12,7 @@ case class AmqpClientConfig(host: String, port: Int, username: String, password:
 
   override type ServiceInstance = Connection
 
-  override def unwrap(connection: Connection): AmqpClient = new AmqpClient(AmqpChannelLifecycle(connection))
+  override def unwrap(connection: Connection): AmqpClient = new RawAmqpClient(AmqpChannelLifecycle(connection))
 
   override def start(): Connection = {
     val connectionFactory = new ConnectionFactory()

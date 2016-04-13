@@ -12,6 +12,7 @@ import org.scalatest.Matchers._
 import org.scalatest.concurrent.ScalaFutures
 
 import scala.concurrent.duration._
+import itv.contentdelivery.testutilities.SameThreadExecutionContext.implicitly
 
 
 class PublisherTest extends FunSuite with ScalaFutures {
@@ -20,7 +21,7 @@ class PublisherTest extends FunSuite with ScalaFutures {
     val channel = new StubChannel()
     val client = createClient(channel)
 
-    Lifecycle.using(client.rawPublisher(timeout = Duration.Inf)) { publish =>
+    Lifecycle.using(client.publisher(timeout = Duration.Inf)) { publish =>
 
       channel.transmittedCommands should have size 1
       channel.transmittedCommands.last shouldBe an[AMQP.Confirm.Select]
@@ -43,7 +44,7 @@ class PublisherTest extends FunSuite with ScalaFutures {
     val channel = new StubChannel()
     val client = createClient(channel)
 
-    Lifecycle.using(client.rawPublisher(timeout = Duration.Inf)) { publish =>
+    Lifecycle.using(client.publisher(timeout = Duration.Inf)) { publish =>
 
       val result = publish(anyPublishCommand())
 
@@ -60,7 +61,7 @@ class PublisherTest extends FunSuite with ScalaFutures {
     val channel = new StubChannel()
     val client = createClient(channel)
 
-    Lifecycle.using(client.rawPublisher(timeout = Duration.Inf)) { publish =>
+    Lifecycle.using(client.publisher(timeout = Duration.Inf)) { publish =>
 
       val pub1 = publish(anyPublishCommand())
       val pub2 = publish(anyPublishCommand())
@@ -88,7 +89,7 @@ class PublisherTest extends FunSuite with ScalaFutures {
     val channel = new StubChannel()
     val client = createClient(channel)
 
-    Lifecycle.using(client.rawPublisher(timeout = Duration.Inf)) { publish =>
+    Lifecycle.using(client.publisher(timeout = Duration.Inf)) { publish =>
 
       val pub1 = publish(anyPublishCommand())
       val pub2 = publish(anyPublishCommand())
@@ -121,7 +122,7 @@ class PublisherTest extends FunSuite with ScalaFutures {
     }
     val client = createClient(channel)
 
-    Lifecycle.using(client.rawPublisher(Duration.Inf)) { publish =>
+    Lifecycle.using(client.publisher(Duration.Inf)) { publish =>
 
       channel.transmittedCommands should have size 1
       channel.transmittedCommands.last shouldBe an[AMQP.Confirm.Select]
@@ -138,7 +139,7 @@ class PublisherTest extends FunSuite with ScalaFutures {
     val channel = new StubChannel()
     val client = createClient(channel)
 
-    Lifecycle.using(client.rawPublisher(timeout = 10.millis)) { publish =>
+    Lifecycle.using(client.publisher(timeout = 10.millis)) { publish =>
 
       val result = publish(anyPublishCommand())
 
@@ -146,7 +147,7 @@ class PublisherTest extends FunSuite with ScalaFutures {
     }
   }
 
-  private def createClient(channel: StubChannel): AmqpClient = {
-    new AmqpClient(NoOpLifecycle(channel), ConsumerTag("consumer-tag"))
+  private def createClient(channel: StubChannel): RawAmqpClient = {
+    new RawAmqpClient(NoOpLifecycle(channel), ConsumerTag("consumer-tag"))
   }
 }

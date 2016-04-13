@@ -1,17 +1,16 @@
 package itv.bucky
 
-import itv.utils.Blob
 
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.Future
 
-class StubHandler extends Handler[Blob] {
+class StubHandler[T] extends Handler[T] {
 
-  val receivedMessages = ListBuffer[Blob]()
+  val receivedMessages = ListBuffer[T]()
 
   var nextResponse: Future[ConsumeAction] = Future.successful(Ack)
 
-  override def apply(blob: Blob): Future[ConsumeAction] = {
+  override def apply(blob: T): Future[ConsumeAction] = {
     receivedMessages += blob
     nextResponse
   }

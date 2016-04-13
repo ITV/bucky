@@ -9,28 +9,51 @@ import org.scalatest.concurrent.ScalaFutures
 
 class ConsumerIntegrationTest extends FunSuite with ScalaFutures {
 
-  val testQueueName = "bucky-consumer-test"
-  lazy val (testQueue, amqpClientConfig, rmqAdminHhttp) = IntegrationUtils.setUp(testQueueName)
+  lazy val (Seq(consumerQueue, rawConsumerQueue), amqpClientConfig, rmqAdminHhttp) = IntegrationUtils.setUp("bucky-consumer-test", "bucky-consumer-raw-test")
 
-  ignore("Can consume messages from a (pre-existing) queue") {
-    testQueue.head.purge()
 
-    val handler = new StubHandler()
+  case class Message(value: String)
+  implicit val messageDeserializer = new BlobDeserializer[Message] {
+    override def apply(blob: Blob): DeserializerResult[Message] = DeserializerResult.Success(Message(blob.to[String]))
+  }
+  test("Can consume messages from a (pre-existing) queue") {
+    consumerQueue.purge()
+
+    val handler = new StubHandler[Message]()
     for {
       amqpClient <- amqpClientConfig
-      consumer <- amqpClient.consumer(testQueueName, handler)
+      consumer <- amqpClient.consumer(consumerQueue.name, AmqpClient.handlerOf(handler))
     } {
       handler.receivedMessages shouldBe 'empty
 
       val msg = Blob from "Hello World!"
-      testQueue.head.publish(msg)
+      consumerQueue.publish(msg)
+
+      eventually {
+        handler.receivedMessages should have size 1
+
+        handler.receivedMessages.head shouldBe Message("Hello World!")
+      }
+    }
+  }
+
+  test("Can consume messages from a (pre-existing) queue with the raw consumer") {
+    rawConsumerQueue.purge()
+
+    val handler = new StubHandler[Blob]()
+    for {
+      amqpClient <- amqpClientConfig
+      consumer <- amqpClient.consumer(rawConsumerQueue.name, handler)
+    } {
+      handler.receivedMessages shouldBe 'empty
+
+      val msg = Blob from "Hello World!"
+      rawConsumerQueue.publish(msg)
 
       eventually {
         handler.receivedMessages should have size 1
         handler.receivedMessages.head shouldBe msg
       }
     }
-
   }
-
 }

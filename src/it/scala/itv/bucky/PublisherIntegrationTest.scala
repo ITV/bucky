@@ -10,6 +10,7 @@ import org.scalatest.Matchers._
 import org.scalatest.concurrent.ScalaFutures
 
 import scala.concurrent.duration._
+import itv.contentdelivery.testutilities.SameThreadExecutionContext.implicitly
 
 class PublisherIntegrationTest extends FunSuite with ScalaFutures {
 
@@ -18,12 +19,12 @@ class PublisherIntegrationTest extends FunSuite with ScalaFutures {
   val exchange = Exchange("")
   lazy val (testQueue, amqpClientConfig, rmqAdminHhttp) = IntegrationUtils.setUp(testQueueName)
 
-  ignore("Can publish messages to a (pre-existing) queue") {
+  test("Can publish messages to a (pre-existing) queue") {
     testQueue.head.purge()
 
     for {
       amqpClient <- amqpClientConfig
-      publish <- amqpClient.rawPublisher()
+      publish <- amqpClient.publisher()
     } {
       val body = Blob.from("Hello World!")
       publish(PublishCommand(Exchange(""), routingKey, MessageProperties.MINIMAL_PERSISTENT_BASIC, body)).asTry.futureValue shouldBe 'success
@@ -33,12 +34,12 @@ class PublisherIntegrationTest extends FunSuite with ScalaFutures {
 
   }
 
-  ignore("Publisher can recover from connection failure") {
+  test("Publisher can recover from connection failure") {
     testQueue.head.purge()
 
     for {
       amqpClient <- amqpClientConfig.copy(networkRecoveryInterval = Some(500.millis))
-      publish <- amqpClient.rawPublisher()
+      publish <- amqpClient.publisher()
     } {
       // Publish before failure
       publish(PublishCommand(exchange, routingKey, MessageProperties.MINIMAL_PERSISTENT_BASIC, Blob.from("Before"))).asTry.futureValue shouldBe 'success
