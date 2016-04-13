@@ -19,7 +19,7 @@ class PublisherIntegrationTest extends FunSuite with ScalaFutures {
   val exchange = Exchange("")
   lazy val (testQueue, amqpClientConfig, rmqAdminHhttp) = IntegrationUtils.setUp(testQueueName)
 
-  test("Can publish messages to a (pre-existing) queue") {
+  ignore("Can publish messages to a (pre-existing) queue") {
     testQueue.head.purge()
 
     for {
@@ -34,7 +34,7 @@ class PublisherIntegrationTest extends FunSuite with ScalaFutures {
 
   }
 
-  test("Publisher can recover from connection failure") {
+  ignore("Publisher can recover from connection failure") {
     testQueue.head.purge()
 
     for {
