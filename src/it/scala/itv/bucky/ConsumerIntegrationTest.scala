@@ -40,7 +40,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures {
   ignore("Can consume messages from a (pre-existing) queue with the raw consumer") {
     rawConsumerQueue.purge()
 
-    val handler = new StubHandler[Blob]()
+    val handler = new StubHandler[Delivery]()
     for {
       amqpClient <- amqpClientConfig
       consumer <- amqpClient.consumer(rawConsumerQueue.name, handler)

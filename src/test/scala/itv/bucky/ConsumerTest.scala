@@ -15,7 +15,7 @@ class ConsumerTest extends FunSuite {
     val channel = new StubChannel()
     val client = createClient(channel)
 
-    val handler = new StubHandler[Blob]()
+    val handler = new StubHandler[Delivery]()
 
     Lifecycle.using(client.consumer("blah", handler)) { _ =>
       channel.consumers should have size 1
@@ -43,7 +43,7 @@ class ConsumerTest extends FunSuite {
     val channel = new StubChannel()
     val client = createClient(channel)
 
-    val handler = new StubHandler[Blob]()
+    val handler = new StubHandler[Delivery]()
 
     Lifecycle.using(client.consumer("blah", handler, exceptionalAction = DeadLetter)) { _ =>
       channel.consumers should have size 1

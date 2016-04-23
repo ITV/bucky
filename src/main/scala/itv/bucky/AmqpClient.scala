@@ -13,51 +13,29 @@ import scala.collection.convert.wrapAsScala.collectionAsScalaIterable
 import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
-case class PublishCommand(exchange: Exchange, routingKey: RoutingKey, basicProperties: BasicProperties, body: Blob) {
-  def description = s"${exchange.value}:${routingKey.value} $body"
-}
-
-case class RoutingKey(value: String)
-
-case class Exchange(value: String)
-
-sealed trait ConsumeAction
-
-case object Ack extends ConsumeAction
-
-case object DeadLetter extends ConsumeAction
-
-case object RequeueImmediately extends ConsumeAction
-
-case class ConsumerTag(value: String)
-
-object ConsumerTag {
-  val pidAndHost: ConsumerTag = ConsumerTag(ManagementFactory.getRuntimeMXBean.getName)
-}
-
 trait AmqpClient {
   def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS))(implicit executionContext: ExecutionContext): Lifecycle[Publisher[PublishCommand]]
 
-  def consumer(queueName: String, handler: Handler[Blob], exceptionalAction: ConsumeAction = DeadLetter)(implicit executionContext: ExecutionContext): Lifecycle[Unit]
+  def consumer(queueName: String, handler: Handler[Delivery], exceptionalAction: ConsumeAction = DeadLetter)(implicit executionContext: ExecutionContext): Lifecycle[Unit]
 }
 
 
 class RawAmqpClient(channelFactory: Lifecycle[Channel], consumerTag: ConsumerTag = ConsumerTag.pidAndHost) extends AmqpClient with StrictLogging {
 
-  def consumer(queueName: String, handler: Handler[Blob], exceptionalAction: ConsumeAction = DeadLetter)(implicit executionContext: ExecutionContext): Lifecycle[Unit] =
+  def consumer(queueName: String, handler: Handler[Delivery], exceptionalAction: ConsumeAction = DeadLetter)(implicit executionContext: ExecutionContext): Lifecycle[Unit] =
     for {
       channel <- channelFactory
     } yield {
       channel.basicConsume(queueName, false, consumerTag.value, new DefaultConsumer(channel) {
         override def handleDelivery(consumerTag: String, envelope: Envelope, properties: BasicProperties, body: Array[Byte]): Unit = {
-          val bodyBlob = Blob(body)
-          logger.debug("Received delivery with tag {}L on {}: {}", box(envelope.getDeliveryTag), queueName, bodyBlob)
-          handler(bodyBlob).recover {
+          val delivery = Delivery(Blob(body), ConsumerTag(consumerTag), envelope, properties)
+          logger.debug("Received {} on {}", delivery, queueName)
+          handler(delivery).recover {
             case error =>
               logger.error(s"Unhandled exception processing delivery ${envelope.getDeliveryTag}L on $queueName", error)
               exceptionalAction
           }.map { action =>
-            logger.debug("Responding with {} to delivery {}L on {}", action, box(envelope.getDeliveryTag), queueName)
+            logger.debug("Responding with {} to {} on {}", action, delivery, queueName)
             action match {
               case Ack => getChannel.basicAck(envelope.getDeliveryTag, false)
               case DeadLetter => getChannel.basicNack(envelope.getDeliveryTag, false, false)
@@ -137,15 +115,15 @@ object AmqpClient extends StrictLogging {
     } yield ()
 
 
-  def handlerOf[T](handler: Handler[T], deserializationFailureAction: ConsumeAction = DeadLetter)(implicit ec: ExecutionContext, deserializer: BlobDeserializer[T]): Handler[Blob] =
-    new Handler[Blob] {
-      override def apply(blob: Blob): Future[ConsumeAction] = Future(deserializer(blob)).flatMap {
+  def handlerOf[T](handler: Handler[T], deserializationFailureAction: ConsumeAction = DeadLetter)(implicit ec: ExecutionContext, deserializer: BlobDeserializer[T]): Handler[Delivery] =
+    new Handler[Delivery] {
+      override def apply(delivery: Delivery): Future[ConsumeAction] = Future(deserializer(delivery.body)).flatMap {
         case DeserializerResult.Success(message) => handler(message)
         case DeserializerResult.Failure(reason) =>
-          logger.error("Cannot deserialize: {} because: \"{}\" (will {})", blob, reason, deserializationFailureAction)
+          logger.error("Cannot deserialize: {} because: \"{}\" (will {})", delivery.body, reason, deserializationFailureAction)
           Future.successful(deserializationFailureAction)
       }.recoverWith { case error: Throwable =>
-        logger.error("Cannot deserialize: {} because: \"{}\" (will {})", blob, error.getMessage, deserializationFailureAction, error)
+        logger.error("Cannot deserialize: {} because: \"{}\" (will {})", delivery.body, error.getMessage, deserializationFailureAction, error)
         Future.successful(deserializationFailureAction)
       }
     }

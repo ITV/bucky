@@ -2,7 +2,9 @@ package itv.bucky
 
 import java.util.UUID
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicLong
 
+import com.rabbitmq.client.{MessageProperties, Envelope}
 import com.typesafe.scalalogging.StrictLogging
 import itv.contentdelivery.lifecycle.{Lifecycle, NoOpLifecycle}
 import itv.utils.Blob
@@ -46,14 +48,15 @@ class RabbitSimulator(exchange: ExchangeSimulator = IdentityExchange)(implicit e
 
   case class Publication(queueName: QueueName, message: Blob, consumeActionValue: Future[ConsumeAction])
 
-  private val consumers = new scala.collection.mutable.HashMap[QueueName, Handler[Blob]]()
+  private val consumers = new scala.collection.mutable.HashMap[QueueName, Handler[Delivery]]()
   private val messagesBeingProcessed: TrieMap[UUID, Publication] = TrieMap.empty
+  private val deliveryTag = new AtomicLong()
 
-  def consumer(queueName: String, handler: Handler[Blob], exceptionalAction: ConsumeAction = DeadLetter)(implicit executionContext: ExecutionContext): Lifecycle[Unit] = NoOpLifecycle {
-    val monitorHandler: Handler[Blob] = message => {
+  def consumer(queueName: String, handler: Handler[Delivery], exceptionalAction: ConsumeAction = DeadLetter)(implicit executionContext: ExecutionContext): Lifecycle[Unit] = NoOpLifecycle {
+    val monitorHandler: Handler[Delivery] = delivery => {
       val key = UUID.randomUUID()
-      val consumeActionValue = handler(message)
-      messagesBeingProcessed += key -> Publication(QueueName(queueName), message, consumeActionValue)
+      val consumeActionValue = handler(delivery)
+      messagesBeingProcessed += key -> Publication(QueueName(queueName), delivery.body, consumeActionValue)
       consumeActionValue.onComplete { _ =>
         val publication = messagesBeingProcessed(key)
         messagesBeingProcessed -= key
@@ -76,7 +79,7 @@ class RabbitSimulator(exchange: ExchangeSimulator = IdentityExchange)(implicit e
     if (exchange.isDefinedAt(routingKey)) {
       val queueName = exchange(routingKey)
       consumers.get(queueName).fold(Future.failed[ConsumeAction](new RuntimeException(s"No consumers found for $queueName!"))) { handler =>
-        handler(message)
+        handler(Delivery(message, ConsumerTag("ctag"), new Envelope(deliveryTag.getAndIncrement(), false, "", routingKey.value), MessageProperties.PERSISTENT_BASIC))
       }
     } else
       Future.failed(new RuntimeException("No queue defined for" + routingKey))
@@ -84,8 +87,8 @@ class RabbitSimulator(exchange: ExchangeSimulator = IdentityExchange)(implicit e
 
   def watchQueue(queueName: String)(implicit executionContext: ExecutionContext): ListBuffer[Blob] = {
     val messages = new ListBuffer[Blob]()
-    this.consumer(queueName, { message =>
-      messages += message
+    this.consumer(queueName, { delivery =>
+      messages += delivery.body
       Future.successful(Ack)
     })
     messages

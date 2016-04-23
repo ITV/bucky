@@ -1,13 +1,33 @@
 package itv
 
+import java.lang.management.ManagementFactory
+
+import com.rabbitmq.client.Envelope
 import itv.utils.Blob
+import com.rabbitmq.client.AMQP.BasicProperties
 
 import scala.concurrent.Future
 
 package object bucky {
 
-  sealed trait DeserializerResult[T]
+  case class PublishCommand(exchange: Exchange, routingKey: RoutingKey, basicProperties: BasicProperties, body: Blob) {
+    def description = s"${exchange.value}:${routingKey.value} $body"
+  }
 
+  case class RoutingKey(value: String)
+  case class Exchange(value: String)
+
+  sealed trait ConsumeAction
+  case object Ack extends ConsumeAction
+  case object DeadLetter extends ConsumeAction
+  case object RequeueImmediately extends ConsumeAction
+
+  case class ConsumerTag(value: String)
+  object ConsumerTag {
+    val pidAndHost: ConsumerTag = ConsumerTag(ManagementFactory.getRuntimeMXBean.getName)
+  }
+
+  sealed trait DeserializerResult[T]
   object DeserializerResult {
 
     case class Success[T](value: T) extends DeserializerResult[T]
@@ -29,8 +49,9 @@ package object bucky {
     def toPublishCommand(t: T): PublishCommand
   }
 
-  type Publisher[-T] = T => Future[Unit]
+  case class Delivery(body: Blob, consumerTag: ConsumerTag, envelope: Envelope, properties: BasicProperties)
 
+  type Publisher[-T] = T => Future[Unit]
   type Handler[-T] = T => Future[ConsumeAction]
 
 }
