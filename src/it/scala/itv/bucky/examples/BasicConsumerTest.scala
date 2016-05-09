@@ -14,7 +14,7 @@ import scala.collection.mutable.ListBuffer
 
 class BasicConsumerTest extends FunSuite with ScalaFutures {
 
-  test("it should requeue a message") {
+  ignore("it should requeue a message") {
     Lifecycle.using(testLifecycle) { app =>
       app.publisher(MyMessage("Hello")).futureValue
 
@@ -25,7 +25,7 @@ class BasicConsumerTest extends FunSuite with ScalaFutures {
     }
   }
 
-  test("it should ack a message") {
+  ignore("it should ack a message") {
     Lifecycle.using(testLifecycle) { app =>
       app.publisher(MyMessage("Foo")).futureValue
 
@@ -46,11 +46,11 @@ class BasicConsumerTest extends FunSuite with ScalaFutures {
       message => Blob.from(message.foo)
     }
     import itv.bucky.BlobSerializer._
-    implicit val foo = blobSerializer[MyMessage] using RoutingKey("bucky-basicconsumer-example") using Exchange("")
+    implicit val myMessageSerializer = blobSerializer[MyMessage] using RoutingKey("bucky-basicconsumer-example") using Exchange("")
 
     import AmqpClient._
     for {
-      publisher <- amqpClient.publisher().map(publisherOf[MyMessage])
+      publisher <- amqpClient.publisher().map(publisherOf[MyMessage](myMessageSerializer))
       _ <- new BasicConsumerLifecycle {
         protected override def buildAmqpClient(amqpClientConfig: AmqpClientConfig): Lifecycle[AmqpClient] = {
           NoOpLifecycle(amqpClient)

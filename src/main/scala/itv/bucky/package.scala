@@ -6,7 +6,7 @@ import com.rabbitmq.client.Envelope
 import itv.utils.Blob
 import com.rabbitmq.client.AMQP.BasicProperties
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 package object bucky {
 
@@ -21,6 +21,7 @@ package object bucky {
   case object Ack extends ConsumeAction
   case object DeadLetter extends ConsumeAction
   case object RequeueImmediately extends ConsumeAction
+  case object Requeue extends ConsumeAction
 
   case class ConsumerTag(value: String)
   object ConsumerTag {
@@ -55,4 +56,14 @@ package object bucky {
   type Handler[-T] = T => Future[ConsumeAction]
 
   type Bindings = PartialFunction[RoutingKey, QueueName]
+
+
+  case class RequeueHandler[T](requeuePublisher: Publisher[T])(handler: Handler[T])
+                              (implicit executionContext: ExecutionContext) extends Handler[T] {
+    override def apply(message: T): Future[ConsumeAction] = handler(message).flatMap {
+      case Requeue => requeuePublisher(message).map(_ => Requeue)
+      case result => Future.successful(result)
+    }
+  }
+
 }

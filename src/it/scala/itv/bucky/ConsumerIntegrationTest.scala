@@ -21,7 +21,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures {
     override def apply(blob: Blob): DeserializerResult[Message] = DeserializerResult.Success(Message(blob.to[String]))
   }
   
-  ignore("Can consume messages from a (pre-existing) queue") {
+  test("Can consume messages from a (pre-existing) queue") {
     consumerQueue.purge()
 
     val handler = new StubHandler[Message]()
@@ -42,7 +42,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures {
     }
   }
 
-  ignore("Can consume messages from a (pre-existing) queue with the raw consumer") {
+  test("Can consume messages from a (pre-existing) queue with the raw consumer") {
     rawConsumerQueue.purge()
 
     val handler = new StubHandler[Delivery]()
@@ -64,7 +64,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures {
     }
   }
 
-  ignore("Message headers are exposed to (raw) consumers") {
+  test("Message headers are exposed to (raw) consumers") {
     headersQueue.purge()
 
     val handler = new StubHandler[Delivery]()

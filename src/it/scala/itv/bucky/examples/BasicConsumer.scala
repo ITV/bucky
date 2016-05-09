@@ -54,7 +54,7 @@ object BasicConsumer extends App {
         message => Blob.from(message.foo)
       }
 
-      implicit val foo = blobSerializer[MyMessage] using RoutingKey(queueName + ".requeue") using Exchange("")
+      val myMessageSerializer = blobSerializer[MyMessage] using RoutingKey(queueName + ".requeue") using Exchange("")
 
 
       lazy val (testQueues, amqpClientConfig, rmqAdminHhttp) = IntegrationUtils.setUp(queueName, queueName + ".requeue")
@@ -64,7 +64,7 @@ object BasicConsumer extends App {
         import AmqpClient._
         for {
           amqClient <- buildAmqpClient(amqpClientConfig)
-          publisher <- amqClient.publisher().map(publisherOf[MyMessage])
+          publisher <- amqClient.publisher().map(publisherOf[MyMessage](myMessageSerializer))
           blah <- amqClient.consumer(queueName, handlerOf[MyMessage](PrintlnHandler(publisher)))
         } yield {
           println("Started the consumer")

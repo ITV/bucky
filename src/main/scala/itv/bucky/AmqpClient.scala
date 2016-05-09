@@ -6,7 +6,7 @@ import com.rabbitmq.client.AMQP.BasicProperties
 import com.rabbitmq.client._
 import com.typesafe.scalalogging.StrictLogging
 import itv.contentdelivery.lifecycle.{ExecutorLifecycles, Lifecycle, NoOpLifecycle}
-import itv.utils.Blob
+import itv.utils.{Blob, BlobMarshaller}
 
 import scala.collection.convert.wrapAsScala.collectionAsScalaIterable
 import scala.concurrent.duration.{Duration, FiniteDuration}
@@ -40,6 +40,7 @@ class RawAmqpClient(channelFactory: Lifecycle[Channel], consumerTag: ConsumerTag
             logger.debug("Responding with {} to {} on {}", action, delivery, queueName)
             action match {
               case Ack => getChannel.basicAck(envelope.getDeliveryTag, false)
+              case Requeue => getChannel.basicAck(envelope.getDeliveryTag, false)
               case DeadLetter => getChannel.basicNack(envelope.getDeliveryTag, false, false)
               case RequeueImmediately => getChannel.basicNack(envelope.getDeliveryTag, false, true)
             }
@@ -108,7 +109,18 @@ class RawAmqpClient(channelFactory: Lifecycle[Channel], consumerTag: ConsumerTag
 
 
 object AmqpClient extends StrictLogging {
-  def publisherOf[T](publisher: Publisher[PublishCommand])(implicit executionContext: ExecutionContext, serializer: PublishCommandSerializer[T]): Publisher[T] = (message: T) =>
+
+  import BlobSerializer._
+
+  def requeueOf[T](amqpClient: AmqpClient)(queueName: QueueName)(handler: Handler[T])(implicit ec: ExecutionContext, blobDeserializer: BlobDeserializer[T], blobMarshaller: BlobMarshaller[T]): Lifecycle[Unit] = {
+    val requeueSerializer = blobSerializer[T] using RoutingKey(queueName.value + ".requeue") using Exchange("")
+    for {
+      requeuePublish <- amqpClient.publisher().map(publisherOf[T](requeueSerializer))
+      consumer <- amqpClient.consumer(queueName.value, handlerOf[T](RequeueHandler(requeuePublish)(handler)))
+    } yield consumer
+  }
+
+  def publisherOf[T](serializer: PublishCommandSerializer[T])(publisher: Publisher[PublishCommand])(implicit executionContext: ExecutionContext): Publisher[T] = (message: T) =>
     for {
       publishCommand <- Future {
         serializer.toPublishCommand(message)
