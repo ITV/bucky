@@ -54,4 +54,5 @@ package object bucky {
   type Publisher[-T] = T => Future[Unit]
   type Handler[-T] = T => Future[ConsumeAction]
 
+  type Bindings = PartialFunction[RoutingKey, QueueName]
 }

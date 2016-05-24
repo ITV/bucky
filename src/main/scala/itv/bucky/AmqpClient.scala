@@ -1,6 +1,5 @@
 package itv.bucky
 
-import java.lang.management.ManagementFactory
 import java.util.concurrent.TimeUnit
 
 import com.rabbitmq.client.AMQP.BasicProperties
@@ -12,9 +11,10 @@ import itv.utils.Blob
 import scala.collection.convert.wrapAsScala.collectionAsScalaIterable
 import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.util.{Success, Failure}
 
 trait AmqpClient {
-  def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS))(implicit executionContext: ExecutionContext): Lifecycle[Publisher[PublishCommand]]
+  def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): Lifecycle[Publisher[PublishCommand]]
 
   def consumer(queueName: String, handler: Handler[Delivery], exceptionalAction: ConsumeAction = DeadLetter)(implicit executionContext: ExecutionContext): Lifecycle[Unit]
 }
@@ -22,7 +22,7 @@ trait AmqpClient {
 
 class RawAmqpClient(channelFactory: Lifecycle[Channel], consumerTag: ConsumerTag = ConsumerTag.pidAndHost) extends AmqpClient with StrictLogging {
 
-  def consumer(queueName: String, handler: Handler[Delivery], exceptionalAction: ConsumeAction = DeadLetter)(implicit executionContext: ExecutionContext): Lifecycle[Unit] =
+  def consumer(queueName: String, handler: Handler[Delivery], actionOnFailure: ConsumeAction = DeadLetter)(implicit executionContext: ExecutionContext): Lifecycle[Unit] =
     for {
       channel <- channelFactory
     } yield {
@@ -30,11 +30,13 @@ class RawAmqpClient(channelFactory: Lifecycle[Channel], consumerTag: ConsumerTag
         override def handleDelivery(consumerTag: String, envelope: Envelope, properties: BasicProperties, body: Array[Byte]): Unit = {
           val delivery = Delivery(Blob(body), ConsumerTag(consumerTag), envelope, properties)
           logger.debug("Received {} on {}", delivery, queueName)
-          handler(delivery).recover {
-            case error =>
-              logger.error(s"Unhandled exception processing delivery ${envelope.getDeliveryTag}L on $queueName", error)
-              exceptionalAction
-          }.map { action =>
+          handler(delivery).onComplete { result =>
+            val action = result match {
+              case Success(outcome) => outcome
+              case Failure(error) =>
+                logger.error(s"Unhandled exception processing delivery ${envelope.getDeliveryTag}L on $queueName", error)
+                actionOnFailure
+            }
             logger.debug("Responding with {} to {} on {}", action, delivery, queueName)
             action match {
               case Ack => getChannel.basicAck(envelope.getDeliveryTag, false)
@@ -46,7 +48,7 @@ class RawAmqpClient(channelFactory: Lifecycle[Channel], consumerTag: ConsumerTag
       })
     }
 
-  def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS))(implicit executionContext: ExecutionContext): Lifecycle[Publisher[PublishCommand]] =
+  def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): Lifecycle[Publisher[PublishCommand]] =
     for {
       channel <- channelFactory
       publisherWrapper <- publisherWrapperLifecycle(timeout)

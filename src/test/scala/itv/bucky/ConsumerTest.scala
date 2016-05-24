@@ -45,7 +45,7 @@ class ConsumerTest extends FunSuite {
 
     val handler = new StubHandler[Delivery]()
 
-    Lifecycle.using(client.consumer("blah", handler, exceptionalAction = DeadLetter)) { _ =>
+    Lifecycle.using(client.consumer("blah", handler, actionOnFailure = DeadLetter)) { _ =>
       channel.consumers should have size 1
       val msg = Blob.from("Hello World!")
 

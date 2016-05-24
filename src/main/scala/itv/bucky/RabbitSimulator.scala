@@ -16,35 +16,21 @@ import scala.concurrent.duration.{Duration, FiniteDuration}
 
 case class QueueName(value: String)
 
-object ExchangeSimulator {
+case object IdentityBindings extends Bindings {
+  def apply(routingQueue: RoutingKey): QueueName = QueueName(routingQueue.value)
 
-  type ExchangeSimulator = PartialFunction[RoutingKey, QueueName]
-
-
-  case object IdentityExchange extends ExchangeSimulator {
-    def apply(routingQueue: RoutingKey): QueueName = QueueName(routingQueue.value)
-
-    override def isDefinedAt(key: RoutingKey): Boolean = true
-  }
-
-  case class MapExchange(mappings: (RoutingKey, QueueName)*) extends ExchangeSimulator {
-    def apply(routingQueue: RoutingKey): QueueName = mappings.toMap.apply(routingQueue)
-
-    override def isDefinedAt(key: RoutingKey): Boolean = mappings.toMap.isDefinedAt(key)
-  }
-
+  override def isDefinedAt(key: RoutingKey): Boolean = true
 }
-
-import ExchangeSimulator._
 
 /**
   * Provides an AmqpClient implementation that simulates RabbitMQ server with one main difference:
   * Messages are sent directly to the consumer when published, there is no intermediate queue.
   * This makes it easy for tests to publish a message and see the corresponding ConsumeAction, e.g. Ack, Nack or Requeue.
   * Tests can use `RabbitSimulator.watchQueue` to see what messages get published to a queue that the application doesn't consume from.
-  * @param exchange A mapping from routing key to queue name, defaults to identity.
+  *
+  * @param bindings A mapping from routing key to queue name, defaults to identity.
   */
-class RabbitSimulator(exchange: ExchangeSimulator = IdentityExchange)(implicit executionContext: ExecutionContext) extends AmqpClient with StrictLogging {
+class RabbitSimulator(bindings: Bindings = IdentityBindings)(implicit executionContext: ExecutionContext) extends AmqpClient with StrictLogging {
 
   case class Publication(queueName: QueueName, message: Blob, consumeActionValue: Future[ConsumeAction])
 
@@ -67,7 +53,7 @@ class RabbitSimulator(exchange: ExchangeSimulator = IdentityExchange)(implicit e
     consumers += (QueueName(queueName) -> monitorHandler)
   }
 
-  def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS))(implicit executionContext: ExecutionContext): Lifecycle[Publisher[PublishCommand]] =
+  def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): Lifecycle[Publisher[PublishCommand]] =
     NoOpLifecycle[Publisher[PublishCommand]] {
       (command: PublishCommand) => {
         publish(command.body)(command.routingKey).map(_ => ())
@@ -76,8 +62,8 @@ class RabbitSimulator(exchange: ExchangeSimulator = IdentityExchange)(implicit e
 
   def publish(message: Blob)(routingKey: RoutingKey): Future[ConsumeAction] = {
     logger.debug(s"Publish message [${message.to[String]}] with $routingKey")
-    if (exchange.isDefinedAt(routingKey)) {
-      val queueName = exchange(routingKey)
+    if (bindings.isDefinedAt(routingKey)) {
+      val queueName = bindings(routingKey)
       consumers.get(queueName).fold(Future.failed[ConsumeAction](new RuntimeException(s"No consumers found for $queueName!"))) { handler =>
         handler(Delivery(message, ConsumerTag("ctag"), new Envelope(deliveryTag.getAndIncrement(), false, "", routingKey.value), MessageProperties.PERSISTENT_BASIC))
       }
@@ -85,7 +71,7 @@ class RabbitSimulator(exchange: ExchangeSimulator = IdentityExchange)(implicit e
       Future.failed(new RuntimeException("No queue defined for" + routingKey))
   }
 
-  def watchQueue(queueName: String)(implicit executionContext: ExecutionContext): ListBuffer[Blob] = {
+  def watchQueue(queueName: String): ListBuffer[Blob] = {
     val messages = new ListBuffer[Blob]()
     this.consumer(queueName, { delivery =>
       messages += delivery.body

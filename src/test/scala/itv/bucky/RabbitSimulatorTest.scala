@@ -1,6 +1,5 @@
 package itv.bucky
 
-import itv.bucky.ExchangeSimulator.{IdentityExchange, MapExchange}
 import itv.utils.Blob
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
@@ -33,7 +32,7 @@ class RabbitSimulatorTest extends FunSuite with ScalaFutures {
   }
 
   test("Can publish and consume via simulator with a defined MapExchange or else use the Identity Exchange") {
-    val rabbit = new RabbitSimulator(MapExchange(RoutingKey("a")->QueueName("b")) orElse IdentityExchange)
+    val rabbit = new RabbitSimulator(Map(RoutingKey("a") -> QueueName("b")) orElse IdentityBindings)
 
     val aTobMessages = rabbit.watchQueue("b")
     aTobMessages shouldBe 'empty
