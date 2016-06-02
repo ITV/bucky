@@ -57,7 +57,7 @@ object IntegrationUtils {
     rmqAdminHttp.handle(PUT(UriBuilder / "api" / "queues" / "/" / name).body("application/json", Blob.from(
       s"""{"auto_delete": "true", "durable": "true", "arguments": {"x-dead-letter-exchange": "$name.dlx", "x-expires": 60000}}"""))) shouldBe 'successful
     rmqAdminHttp.handle(PUT(UriBuilder / "api" / "queues" / "/" / s"$name.requeue").body("application/json", Blob.from(
-      s"""{"auto_delete": "true", "durable": "true", "arguments": {"x-dead-letter-exchange": "$name.redeliver", "x-expires": 60000}}"""))) shouldBe 'successful
+      s"""{"auto_delete": "true", "durable": "true", "arguments": {"x-dead-letter-exchange": "$name.redeliver", "x-expires": 60000, "x-message-ttl": 1000}}"""))) shouldBe 'successful
     rmqAdminHttp.handle(PUT(UriBuilder / "api" / "queues" / "/" / s"$name.dlq").body("application/json", Blob.from(
       """{"auto_delete": "true", "durable": "true", "arguments": {"x-expires": 60000}}"""))) shouldBe 'successful
 

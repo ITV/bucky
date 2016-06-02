@@ -2,11 +2,13 @@ package itv
 
 import java.lang.management.ManagementFactory
 
-import com.rabbitmq.client.Envelope
+import com.rabbitmq.client.{MessageProperties, Envelope}
 import itv.utils.Blob
 import com.rabbitmq.client.AMQP.BasicProperties
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.collection.JavaConverters._
+import scala.util.Try
 
 package object bucky {
 
@@ -56,14 +58,5 @@ package object bucky {
   type Handler[-T] = T => Future[ConsumeAction]
 
   type Bindings = PartialFunction[RoutingKey, QueueName]
-
-
-  case class RequeueHandler[T](requeuePublisher: Publisher[T])(handler: Handler[T])
-                              (implicit executionContext: ExecutionContext) extends Handler[T] {
-    override def apply(message: T): Future[ConsumeAction] = handler(message).flatMap {
-      case Requeue => requeuePublisher(message).map(_ => Requeue)
-      case result => Future.successful(result)
-    }
-  }
 
 }
