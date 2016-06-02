@@ -82,7 +82,7 @@ class RawAmqpClient(channelFactory: Lifecycle[Channel], consumerTag: ConsumerTag
       publisherWrapper(cmd => channel.synchronized {
         val promise = Promise[Unit]()
         val deliveryTag = channel.getNextPublishSeqNo
-        logger.debug("Publishing with delivery tag {}L to {}:{} {}", box(deliveryTag), cmd.exchange, cmd.routingKey, cmd.body)
+        logger.debug("Publishing with delivery tag {}L to {}:{} with {}: {}", box(deliveryTag), cmd.exchange, cmd.routingKey, cmd.basicProperties, cmd.body)
         unconfirmedPublications.put(deliveryTag, promise)
         try {
           channel.basicPublish(cmd.exchange.value, cmd.routingKey.value, false, false, cmd.basicProperties, cmd.body.content)
@@ -113,7 +113,8 @@ object AmqpClient extends StrictLogging {
   import BlobSerializer._
 
   def requeueOf[T](amqpClient: AmqpClient)(queueName: QueueName)(handler: Handler[T])(implicit ec: ExecutionContext, blobDeserializer: BlobDeserializer[T], blobMarshaller: BlobMarshaller[T]): Lifecycle[Unit] = {
-    val requeueSerializer = blobSerializer[T] using RoutingKey(queueName.value + ".requeue") using Exchange("")
+    val requeueMessageProperties = MessageProperties.PERSISTENT_BASIC.builder().expiration("1000").build()
+    val requeueSerializer = blobSerializer[T] using RoutingKey(queueName.value) using Exchange(s"${queueName.value}.requeue") using requeueMessageProperties
     for {
       requeuePublish <- amqpClient.publisher().map(publisherOf[T](requeueSerializer))
       consumer <- amqpClient.consumer(queueName.value, handlerOf[T](RequeueHandler(requeuePublish)(handler)))
