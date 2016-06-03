@@ -6,23 +6,24 @@ import com.rabbitmq.client.AMQP.BasicProperties
 import com.rabbitmq.client._
 import com.typesafe.scalalogging.StrictLogging
 import itv.contentdelivery.lifecycle.{ExecutorLifecycles, Lifecycle, NoOpLifecycle}
-import itv.utils.{Blob, BlobMarshaller}
+import itv.utils.Blob
 
 import scala.collection.convert.wrapAsScala.collectionAsScalaIterable
 import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.concurrent.{ExecutionContext, Future, Promise}
-import scala.util.{Success, Failure}
+import scala.util.{Failure, Success}
 
 trait AmqpClient {
   def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): Lifecycle[Publisher[PublishCommand]]
 
-  def consumer(queueName: String, handler: Handler[Delivery], exceptionalAction: ConsumeAction = DeadLetter)(implicit executionContext: ExecutionContext): Lifecycle[Unit]
+  def consumer(queueName: String, handler: Handler[Delivery], exceptionalAction: ConsumeAction = DeadLetter)
+              (implicit executionContext: ExecutionContext): Lifecycle[Unit]
 }
-
 
 class RawAmqpClient(channelFactory: Lifecycle[Channel], consumerTag: ConsumerTag = ConsumerTag.pidAndHost) extends AmqpClient with StrictLogging {
 
-  def consumer(queueName: String, handler: Handler[Delivery], actionOnFailure: ConsumeAction = DeadLetter)(implicit executionContext: ExecutionContext): Lifecycle[Unit] =
+  def consumer(queueName: String, handler: Handler[Delivery], actionOnFailure: ConsumeAction = DeadLetter)
+              (implicit executionContext: ExecutionContext): Lifecycle[Unit] =
     for {
       channel <- channelFactory
     } yield {
@@ -102,20 +103,40 @@ class RawAmqpClient(channelFactory: Lifecycle[Channel], consumerTag: ConsumerTag
       ExecutorLifecycles.singleThreadScheduledExecutor.map(ec => new TimeoutPublisher(_, finiteTimeout)(ec))
     case infinite => NoOpLifecycle(identity)
   }
-
-
 }
 
 case class RequeuePolicy(maximumProcessAttempts: Int)
 
 object AmqpClient extends StrictLogging {
 
-  import BlobSerializer._
+  def publisherOf[T](serializer: PublishCommandSerializer[T])(publisher: Publisher[PublishCommand])
+                    (implicit executionContext: ExecutionContext): Publisher[T] = (message: T) =>
+    for {
+      publishCommand <- Future {
+        serializer.toPublishCommand(message)
+      }
+      _ <- publisher(publishCommand)
+    } yield ()
 
-  def requeueHandlerOf[T](amqpClient: AmqpClient)(queueName: QueueName, handler: RequeueHandler[T], requeuePolicy: RequeuePolicy, deserializationFailureAction: RequeueConsumeAction = Consume(DeadLetter))(implicit ec: ExecutionContext, deserializer: BlobDeserializer[T]): Lifecycle[Unit] =
+  def handlerOf[T](handler: RequeueHandler[T], deserializationFailureAction: RequeueConsumeAction)
+                  (implicit ec: ExecutionContext, deserializer: BlobDeserializer[T]): RequeueHandler[Delivery] =
+    new BlobDeserializationHandler[T, RequeueConsumeAction](handler, deserializationFailureAction)
+
+  def handlerOf[T](handler: Handler[T], deserializationFailureAction: ConsumeAction = DeadLetter)
+                  (implicit ec: ExecutionContext, deserializer: BlobDeserializer[T]): Handler[Delivery] =
+    new BlobDeserializationHandler[T, ConsumeAction](handler, deserializationFailureAction)
+
+  def requeueHandlerOf[T](amqpClient: AmqpClient)(queueName: QueueName,
+                                                  handler: RequeueHandler[T],
+                                                  requeuePolicy: RequeuePolicy,
+                                                  deserializationFailureAction: RequeueConsumeAction = Consume(DeadLetter))
+                                                  (implicit ec: ExecutionContext, deserializer: BlobDeserializer[T]): Lifecycle[Unit] =
     requeueOf(amqpClient)(queueName, handlerOf(handler, deserializationFailureAction), requeuePolicy)
 
-  def requeueOf(amqpClient: AmqpClient)(queueName: QueueName, handler: RequeueHandler[Delivery], requeuePolicy: RequeuePolicy)(implicit ec: ExecutionContext): Lifecycle[Unit] = {
+  def requeueOf(amqpClient: AmqpClient)(queueName: QueueName,
+                                        handler: RequeueHandler[Delivery],
+                                        requeuePolicy: RequeuePolicy)
+                                        (implicit ec: ExecutionContext): Lifecycle[Unit] = {
     //TODO: doesn't feel right to be calculating requeue exchange name here
     val requeueExchange = Exchange(s"${queueName.value}.requeue")
     for {
@@ -124,21 +145,8 @@ object AmqpClient extends StrictLogging {
     } yield consumer
   }
 
-  def publisherOf[T](serializer: PublishCommandSerializer[T])(publisher: Publisher[PublishCommand])(implicit executionContext: ExecutionContext): Publisher[T] = (message: T) =>
-    for {
-      publishCommand <- Future {
-        serializer.toPublishCommand(message)
-      }
-      _ <- publisher(publishCommand)
-    } yield ()
-
-  def handlerOf[T](handler: RequeueHandler[T], deserializationFailureAction: RequeueConsumeAction)(implicit ec: ExecutionContext, deserializer: BlobDeserializer[T]): RequeueHandler[Delivery] =
-    new BlobDeserializationHandler[T, RequeueConsumeAction](handler, deserializationFailureAction)
-
-  def handlerOf[T](handler: Handler[T], deserializationFailureAction: ConsumeAction = DeadLetter)(implicit ec: ExecutionContext, deserializer: BlobDeserializer[T]): Handler[Delivery] =
-    new BlobDeserializationHandler[T, ConsumeAction](handler, deserializationFailureAction)
-
-  class BlobDeserializationHandler[T, S](handler: T => Future[S], deserializationFailureAction: S)(implicit ec: ExecutionContext, deserializer: BlobDeserializer[T]) extends (Delivery => Future[S]) {
+  class BlobDeserializationHandler[T, S](handler: T => Future[S], deserializationFailureAction: S)
+                                        (implicit ec: ExecutionContext, deserializer: BlobDeserializer[T]) extends (Delivery => Future[S]) {
     override def apply(delivery: Delivery): Future[S] =
       Future(deserializer(delivery.body)).flatMap {
         case DeserializerResult.Success(message) => handler(message)
@@ -150,5 +158,4 @@ object AmqpClient extends StrictLogging {
         Future.successful(deserializationFailureAction)
       }
   }
-
 }

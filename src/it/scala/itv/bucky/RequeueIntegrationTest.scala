@@ -3,8 +3,6 @@ package itv.bucky
 import com.rabbitmq.client.{AMQP, MessageProperties}
 import itv.bucky.AmqpClient._
 import itv.contentdelivery.testutilities.SameThreadExecutionContext.implicitly
-import itv.contentdelivery.testutilities.rmq.{MessageQueue, BrokerConfig}
-import itv.httpyroraptor.AuthenticatedHttpClient
 import itv.utils.{Blob, BlobMarshaller}
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
@@ -15,13 +13,12 @@ import scala.collection.JavaConverters
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.Random
-import scalaz.Id
 import JavaConverters._
 
 class RequeueIntegrationTest extends FunSuite with ScalaFutures {
 
-  import BlobSerializer._
   import DeserializerResult._
+  private val published = ()
 
   implicit val messageDeserializer = new BlobDeserializer[String] {
     override def apply(blob: Blob): DeserializerResult[String] = blob.to[String].success
@@ -51,7 +48,8 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
       consumer <- requeueHandlerOf(amqpClient)(QueueName(testQueueName), AlwaysRequeue, requeuePolicy)
     } {
       val body = Blob.from("Hello World!")
-      publish(PublishCommand(Exchange(""), RoutingKey(testQueueName), MessageProperties.MINIMAL_PERSISTENT_BASIC, body)).futureValue shouldBe (())
+
+      publish(PublishCommand(Exchange(""), RoutingKey(testQueueName), MessageProperties.MINIMAL_PERSISTENT_BASIC, body)).futureValue shouldBe published
 
       eventually {
         testRequeue.allMessages.map(_.payload) shouldBe List(body)
@@ -66,7 +64,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
     val testQueueName = "bucky-requeue-consumer-ack" + Random.nextInt()
 
     val (amqpClientConfig: AmqpClientConfig, _, _) = IntegrationUtils.configAndHttp
-    val (_, testRequeue, _) = IntegrationUtils.declareQueue(testQueueName)
+    IntegrationUtils.declareQueue(testQueueName)
 
     for {
       amqpClient <- amqpClientConfig
@@ -78,7 +76,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
 
       val headers: java.util.Map[String, AnyRef] = Map[String, AnyRef]("foo" -> "bar").asJava
       val properties = MessageProperties.MINIMAL_PERSISTENT_BASIC.builder().headers(headers).build()
-      publish(PublishCommand(Exchange(""), RoutingKey(testQueueName), properties, Blob.from("Hello World!"))).futureValue shouldBe (())
+      publish(PublishCommand(Exchange(""), RoutingKey(testQueueName), properties, Blob.from("Hello World!"))).futureValue shouldBe published
 
       eventually {
         val headersOfReceived = stubHandler.receivedMessages.map(d => getHeader("foo", d.properties))
@@ -91,7 +89,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
     val testQueueName = "bucky-requeue-consumer-ack" + Random.nextInt()
 
     val (amqpClientConfig: AmqpClientConfig, _, _) = IntegrationUtils.configAndHttp
-    val (_, testRequeue, _) = IntegrationUtils.declareQueue(testQueueName)
+    IntegrationUtils.declareQueue(testQueueName)
 
     for {
       amqpClient <- amqpClientConfig
@@ -103,7 +101,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
 
       val expectedCorrelationId: String = "banana"
       val properties = MessageProperties.MINIMAL_PERSISTENT_BASIC.builder().correlationId(expectedCorrelationId).build()
-      publish(PublishCommand(Exchange(""), RoutingKey(testQueueName), properties, Blob.from("Hello World!"))).futureValue shouldBe (())
+      publish(PublishCommand(Exchange(""), RoutingKey(testQueueName), properties, Blob.from("Hello World!"))).futureValue shouldBe published
 
       eventually {
         stubHandler.receivedMessages.count(_.properties.getCorrelationId == expectedCorrelationId) should be > 1
@@ -124,7 +122,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
       consumer <- requeueHandlerOf(amqpClient)(QueueName(testQueueName), stubHandler, requeuePolicy)
     } {
       stubHandler.nextResponse = Future.successful(Consume(Ack))
-      publish(PublishCommand(Exchange(""), RoutingKey(testQueueName), MessageProperties.MINIMAL_PERSISTENT_BASIC, Blob.from(1))).futureValue shouldBe (())
+      publish(PublishCommand(Exchange(""), RoutingKey(testQueueName), MessageProperties.MINIMAL_PERSISTENT_BASIC, Blob.from(1))).futureValue shouldBe published
 
       eventually {
         testQueue.allMessages shouldBe 'empty
@@ -146,7 +144,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
       consumer <- requeueHandlerOf(amqpClient)(QueueName(testQueueName), stubHandler, requeuePolicy)
     } {
       stubHandler.nextResponse = Future.successful(Requeue)
-      publish(PublishCommand(Exchange(""), RoutingKey(testQueueName), MessageProperties.MINIMAL_PERSISTENT_BASIC, Blob.from(1))).futureValue shouldBe (())
+      publish(PublishCommand(Exchange(""), RoutingKey(testQueueName), MessageProperties.MINIMAL_PERSISTENT_BASIC, Blob.from(1))).futureValue shouldBe published
 
       eventually {
         stubHandler.receivedMessages.length should be >= requeuePolicy.maximumProcessAttempts
@@ -167,7 +165,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
     } {
       stubHandler.nextResponse = Future.successful(Requeue)
       val payload = Blob.from(1)
-      publish(PublishCommand(Exchange(""), RoutingKey(testQueueName), MessageProperties.MINIMAL_PERSISTENT_BASIC, payload)).futureValue shouldBe (())
+      publish(PublishCommand(Exchange(""), RoutingKey(testQueueName), MessageProperties.MINIMAL_PERSISTENT_BASIC, payload)).futureValue shouldBe published
 
       eventually {
         testQueue.allMessages shouldBe 'empty
@@ -195,7 +193,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
     } {
       stubHandler.nextResponse = Future.successful(Requeue)
       val payload = Blob.from(1)
-      publish(PublishCommand(Exchange(""), RoutingKey(testQueueName), MessageProperties.MINIMAL_PERSISTENT_BASIC, payload)).futureValue shouldBe (())
+      publish(PublishCommand(Exchange(""), RoutingKey(testQueueName), MessageProperties.MINIMAL_PERSISTENT_BASIC, payload)).futureValue shouldBe published
 
       eventually {
         testQueue.allMessages shouldBe 'empty

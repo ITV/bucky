@@ -33,24 +33,6 @@ object IntegrationUtils {
     (amqpClientConfig, rmqAdminConfig, rmqAdminHhttp)
   }
 
-  def defineDeadlettering(queueName: String) = {
-    val config = ConfigFactory.load("bucky")
-    val host = config.getString("rmq.host")
-    val adminConfig = config.getConfig("rmq.admin-api")
-    val requeueQueue = queueName + ".requeue"
-    val rmqAdminConfig = BrokerConfig(adminConfig.getString("username"), adminConfig.getString("password"), host, adminConfig.getInt("port"))
-    val rmqAdminHhttp = SyncHttpClient.forHost(rmqAdminConfig.hostname, rmqAdminConfig.port).withAuthentication(rmqAdminConfig.username, rmqAdminConfig.password)
-
-    rmqAdminHhttp.handle(PUT(UriBuilder / "api" / "queues" / "/" / requeueQueue).body("application/json", Blob.from(
-      """{"auto_delete": "true", "durable": "true", "arguments": {"x-expires": 120000}}"""))) shouldBe 'successful
-
-    rmqAdminHhttp.handle(POST(UriBuilder / "api" / "bindings" / "/" / "e" / s"$queueName.redeliver" / "q" / queueName).body("application/json", Blob.from(
-      s"""{"routing_key":"$queueName","arguments":{}}"""))) shouldBe 'successful
-
-    val response = rmqAdminHhttp.handle(PUT(UriBuilder / "api" / "policies" / "/" / "bucky-requeue").body("application/json", Blob.from(
-      s"""{"pattern":"$queueName.requeue$$", "definition": {"dead-letter-exchange":	"$queueName.redeliver", "ha-mode":	"all", "ha-sync-mode": "automatic"}, "priority":100, "apply-to": "queues"}"""))) shouldBe 'successful
-  }
-
   def declareQueue(name: String): (MessageQueue, MessageQueue, MessageQueue) = {
     val (amqpClientConfig: AmqpClientConfig, rmqAdminConfig: BrokerConfig, rmqAdminHttp: AuthenticatedHttpClient[Id.Id]) = configAndHttp
 

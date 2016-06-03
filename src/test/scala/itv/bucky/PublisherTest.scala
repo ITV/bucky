@@ -12,8 +12,6 @@ import org.scalatest.Matchers._
 import org.scalatest.concurrent.ScalaFutures
 
 import scala.concurrent.duration._
-import itv.contentdelivery.testutilities.SameThreadExecutionContext.implicitly
-
 
 class PublisherTest extends FunSuite with ScalaFutures {
 
