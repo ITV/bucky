@@ -36,11 +36,11 @@ class RabbitSimulator(bindings: Bindings = IdentityBindings)(implicit executionC
   private val messagesBeingProcessed: TrieMap[UUID, Publication] = TrieMap.empty
   private val deliveryTag = new AtomicLong()
 
-  def consumer(queueName: String, handler: Handler[Delivery], exceptionalAction: ConsumeAction = DeadLetter)(implicit executionContext: ExecutionContext): Lifecycle[Unit] = NoOpLifecycle {
+  def consumer(queueName: QueueName, handler: Handler[Delivery], exceptionalAction: ConsumeAction = DeadLetter)(implicit executionContext: ExecutionContext): Lifecycle[Unit] = NoOpLifecycle {
     val monitorHandler: Handler[Delivery] = delivery => {
       val key = UUID.randomUUID()
       val consumeActionValue = handler(delivery)
-      messagesBeingProcessed += key -> Publication(QueueName(queueName), delivery.body, consumeActionValue)
+      messagesBeingProcessed += key -> Publication(queueName, delivery.body, consumeActionValue)
       consumeActionValue.onComplete { _ =>
         val publication = messagesBeingProcessed(key)
         messagesBeingProcessed -= key
@@ -48,7 +48,7 @@ class RabbitSimulator(bindings: Bindings = IdentityBindings)(implicit executionC
       }
       consumeActionValue
     }
-    consumers += (QueueName(queueName) -> monitorHandler)
+    consumers += (queueName -> monitorHandler)
   }
 
   def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): Lifecycle[Publisher[PublishCommand]] =
@@ -69,7 +69,7 @@ class RabbitSimulator(bindings: Bindings = IdentityBindings)(implicit executionC
       Future.failed(new RuntimeException("No queue defined for" + routingKey))
   }
 
-  def watchQueue(queueName: String): ListBuffer[Blob] = {
+  def watchQueue(queueName: QueueName): ListBuffer[Blob] = {
     val messages = new ListBuffer[Blob]()
     this.consumer(queueName, { delivery =>
       messages += delivery.body

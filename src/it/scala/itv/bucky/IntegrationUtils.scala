@@ -8,15 +8,15 @@ import org.scalatest.Matchers._
 import scalaz.Id
 import scalaz.Id.Id
 
-object IntegrationUtils {
+object IntegrationUtils  {
 
-  def setUp(testQueueNames: String*): (Seq[MessageQueue], AmqpClientConfig, HttpClient[Id]) = {
+  def setUp(testQueueNames: QueueName*): (Seq[MessageQueue], AmqpClientConfig, HttpClient[Id]) = {
     val (amqpClientConfig: AmqpClientConfig, rmqAdminConfig: BrokerConfig, rmqAdminHhttp: AuthenticatedHttpClient[Id.Id]) = configAndHttp
 
     val testQueues = testQueueNames.map { testQueueName =>
-      rmqAdminHhttp.handle(PUT(UriBuilder / "api" / "queues" / "/" / testQueueName).body("application/json", Blob.from(
+      rmqAdminHhttp.handle(PUT(UriBuilder / "api" / "queues" / "/" / testQueueName.value).body("application/json", Blob.from(
         """{"auto_delete": "true", "durable": "true", "arguments": {"x-expires": 120000}}"""))) shouldBe 'successful
-      MessageQueue(testQueueName, rmqAdminConfig)
+      MessageQueue(testQueueName.value, rmqAdminConfig)
     }
     (testQueues, amqpClientConfig, rmqAdminHhttp)
   }

@@ -39,7 +39,7 @@ class BasicConsumerTest extends FunSuite with ScalaFutures {
 
   def testLifecycle: Lifecycle[AppFixture] = {
     val amqpClient = new RabbitSimulator()
-    val requeueMessages = amqpClient.watchQueue("bucky-basicconsumer-example.requeue")
+    val requeueMessages = amqpClient.watchQueue(QueueName("bucky-basicconsumer-example.requeue"))
 
 
     implicit val messageMarshaller = BlobMarshaller[MyMessage] {
@@ -55,7 +55,7 @@ class BasicConsumerTest extends FunSuite with ScalaFutures {
         protected override def buildAmqpClient(amqpClientConfig: AmqpClientConfig): Lifecycle[AmqpClient] = {
           NoOpLifecycle(amqpClient)
         }
-      }.apply(Config("bucky-basicconsumer-example"))
+      }.apply(Config(QueueName("bucky-basicconsumer-example"),QueueName("bucky-basicconsumer-example.requeue"))) //FIXME Change the requeue name to target
     } yield AppFixture(amqpClient, publisher, requeueMessages)
   }
 

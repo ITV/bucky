@@ -13,7 +13,8 @@ import scala.collection.JavaConverters._
 
 class ConsumerIntegrationTest extends FunSuite with ScalaFutures {
 
-  lazy val (Seq(consumerQueue, rawConsumerQueue, headersQueue), amqpClientConfig, rmqAdminHhttp) = IntegrationUtils.setUp("bucky-consumer-test", "bucky-consumer-raw-test", "bucky-consumer-headers-test")
+  lazy val (Seq(consumerQueue, rawConsumerQueue, headersQueue), amqpClientConfig, rmqAdminHhttp) = IntegrationUtils.setUp(
+    List("bucky-consumer-test" , "bucky-consumer-raw-test", "bucky-consumer-headers-test").map(QueueName) : _*)
 
 
   case class Message(value: String)
@@ -27,7 +28,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures {
     val handler = new StubConsumeHandler[Message]()
     for {
       amqpClient <- amqpClientConfig
-      consumer <- amqpClient.consumer(consumerQueue.name, AmqpClient.handlerOf(handler))
+      consumer <- amqpClient.consumer(QueueName(consumerQueue.name), AmqpClient.handlerOf(handler))
     } {
       handler.receivedMessages shouldBe 'empty
 
@@ -48,7 +49,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures {
     val handler = new StubConsumeHandler[Delivery]()
     for {
       amqpClient <- amqpClientConfig
-      consumer <- amqpClient.consumer(rawConsumerQueue.name, handler)
+      consumer <- amqpClient.consumer(QueueName(rawConsumerQueue.name), handler)
     } {
       handler.receivedMessages shouldBe 'empty
 
@@ -70,7 +71,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures {
     val handler = new StubConsumeHandler[Delivery]()
     for {
       amqpClient <- amqpClientConfig
-      consumer <- amqpClient.consumer(headersQueue.name, handler)
+      consumer <- amqpClient.consumer(QueueName(headersQueue.name), handler)
     } {
       handler.receivedMessages shouldBe 'empty
 

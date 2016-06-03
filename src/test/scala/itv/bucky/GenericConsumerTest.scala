@@ -22,7 +22,7 @@ class GenericConsumerTest extends FunSuite with ScalaFutures {
 
     val handler = new StubConsumeHandler[Blob]()
 
-    Lifecycle.using(client.consumer("blah", AmqpClient.handlerOf[Blob](handler))) { _ =>
+    Lifecycle.using(client.consumer(QueueName("blah"), AmqpClient.handlerOf[Blob](handler))) { _ =>
       channel.consumers should have size 1
       val msg = Blob.from("Hello World!")
 
@@ -45,7 +45,7 @@ class GenericConsumerTest extends FunSuite with ScalaFutures {
 
     val handler = new StubConsumeHandler[Blob]()
 
-    Lifecycle.using(client.consumer("blah", AmqpClient.handlerOf[Blob](handler))) { _ =>
+    Lifecycle.using(client.consumer(QueueName("blah"), AmqpClient.handlerOf[Blob](handler))) { _ =>
       channel.consumers should have size 1
       val msg = Blob.from("Hello World!")
 
@@ -68,7 +68,7 @@ class GenericConsumerTest extends FunSuite with ScalaFutures {
 
     val handler = new StubConsumeHandler[Blob]()
 
-    Lifecycle.using(client.consumer("blah", AmqpClient.handlerOf[Blob](handler, Ack), DeadLetter)) { _ =>
+    Lifecycle.using(client.consumer(QueueName("blah"), AmqpClient.handlerOf[Blob](handler, Ack), DeadLetter)) { _ =>
       channel.consumers should have size 1
       val msg = Blob.from("Hello World!")
 
@@ -90,7 +90,7 @@ class GenericConsumerTest extends FunSuite with ScalaFutures {
 
     val handler = new StubConsumeHandler[Blob]()
 
-    Lifecycle.using(client.consumer("blah", AmqpClient.handlerOf[Blob](handler))) { _ =>
+    Lifecycle.using(client.consumer(QueueName("blah"), AmqpClient.handlerOf[Blob](handler))) { _ =>
       channel.consumers should have size 1
       val msg = Blob.from("Hello World!")
 

@@ -16,18 +16,18 @@ import scala.util.{Failure, Success}
 trait AmqpClient {
   def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): Lifecycle[Publisher[PublishCommand]]
 
-  def consumer(queueName: String, handler: Handler[Delivery], exceptionalAction: ConsumeAction = DeadLetter)
+  def consumer(queueName: QueueName, handler: Handler[Delivery], exceptionalAction: ConsumeAction = DeadLetter)
               (implicit executionContext: ExecutionContext): Lifecycle[Unit]
 }
 
 class RawAmqpClient(channelFactory: Lifecycle[Channel], consumerTag: ConsumerTag = ConsumerTag.pidAndHost) extends AmqpClient with StrictLogging {
 
-  def consumer(queueName: String, handler: Handler[Delivery], actionOnFailure: ConsumeAction = DeadLetter)
+  def consumer(queueName: QueueName, handler: Handler[Delivery], actionOnFailure: ConsumeAction = DeadLetter)
               (implicit executionContext: ExecutionContext): Lifecycle[Unit] =
     for {
       channel <- channelFactory
     } yield {
-      channel.basicConsume(queueName, false, consumerTag.value, new DefaultConsumer(channel) {
+      channel.basicConsume(queueName.value, false, consumerTag.value, new DefaultConsumer(channel) {
         override def handleDelivery(consumerTag: String, envelope: Envelope, properties: BasicProperties, body: Array[Byte]): Unit = {
           val delivery = Delivery(Blob(body), ConsumerTag(consumerTag), envelope, properties)
           logger.debug("Received {} on {}", delivery, queueName)
@@ -141,7 +141,7 @@ object AmqpClient extends StrictLogging {
     val requeueExchange = Exchange(s"${queueName.value}.requeue")
     for {
       requeuePublish <- amqpClient.publisher()
-      consumer <- amqpClient.consumer(queueName.value, RequeueTransformer(requeuePublish, requeueExchange, requeuePolicy)(handler))
+      consumer <- amqpClient.consumer(queueName, RequeueTransformer(requeuePublish, requeueExchange, requeuePolicy)(handler))
     } yield consumer
   }
 
