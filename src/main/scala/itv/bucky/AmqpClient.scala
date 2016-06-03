@@ -118,20 +118,21 @@ object AmqpClient extends StrictLogging {
       _ <- publisher(publishCommand)
     } yield ()
 
-  def handlerOf[T](handler: RequeueHandler[T], deserializationFailureAction: RequeueConsumeAction)
-                  (implicit ec: ExecutionContext, deserializer: BlobDeserializer[T]): RequeueHandler[Delivery] =
+  def handlerOf[T](handler: RequeueHandler[T], deserializer: BlobDeserializer[T], deserializationFailureAction: RequeueConsumeAction)
+                  (implicit ec: ExecutionContext): RequeueHandler[Delivery] =
     new BlobDeserializationHandler[T, RequeueConsumeAction](deserializer)(handler, deserializationFailureAction)
 
-  def handlerOf[T](deserializer: BlobDeserializer[T])(handler: Handler[T], deserializationFailureAction: ConsumeAction = DeadLetter)
+  def handlerOf[T](handler: Handler[T], deserializer: BlobDeserializer[T], deserializationFailureAction: ConsumeAction = DeadLetter)
                   (implicit ec: ExecutionContext): Handler[Delivery] =
     new BlobDeserializationHandler[T, ConsumeAction](deserializer)(handler, deserializationFailureAction)
 
-  def requeueHandlerOf[T](amqpClient: AmqpClient)(deserializer: BlobDeserializer[T])(queueName: QueueName,
+  def requeueHandlerOf[T](amqpClient: AmqpClient)(queueName: QueueName,
                                                   handler: RequeueHandler[T],
                                                   requeuePolicy: RequeuePolicy,
+                                                  deserializer: BlobDeserializer[T],
                                                   deserializationFailureAction: RequeueConsumeAction = Consume(DeadLetter))
                                                   (implicit ec: ExecutionContext): Lifecycle[Unit] =
-    requeueOf(amqpClient)(queueName, handlerOf(handler, deserializationFailureAction)(ec, deserializer), requeuePolicy)
+    requeueOf(amqpClient)(queueName, handlerOf(handler, deserializer, deserializationFailureAction)(ec), requeuePolicy)
 
   def requeueOf(amqpClient: AmqpClient)(queueName: QueueName,
                                         handler: RequeueHandler[Delivery],

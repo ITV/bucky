@@ -56,7 +56,6 @@ object BasicConsumer extends App {
 
       val myMessageSerializer = blobSerializer[MyMessage] using RoutingKey(targetQueueName.value) using Exchange("")
 
-
       lazy val (testQueues, amqpClientConfig, rmqAdminHhttp) = IntegrationUtils.setUp(QueueName(queueName.value), QueueName(targetQueueName.value))
 
         testQueues.foreach(_.purge())
@@ -64,8 +63,8 @@ object BasicConsumer extends App {
         import AmqpClient._
         for {
           amqClient <- buildAmqpClient(amqpClientConfig)
-          publisher <- amqClient.publisher().map(publisherOf[MyMessage](myMessageSerializer))
-          blah <- amqClient.consumer(queueName, handlerOf[MyMessage](messageDeserializer)(PrintlnHandler(publisher)))
+          publisher <- amqClient.publisher().map(publisherOf(myMessageSerializer))
+          blah <- amqClient.consumer(queueName, handlerOf(PrintlnHandler(publisher), messageDeserializer))
         } yield {
           println("Started the consumer")
           ServletBootstrap.default

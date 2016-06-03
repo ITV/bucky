@@ -28,7 +28,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures {
     val handler = new StubConsumeHandler[Message]()
     for {
       amqpClient <- amqpClientConfig
-      consumer <- amqpClient.consumer(QueueName(consumerQueue.name), AmqpClient.handlerOf(messageDeserializer)(handler))
+      consumer <- amqpClient.consumer(QueueName(consumerQueue.name), AmqpClient.handlerOf(handler, messageDeserializer))
     } {
       handler.receivedMessages shouldBe 'empty
 
