@@ -16,13 +16,13 @@ class GenericConsumerTest extends FunSuite with ScalaFutures {
     val client = createClient(channel)
 
     import DeserializerResult._
-    implicit val deserializer : BlobDeserializer[Blob] = new BlobDeserializer[Blob] {
+    val deserializer : BlobDeserializer[Blob] = new BlobDeserializer[Blob] {
       override def apply(message: Blob): DeserializerResult[Blob] = message.success
     }
 
     val handler = new StubConsumeHandler[Blob]()
 
-    Lifecycle.using(client.consumer(QueueName("blah"), AmqpClient.handlerOf[Blob](handler))) { _ =>
+    Lifecycle.using(client.consumer(QueueName("blah"), AmqpClient.handlerOf(deserializer)(handler))) { _ =>
       channel.consumers should have size 1
       val msg = Blob.from("Hello World!")
 
@@ -45,7 +45,7 @@ class GenericConsumerTest extends FunSuite with ScalaFutures {
 
     val handler = new StubConsumeHandler[Blob]()
 
-    Lifecycle.using(client.consumer(QueueName("blah"), AmqpClient.handlerOf[Blob](handler))) { _ =>
+    Lifecycle.using(client.consumer(QueueName("blah"), AmqpClient.handlerOf(deserializer)(handler))) { _ =>
       channel.consumers should have size 1
       val msg = Blob.from("Hello World!")
 
@@ -68,7 +68,7 @@ class GenericConsumerTest extends FunSuite with ScalaFutures {
 
     val handler = new StubConsumeHandler[Blob]()
 
-    Lifecycle.using(client.consumer(QueueName("blah"), AmqpClient.handlerOf[Blob](handler, Ack), DeadLetter)) { _ =>
+    Lifecycle.using(client.consumer(QueueName("blah"), AmqpClient.handlerOf(deserializer)(handler, Ack), DeadLetter)) { _ =>
       channel.consumers should have size 1
       val msg = Blob.from("Hello World!")
 
@@ -90,7 +90,7 @@ class GenericConsumerTest extends FunSuite with ScalaFutures {
 
     val handler = new StubConsumeHandler[Blob]()
 
-    Lifecycle.using(client.consumer(QueueName("blah"), AmqpClient.handlerOf[Blob](handler))) { _ =>
+    Lifecycle.using(client.consumer(QueueName("blah"), AmqpClient.handlerOf(deserializer)(handler))) { _ =>
       channel.consumers should have size 1
       val msg = Blob.from("Hello World!")
 

@@ -8,7 +8,7 @@ import org.scalatest.Matchers._
 import scalaz.Id
 import scalaz.Id.Id
 
-object IntegrationUtils  {
+object IntegrationUtils {
 
   def setUp(testQueueNames: QueueName*): (Seq[MessageQueue], AmqpClientConfig, HttpClient[Id]) = {
     val (amqpClientConfig: AmqpClientConfig, rmqAdminConfig: BrokerConfig, rmqAdminHhttp: AuthenticatedHttpClient[Id.Id]) = configAndHttp

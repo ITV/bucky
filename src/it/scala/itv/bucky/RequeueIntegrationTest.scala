@@ -20,7 +20,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
   import DeserializerResult._
   private val published = ()
 
-  implicit val messageDeserializer = new BlobDeserializer[String] {
+  val messageDeserializer = new BlobDeserializer[String] {
     override def apply(blob: Blob): DeserializerResult[String] = blob.to[String].success
   }
 
@@ -45,7 +45,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
     for {
       amqpClient <- amqpClientConfig
       publish <- amqpClient.publisher()
-      consumer <- requeueHandlerOf(amqpClient)(QueueName(testQueueName), AlwaysRequeue, requeuePolicy)
+      consumer <- requeueHandlerOf(amqpClient)(messageDeserializer)(QueueName(testQueueName), AlwaysRequeue, requeuePolicy)
     } {
       val body = Blob.from("Hello World!")
 
@@ -119,7 +119,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
       amqpClient <- amqpClientConfig
       publish <- amqpClient.publisher()
       stubHandler = new StubRequeueHandler[Int]
-      consumer <- requeueHandlerOf(amqpClient)(QueueName(testQueueName), stubHandler, requeuePolicy)
+      consumer <- requeueHandlerOf(amqpClient)(intMessageDeserializer)(QueueName(testQueueName), stubHandler, requeuePolicy)
     } {
       stubHandler.nextResponse = Future.successful(Consume(Ack))
       publish(PublishCommand(Exchange(""), RoutingKey(testQueueName), MessageProperties.MINIMAL_PERSISTENT_BASIC, Blob.from(1))).futureValue shouldBe published
@@ -141,7 +141,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
       amqpClient <- amqpClientConfig
       publish <- amqpClient.publisher()
       stubHandler = new StubRequeueHandler[Int]
-      consumer <- requeueHandlerOf(amqpClient)(QueueName(testQueueName), stubHandler, requeuePolicy)
+      consumer <- requeueHandlerOf(amqpClient)(intMessageDeserializer)(QueueName(testQueueName), stubHandler, requeuePolicy)
     } {
       stubHandler.nextResponse = Future.successful(Requeue)
       publish(PublishCommand(Exchange(""), RoutingKey(testQueueName), MessageProperties.MINIMAL_PERSISTENT_BASIC, Blob.from(1))).futureValue shouldBe published
@@ -161,7 +161,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
       amqpClient <- amqpClientConfig
       publish <- amqpClient.publisher()
       stubHandler = new StubRequeueHandler[Int]
-      consumer <- requeueHandlerOf(amqpClient)(QueueName(testQueueName), stubHandler, requeuePolicy)
+      consumer <- requeueHandlerOf(amqpClient)(intMessageDeserializer)(QueueName(testQueueName), stubHandler, requeuePolicy)
     } {
       stubHandler.nextResponse = Future.successful(Requeue)
       val payload = Blob.from(1)
@@ -189,7 +189,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
       amqpClient <- amqpClientConfig
       publish <- amqpClient.publisher()
       stubHandler = new StubRequeueHandler[Int]
-      consumer <- requeueHandlerOf(amqpClient)(QueueName(testQueueName), stubHandler, negativeProcessAttemptsRequeuePolicy)
+      consumer <- requeueHandlerOf(amqpClient)(intMessageDeserializer)(QueueName(testQueueName), stubHandler, negativeProcessAttemptsRequeuePolicy)
     } {
       stubHandler.nextResponse = Future.successful(Requeue)
       val payload = Blob.from(1)

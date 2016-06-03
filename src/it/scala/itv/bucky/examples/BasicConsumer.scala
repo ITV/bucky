@@ -46,7 +46,7 @@ object BasicConsumer extends App {
     override protected def mainService(config: Config, registries: MetricsRegistries): Lifecycle[ServletBootstrap] = {
         import config._
 
-      implicit val messageDeserializer = new BlobDeserializer[MyMessage] {
+      val messageDeserializer = new BlobDeserializer[MyMessage] {
           override def apply(blob: Blob): DeserializerResult[MyMessage] = MyMessage(blob.to[String]).success
       }
 
@@ -65,7 +65,7 @@ object BasicConsumer extends App {
         for {
           amqClient <- buildAmqpClient(amqpClientConfig)
           publisher <- amqClient.publisher().map(publisherOf[MyMessage](myMessageSerializer))
-          blah <- amqClient.consumer(queueName, handlerOf[MyMessage](PrintlnHandler(publisher)))
+          blah <- amqClient.consumer(queueName, handlerOf[MyMessage](messageDeserializer)(PrintlnHandler(publisher)))
         } yield {
           println("Started the consumer")
           ServletBootstrap.default

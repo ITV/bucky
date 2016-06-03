@@ -18,7 +18,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures {
 
 
   case class Message(value: String)
-  implicit val messageDeserializer = new BlobDeserializer[Message] {
+  val messageDeserializer = new BlobDeserializer[Message] {
     override def apply(blob: Blob): DeserializerResult[Message] = DeserializerResult.Success(Message(blob.to[String]))
   }
   
@@ -28,7 +28,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures {
     val handler = new StubConsumeHandler[Message]()
     for {
       amqpClient <- amqpClientConfig
-      consumer <- amqpClient.consumer(QueueName(consumerQueue.name), AmqpClient.handlerOf(handler))
+      consumer <- amqpClient.consumer(QueueName(consumerQueue.name), AmqpClient.handlerOf(messageDeserializer)(handler))
     } {
       handler.receivedMessages shouldBe 'empty
 

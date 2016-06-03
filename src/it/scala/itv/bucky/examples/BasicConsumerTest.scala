@@ -14,7 +14,7 @@ import scala.collection.mutable.ListBuffer
 
 class BasicConsumerTest extends FunSuite with ScalaFutures {
 
-  ignore("it should requeue a message") {
+  test("it should requeue a message") {
     Lifecycle.using(testLifecycle) { app =>
       app.publisher(MyMessage("Hello")).futureValue
 
@@ -25,7 +25,7 @@ class BasicConsumerTest extends FunSuite with ScalaFutures {
     }
   }
 
-  ignore("it should ack a message") {
+  test("it should ack a message") {
     Lifecycle.using(testLifecycle) { app =>
       app.publisher(MyMessage("Foo")).futureValue
 
