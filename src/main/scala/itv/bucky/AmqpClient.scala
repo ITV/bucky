@@ -116,6 +116,7 @@ object AmqpClient extends StrictLogging {
     requeueOf(amqpClient)(queueName, handlerOf(handler, deserializationFailureAction), requeuePolicy)
 
   def requeueOf(amqpClient: AmqpClient)(queueName: QueueName, handler: RequeueHandler[Delivery], requeuePolicy: RequeuePolicy)(implicit ec: ExecutionContext): Lifecycle[Unit] = {
+    //TODO: doesn't feel right to be calculating requeue exchange name here
     val requeueExchange = Exchange(s"${queueName.value}.requeue")
     for {
       requeuePublish <- amqpClient.publisher()
