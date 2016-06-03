@@ -14,8 +14,6 @@ import scala.collection.mutable.ListBuffer
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration.{Duration, FiniteDuration}
 
-case class QueueName(value: String)
-
 case object IdentityBindings extends Bindings {
   def apply(routingQueue: RoutingKey): QueueName = QueueName(routingQueue.value)
 

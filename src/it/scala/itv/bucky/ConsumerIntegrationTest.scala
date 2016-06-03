@@ -24,7 +24,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures {
   test("Can consume messages from a (pre-existing) queue") {
     consumerQueue.purge()
 
-    val handler = new StubHandler[Message]()
+    val handler = new StubConsumeHandler[Message]()
     for {
       amqpClient <- amqpClientConfig
       consumer <- amqpClient.consumer(consumerQueue.name, AmqpClient.handlerOf(handler))
@@ -45,7 +45,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures {
   test("Can consume messages from a (pre-existing) queue with the raw consumer") {
     rawConsumerQueue.purge()
 
-    val handler = new StubHandler[Delivery]()
+    val handler = new StubConsumeHandler[Delivery]()
     for {
       amqpClient <- amqpClientConfig
       consumer <- amqpClient.consumer(rawConsumerQueue.name, handler)
@@ -67,7 +67,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures {
   test("Message headers are exposed to (raw) consumers") {
     headersQueue.purge()
 
-    val handler = new StubHandler[Delivery]()
+    val handler = new StubConsumeHandler[Delivery]()
     for {
       amqpClient <- amqpClientConfig
       consumer <- amqpClient.consumer(headersQueue.name, handler)

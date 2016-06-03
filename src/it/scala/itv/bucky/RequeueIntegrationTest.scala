@@ -71,7 +71,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
     for {
       amqpClient <- amqpClientConfig
       publish <- amqpClient.publisher()
-      stubHandler = new StubHandler[Delivery]
+      stubHandler = new StubRequeueHandler[Delivery]
       consumer <- requeueOf(amqpClient)(QueueName(testQueueName), stubHandler, requeuePolicy)
     } {
       stubHandler.nextResponse = Future.successful(Requeue)
@@ -96,7 +96,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
     for {
       amqpClient <- amqpClientConfig
       publish <- amqpClient.publisher()
-      stubHandler = new StubHandler[Delivery]
+      stubHandler = new StubRequeueHandler[Delivery]
       consumer <- requeueOf(amqpClient)(QueueName(testQueueName), stubHandler, requeuePolicy)
     } {
       stubHandler.nextResponse = Future.successful(Requeue)
@@ -120,10 +120,10 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
     for {
       amqpClient <- amqpClientConfig
       publish <- amqpClient.publisher()
-      stubHandler = new StubHandler[Int]
+      stubHandler = new StubRequeueHandler[Int]
       consumer <- requeueHandlerOf(amqpClient)(QueueName(testQueueName), stubHandler, requeuePolicy)
     } {
-      stubHandler.nextResponse = Future.successful(Ack)
+      stubHandler.nextResponse = Future.successful(Consume(Ack))
       publish(PublishCommand(Exchange(""), RoutingKey(testQueueName), MessageProperties.MINIMAL_PERSISTENT_BASIC, Blob.from(1))).futureValue shouldBe (())
 
       eventually {
@@ -142,7 +142,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
     for {
       amqpClient <- amqpClientConfig
       publish <- amqpClient.publisher()
-      stubHandler = new StubHandler[Int]
+      stubHandler = new StubRequeueHandler[Int]
       consumer <- requeueHandlerOf(amqpClient)(QueueName(testQueueName), stubHandler, requeuePolicy)
     } {
       stubHandler.nextResponse = Future.successful(Requeue)
@@ -162,7 +162,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
     for {
       amqpClient <- amqpClientConfig
       publish <- amqpClient.publisher()
-      stubHandler = new StubHandler[Int]
+      stubHandler = new StubRequeueHandler[Int]
       consumer <- requeueHandlerOf(amqpClient)(QueueName(testQueueName), stubHandler, requeuePolicy)
     } {
       stubHandler.nextResponse = Future.successful(Requeue)
@@ -190,7 +190,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
     for {
       amqpClient <- amqpClientConfig
       publish <- amqpClient.publisher()
-      stubHandler = new StubHandler[Int]
+      stubHandler = new StubRequeueHandler[Int]
       consumer <- requeueHandlerOf(amqpClient)(QueueName(testQueueName), stubHandler, negativeProcessAttemptsRequeuePolicy)
     } {
       stubHandler.nextResponse = Future.successful(Requeue)
@@ -209,9 +209,9 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
 }
 
 
-object AlwaysRequeue extends Handler[String] {
+object AlwaysRequeue extends RequeueHandler[String] {
 
-  override def apply(message: String): Future[ConsumeAction] = {
+  override def apply(message: String): Future[RequeueConsumeAction] = {
     Future.successful(Requeue)
   }
 

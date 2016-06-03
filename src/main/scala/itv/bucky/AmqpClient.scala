@@ -40,7 +40,6 @@ class RawAmqpClient(channelFactory: Lifecycle[Channel], consumerTag: ConsumerTag
             logger.debug("Responding with {} to {} on {}", action, delivery, queueName)
             action match {
               case Ack => getChannel.basicAck(envelope.getDeliveryTag, false)
-              case Requeue => getChannel.basicAck(envelope.getDeliveryTag, false)
               case DeadLetter => getChannel.basicNack(envelope.getDeliveryTag, false, false)
               case RequeueImmediately => getChannel.basicNack(envelope.getDeliveryTag, false, true)
             }
@@ -113,14 +112,14 @@ object AmqpClient extends StrictLogging {
 
   import BlobSerializer._
 
-  def requeueHandlerOf[T](amqpClient: AmqpClient)(queueName: QueueName, handler: Handler[T], requeuePolicy: RequeuePolicy, deserializationFailureAction: ConsumeAction = DeadLetter)(implicit ec: ExecutionContext, deserializer: BlobDeserializer[T]): Lifecycle[Unit] =
+  def requeueHandlerOf[T](amqpClient: AmqpClient)(queueName: QueueName, handler: RequeueHandler[T], requeuePolicy: RequeuePolicy, deserializationFailureAction: RequeueConsumeAction = Consume(DeadLetter))(implicit ec: ExecutionContext, deserializer: BlobDeserializer[T]): Lifecycle[Unit] =
     requeueOf(amqpClient)(queueName, handlerOf(handler, deserializationFailureAction), requeuePolicy)
 
-  def requeueOf(amqpClient: AmqpClient)(queueName: QueueName, handler: Handler[Delivery], requeuePolicy: RequeuePolicy)(implicit ec: ExecutionContext): Lifecycle[Unit] = {
+  def requeueOf(amqpClient: AmqpClient)(queueName: QueueName, handler: RequeueHandler[Delivery], requeuePolicy: RequeuePolicy)(implicit ec: ExecutionContext): Lifecycle[Unit] = {
     val requeueExchange = Exchange(s"${queueName.value}.requeue")
     for {
       requeuePublish <- amqpClient.publisher()
-      consumer <- amqpClient.consumer(queueName.value, RequeueHandler(requeuePublish, requeueExchange, requeuePolicy)(handler))
+      consumer <- amqpClient.consumer(queueName.value, RequeueTransformer(requeuePublish, requeueExchange, requeuePolicy)(handler))
     } yield consumer
   }
 
@@ -132,17 +131,23 @@ object AmqpClient extends StrictLogging {
       _ <- publisher(publishCommand)
     } yield ()
 
+  def handlerOf[T](handler: RequeueHandler[T], deserializationFailureAction: RequeueConsumeAction)(implicit ec: ExecutionContext, deserializer: BlobDeserializer[T]): RequeueHandler[Delivery] =
+    new BlobDeserializationHandler[T, RequeueConsumeAction](handler, deserializationFailureAction)
+
   def handlerOf[T](handler: Handler[T], deserializationFailureAction: ConsumeAction = DeadLetter)(implicit ec: ExecutionContext, deserializer: BlobDeserializer[T]): Handler[Delivery] =
-    new Handler[Delivery] {
-      override def apply(delivery: Delivery): Future[ConsumeAction] = Future(deserializer(delivery.body)).flatMap {
+    new BlobDeserializationHandler[T, ConsumeAction](handler, deserializationFailureAction)
+
+  class BlobDeserializationHandler[T, S](handler: T => Future[S], deserializationFailureAction: S)(implicit ec: ExecutionContext, deserializer: BlobDeserializer[T]) extends (Delivery => Future[S]) {
+    override def apply(delivery: Delivery): Future[S] =
+      Future(deserializer(delivery.body)).flatMap {
         case DeserializerResult.Success(message) => handler(message)
         case DeserializerResult.Failure(reason) =>
-          logger.error("Cannot deserialize: {} because: \"{}\" (will {})", delivery.body, reason, deserializationFailureAction)
+          logger.error(s"Cannot deserialize: ${delivery.body} because: '$reason' (will $deserializationFailureAction)")
           Future.successful(deserializationFailureAction)
       }.recoverWith { case error: Throwable =>
-        logger.error("Cannot deserialize: {} because: \"{}\" (will {})", delivery.body, error.getMessage, deserializationFailureAction, error)
+        logger.error(s"Cannot deserialize: ${delivery.body} because: '${error.getMessage}' (will $deserializationFailureAction)", error)
         Future.successful(deserializationFailureAction)
       }
-    }
+  }
 
 }

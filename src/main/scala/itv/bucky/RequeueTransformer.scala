@@ -1,12 +1,13 @@
 package itv.bucky
 
 import com.rabbitmq.client.AMQP
+import itv.bucky._
 
 import scala.concurrent.{Future, ExecutionContext}
 import scala.util.Try
 import scala.collection.JavaConverters._
 
-case class RequeueHandler[T](requeuePublisher: Publisher[PublishCommand], requeueExchange: Exchange, requeuePolicy: RequeuePolicy)(handler: Handler[Delivery])
+case class RequeueTransformer(requeuePublisher: Publisher[PublishCommand], requeueExchange: Exchange, requeuePolicy: RequeuePolicy)(handler: RequeueHandler[Delivery])
                             (implicit executionContext: ExecutionContext) extends Handler[Delivery] {
 
   implicit class BasicPropertiesOps(val basicProperties: AMQP.BasicProperties) {
@@ -39,19 +40,19 @@ case class RequeueHandler[T](requeuePublisher: Publisher[PublishCommand], requeu
       case Requeue => {
         remainingAttempts(delivery) match {
           case Some(value) if value < 1 => Future.successful(DeadLetter)
-          case Some(value) => requeuePublisher(buildRequeuePublishCommand(delivery, value - 1)).map(_ => Requeue)
+          case Some(value) => requeuePublisher(buildRequeuePublishCommand(delivery, value - 1)).map(_ => Ack)
           case None => {
             if (requeuePolicy.maximumProcessAttempts <= 1)
               Future.successful(DeadLetter)
             else {
               val initialRemainingAttempts = requeuePolicy.maximumProcessAttempts - 2
-              requeuePublisher(buildRequeuePublishCommand(delivery, initialRemainingAttempts)).map(_ => Requeue)
+              requeuePublisher(buildRequeuePublishCommand(delivery, initialRemainingAttempts)).map(_ => Ack)
             }
           }
         }
       }
 
-      case result => Future.successful(result)
+      case Consume(action) => Future.successful(action)
 
     }
 }
