@@ -9,7 +9,7 @@ import scala.collection.JavaConverters._
 //TODO: Logging!
 //TODO: Should some of this logic be separated?
 case class RequeueTransformer(requeuePublisher: Publisher[PublishCommand],
-                              requeueExchange: Exchange,
+                              requeueExchange: ExchangeName,
                               requeuePolicy: RequeuePolicy)(handler: RequeueHandler[Delivery])
                             (implicit executionContext: ExecutionContext) extends Handler[Delivery] {
 

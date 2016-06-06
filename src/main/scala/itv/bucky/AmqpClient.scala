@@ -18,6 +18,8 @@ trait AmqpClient {
 
   def consumer(queueName: QueueName, handler: Handler[Delivery], exceptionalAction: ConsumeAction = DeadLetter)
               (implicit executionContext: ExecutionContext): Lifecycle[Unit]
+
+  def withChannel[T](thunk: Channel => T): T
 }
 
 class RawAmqpClient(channelFactory: Lifecycle[Channel], consumerTag: ConsumerTag = ConsumerTag.pidAndHost) extends AmqpClient with StrictLogging {
@@ -103,6 +105,10 @@ class RawAmqpClient(channelFactory: Lifecycle[Channel], consumerTag: ConsumerTag
       ExecutorLifecycles.singleThreadScheduledExecutor.map(ec => new TimeoutPublisher(_, finiteTimeout)(ec))
     case infinite => NoOpLifecycle(identity)
   }
+
+  override def withChannel[T](thunk: (Channel) => T): T =
+    Lifecycle.using(channelFactory)(thunk)
+
 }
 
 case class RequeuePolicy(maximumProcessAttempts: Int)
@@ -139,7 +145,7 @@ object AmqpClient extends StrictLogging {
                                         requeuePolicy: RequeuePolicy)
                                         (implicit ec: ExecutionContext): Lifecycle[Unit] = {
     //TODO: doesn't feel right to be calculating requeue exchange name here
-    val requeueExchange = Exchange(s"${queueName.value}.requeue")
+    val requeueExchange = ExchangeName(s"${queueName.value}.requeue")
     for {
       requeuePublish <- amqpClient.publisher()
       consumer <- amqpClient.consumer(queueName, RequeueTransformer(requeuePublish, requeueExchange, requeuePolicy)(handler))

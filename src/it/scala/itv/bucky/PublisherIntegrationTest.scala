@@ -16,7 +16,7 @@ class PublisherIntegrationTest extends FunSuite with ScalaFutures {
 
   val testQueueName = "bucky-publisher-test"
   val routingKey = RoutingKey(testQueueName)
-  val exchange = Exchange("")
+  val exchange = ExchangeName("")
   lazy val (testQueue, amqpClientConfig, rmqAdminHhttp) = IntegrationUtils.setUp(QueueName(testQueueName))
 
   test("Can publish messages to a (pre-existing) queue") {
@@ -27,7 +27,7 @@ class PublisherIntegrationTest extends FunSuite with ScalaFutures {
       publish <- amqpClient.publisher()
     } {
       val body = Blob.from("Hello World!")
-      publish(PublishCommand(Exchange(""), routingKey, MessageProperties.MINIMAL_PERSISTENT_BASIC, body)).asTry.futureValue shouldBe 'success
+      publish(PublishCommand(ExchangeName(""), routingKey, MessageProperties.MINIMAL_PERSISTENT_BASIC, body)).asTry.futureValue shouldBe 'success
 
       testQueue.head.getNextMessage().payload shouldBe body
     }

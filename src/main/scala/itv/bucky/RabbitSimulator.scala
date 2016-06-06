@@ -4,7 +4,7 @@ import java.util.UUID
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 
-import com.rabbitmq.client.{MessageProperties, Envelope}
+import com.rabbitmq.client.{Channel, MessageProperties, Envelope}
 import com.typesafe.scalalogging.StrictLogging
 import itv.contentdelivery.lifecycle.{Lifecycle, NoOpLifecycle}
 import itv.utils.Blob
@@ -81,4 +81,6 @@ class RabbitSimulator(bindings: Bindings = IdentityBindings)(implicit executionC
   def waitForMessagesToBeProcessed()(implicit timeout: Duration): Unit = {
     Await.result(Future.sequence(messagesBeingProcessed.values.map(_.consumeActionValue)), timeout)
   }
+
+  override def withChannel[T](thunk: (Channel) => T): T = ???
 }

@@ -10,12 +10,12 @@ import scala.concurrent.Future
 
 package object bucky {
 
-  case class PublishCommand(exchange: Exchange, routingKey: RoutingKey, basicProperties: BasicProperties, body: Blob) {
+  case class PublishCommand(exchange: ExchangeName, routingKey: RoutingKey, basicProperties: BasicProperties, body: Blob) {
     def description = s"${exchange.value}:${routingKey.value} $body"
   }
 
   case class RoutingKey(value: String)
-  case class Exchange(value: String)
+  case class ExchangeName(value: String)
   case class QueueName(value: String)
 
   sealed trait ConsumeAction

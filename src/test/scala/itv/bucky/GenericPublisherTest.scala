@@ -12,7 +12,7 @@ class GenericPublisherTest extends FunSuite with ScalaFutures {
 
   test("Publishing only returns success once publication is acknowledged") {
     val client = createClient()
-    val expectedExchange = Exchange("")
+    val expectedExchange = ExchangeName("")
     val expectedRoutingKey = RoutingKey("mymessage")
     val expectedProperties = MessageProperties.TEXT_PLAIN
     val expectedBody = Blob.from("expected message")

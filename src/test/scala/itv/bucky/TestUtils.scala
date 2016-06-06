@@ -9,7 +9,7 @@ import scala.util.{Random, Try}
 
 object TestUtils {
 
-  def anyPublishCommand() = PublishCommand(Exchange("exchange"), RoutingKey("routing.key"), MessageProperties.MINIMAL_PERSISTENT_BASIC, Blob.from("msg" + Random.nextInt()))
+  def anyPublishCommand() = PublishCommand(ExchangeName("exchange"), RoutingKey("routing.key"), MessageProperties.MINIMAL_PERSISTENT_BASIC, Blob.from("msg" + Random.nextInt()))
 
   implicit class FutureOps[T](f: Future[T]) {
     def asTry: Future[Try[T]] = {

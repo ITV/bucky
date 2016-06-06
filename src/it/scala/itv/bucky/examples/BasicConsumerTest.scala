@@ -46,7 +46,7 @@ class BasicConsumerTest extends FunSuite with ScalaFutures {
       message => Blob.from(message.foo)
     }
     import itv.bucky.BlobSerializer._
-    implicit val myMessageSerializer = blobSerializer[MyMessage] using RoutingKey("bucky-basicconsumer-example") using Exchange("")
+    implicit val myMessageSerializer = blobSerializer[MyMessage] using RoutingKey("bucky-basicconsumer-example") using ExchangeName("")
 
     import AmqpClient._
     for {

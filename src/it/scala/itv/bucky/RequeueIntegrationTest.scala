@@ -32,7 +32,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
 
   val requeuePatienceConfig: Eventually.PatienceConfig = Eventually.PatienceConfig(timeout = 5.second, interval = 100.millis)
 
-  val exchange = Exchange("")
+  val exchange = ExchangeName("")
 
   val requeuePolicy = RequeuePolicy(3)
 
@@ -40,16 +40,17 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
     val testQueueName = "bucky-requeue-consumer-ack" + Random.nextInt()
 
     val (amqpClientConfig: AmqpClientConfig, _, _) = IntegrationUtils.configAndHttp
-    val (_, testRequeue, _) = IntegrationUtils.declareQueue(testQueueName)
 
     for {
       amqpClient <- amqpClientConfig
+      queues <- IntegrationUtils.declareQueue(testQueueName)
+      (_, testRequeue, _) = queues
       publish <- amqpClient.publisher()
       consumer <- requeueHandlerOf(amqpClient)(QueueName(testQueueName), AlwaysRequeue,requeuePolicy, messageDeserializer)
     } {
       val body = Blob.from("Hello World!")
 
-      publish(PublishCommand(Exchange(""), RoutingKey(testQueueName), MessageProperties.MINIMAL_PERSISTENT_BASIC, body)).futureValue shouldBe published
+      publish(PublishCommand(ExchangeName(""), RoutingKey(testQueueName), MessageProperties.MINIMAL_PERSISTENT_BASIC, body)).futureValue shouldBe published
 
       eventually {
         testRequeue.allMessages.map(_.payload) shouldBe List(body)
@@ -64,10 +65,10 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
     val testQueueName = "bucky-requeue-consumer-ack" + Random.nextInt()
 
     val (amqpClientConfig: AmqpClientConfig, _, _) = IntegrationUtils.configAndHttp
-    IntegrationUtils.declareQueue(testQueueName)
 
     for {
       amqpClient <- amqpClientConfig
+      _ <- IntegrationUtils.declareQueue(testQueueName)
       publish <- amqpClient.publisher()
       stubHandler = new StubRequeueHandler[Delivery]
       consumer <- requeueOf(amqpClient)(QueueName(testQueueName), stubHandler, requeuePolicy)
@@ -76,7 +77,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
 
       val headers: java.util.Map[String, AnyRef] = Map[String, AnyRef]("foo" -> "bar").asJava
       val properties = MessageProperties.MINIMAL_PERSISTENT_BASIC.builder().headers(headers).build()
-      publish(PublishCommand(Exchange(""), RoutingKey(testQueueName), properties, Blob.from("Hello World!"))).futureValue shouldBe published
+      publish(PublishCommand(ExchangeName(""), RoutingKey(testQueueName), properties, Blob.from("Hello World!"))).futureValue shouldBe published
 
       eventually {
         val headersOfReceived = stubHandler.receivedMessages.map(d => getHeader("foo", d.properties))
@@ -85,125 +86,127 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
     }
   }
 
-  test("Should retain any custom amqp properties when republishing") {
-    val testQueueName = "bucky-requeue-consumer-ack" + Random.nextInt()
+    test("Should retain any custom amqp properties when republishing") {
+      val testQueueName = "bucky-requeue-consumer-ack" + Random.nextInt()
 
-    val (amqpClientConfig: AmqpClientConfig, _, _) = IntegrationUtils.configAndHttp
-    IntegrationUtils.declareQueue(testQueueName)
+      val (amqpClientConfig: AmqpClientConfig, _, _) = IntegrationUtils.configAndHttp
 
-    for {
-      amqpClient <- amqpClientConfig
-      publish <- amqpClient.publisher()
-      stubHandler = new StubRequeueHandler[Delivery]
-      consumer <- requeueOf(amqpClient)(QueueName(testQueueName), stubHandler, requeuePolicy)
-    } {
-      stubHandler.nextResponse = Future.successful(Requeue)
+      for {
+        amqpClient <- amqpClientConfig
+        _ <- IntegrationUtils.declareQueue(testQueueName)
+        publish <- amqpClient.publisher()
+        stubHandler = new StubRequeueHandler[Delivery]
+        consumer <- requeueOf(amqpClient)(QueueName(testQueueName), stubHandler, requeuePolicy)
+      } {
+        stubHandler.nextResponse = Future.successful(Requeue)
 
-      val expectedCorrelationId: String = "banana"
-      val properties = MessageProperties.MINIMAL_PERSISTENT_BASIC.builder().correlationId(expectedCorrelationId).build()
-      publish(PublishCommand(Exchange(""), RoutingKey(testQueueName), properties, Blob.from("Hello World!"))).futureValue shouldBe published
+        val expectedCorrelationId: String = "banana"
+        val properties = MessageProperties.MINIMAL_PERSISTENT_BASIC.builder().correlationId(expectedCorrelationId).build()
+        publish(PublishCommand(ExchangeName(""), RoutingKey(testQueueName), properties, Blob.from("Hello World!"))).futureValue shouldBe published
 
-      eventually {
-        stubHandler.receivedMessages.count(_.properties.getCorrelationId == expectedCorrelationId) should be > 1
-      }(requeuePatienceConfig)
-    }
-  }
-
-  test("It should not requeue when the handler Acks") {
-    val testQueueName = "bucky-requeue-consumer-ack" + Random.nextInt()
-
-    val (amqpClientConfig: AmqpClientConfig, _, _) = IntegrationUtils.configAndHttp
-    val (testQueue, testRequeue, _) = IntegrationUtils.declareQueue(testQueueName)
-
-    for {
-      amqpClient <- amqpClientConfig
-      publish <- amqpClient.publisher()
-      stubHandler = new StubRequeueHandler[Int]
-      consumer <- requeueHandlerOf(amqpClient)(QueueName(testQueueName), stubHandler, requeuePolicy, intMessageDeserializer)
-    } {
-      stubHandler.nextResponse = Future.successful(Consume(Ack))
-      publish(PublishCommand(Exchange(""), RoutingKey(testQueueName), MessageProperties.MINIMAL_PERSISTENT_BASIC, Blob.from(1))).futureValue shouldBe published
-
-      eventually {
-        testQueue.allMessages shouldBe 'empty
+        eventually {
+          stubHandler.receivedMessages.count(_.properties.getCorrelationId == expectedCorrelationId) should be > 1
+        }(requeuePatienceConfig)
       }
-      testRequeue.allMessages shouldBe 'empty
-      stubHandler.receivedMessages.length shouldBe 1
     }
-  }
 
-  test("It should reprocess the message at least maximumProcessAttempts times upon repeated requeue") {
-    val testQueueName = "bucky-requeue-consumer-test" + Random.nextInt()
-    val (amqpClientConfig: AmqpClientConfig, _, _) = IntegrationUtils.configAndHttp
-    IntegrationUtils.declareQueue(testQueueName)
+    test("It should not requeue when the handler Acks") {
+      val testQueueName = "bucky-requeue-consumer-ack" + Random.nextInt()
 
-    for {
-      amqpClient <- amqpClientConfig
-      publish <- amqpClient.publisher()
-      stubHandler = new StubRequeueHandler[Int]
-      consumer <- requeueHandlerOf(amqpClient)(QueueName(testQueueName), stubHandler, requeuePolicy, intMessageDeserializer)
-    } {
-      stubHandler.nextResponse = Future.successful(Requeue)
-      publish(PublishCommand(Exchange(""), RoutingKey(testQueueName), MessageProperties.MINIMAL_PERSISTENT_BASIC, Blob.from(1))).futureValue shouldBe published
+      val (amqpClientConfig: AmqpClientConfig, _, _) = IntegrationUtils.configAndHttp
 
-      eventually {
-        stubHandler.receivedMessages.length should be >= requeuePolicy.maximumProcessAttempts
-      }(requeuePatienceConfig)
-    }
-  }
+      for {
+        amqpClient <- amqpClientConfig
+        queues <- IntegrationUtils.declareQueue(testQueueName)
+        (testQueue, testRequeue, _) = queues
+        publish <- amqpClient.publisher()
+        stubHandler = new StubRequeueHandler[Int]
+        consumer <- requeueHandlerOf(amqpClient)(QueueName(testQueueName), stubHandler, requeuePolicy, intMessageDeserializer)
+      } {
+        stubHandler.nextResponse = Future.successful(Consume(Ack))
+        publish(PublishCommand(ExchangeName(""), RoutingKey(testQueueName), MessageProperties.MINIMAL_PERSISTENT_BASIC, Blob.from(1))).futureValue shouldBe published
 
-  test("It should deadletter the message after maximumProcessAttempts unsuccessful attempts to process") {
-    val testQueueName = "bucky-requeue-consumer-test" + Random.nextInt()
-    val (amqpClientConfig: AmqpClientConfig, _, _) = IntegrationUtils.configAndHttp
-    val (testQueue, testRequeue, testDeadletterQueue) = IntegrationUtils.declareQueue(testQueueName)
-
-    for {
-      amqpClient <- amqpClientConfig
-      publish <- amqpClient.publisher()
-      stubHandler = new StubRequeueHandler[Int]
-      consumer <- requeueHandlerOf(amqpClient)(QueueName(testQueueName), stubHandler, requeuePolicy, intMessageDeserializer)
-    } {
-      stubHandler.nextResponse = Future.successful(Requeue)
-      val payload = Blob.from(1)
-      publish(PublishCommand(Exchange(""), RoutingKey(testQueueName), MessageProperties.MINIMAL_PERSISTENT_BASIC, payload)).futureValue shouldBe published
-
-      eventually {
-        testQueue.allMessages shouldBe 'empty
+        eventually {
+          testQueue.allMessages shouldBe 'empty
+        }
         testRequeue.allMessages shouldBe 'empty
-        stubHandler.receivedMessages.size shouldBe requeuePolicy.maximumProcessAttempts
-        testDeadletterQueue.allMessages.map(_.payload) shouldBe List(payload)
-      }(requeuePatienceConfig)
+        stubHandler.receivedMessages.length shouldBe 1
+      }
     }
-  }
 
-  test("It should deadletter the message if requeued and maximumProcessAttempts is < 1") {
-    val testQueueName = "bucky-requeue-consumer-test" + Random.nextInt()
-    val (amqpClientConfig: AmqpClientConfig, _, _) = IntegrationUtils.configAndHttp
-    val (testQueue, testRequeue, testDeadletterQueue) = IntegrationUtils.declareQueue(testQueueName)
+    test("It should reprocess the message at least maximumProcessAttempts times upon repeated requeue") {
+      val testQueueName = "bucky-requeue-consumer-test" + Random.nextInt()
+      val (amqpClientConfig: AmqpClientConfig, _, _) = IntegrationUtils.configAndHttp
 
-    val negativeProcessAttemptsRequeuePolicy = RequeuePolicy(Random.nextInt(10) * -1)
+      for {
+        amqpClient <- amqpClientConfig
+        _ <- IntegrationUtils.declareQueue(testQueueName)
+        publish <- amqpClient.publisher()
+        stubHandler = new StubRequeueHandler[Int]
+        consumer <- requeueHandlerOf(amqpClient)(QueueName(testQueueName), stubHandler, requeuePolicy, intMessageDeserializer)
+      } {
+        stubHandler.nextResponse = Future.successful(Requeue)
+        publish(PublishCommand(ExchangeName(""), RoutingKey(testQueueName), MessageProperties.MINIMAL_PERSISTENT_BASIC, Blob.from(1))).futureValue shouldBe published
 
-    println(negativeProcessAttemptsRequeuePolicy)
-
-    for {
-      amqpClient <- amqpClientConfig
-      publish <- amqpClient.publisher()
-      stubHandler = new StubRequeueHandler[Int]
-      consumer <- requeueHandlerOf(amqpClient)(QueueName(testQueueName), stubHandler, negativeProcessAttemptsRequeuePolicy, intMessageDeserializer)
-    } {
-      stubHandler.nextResponse = Future.successful(Requeue)
-      val payload = Blob.from(1)
-      publish(PublishCommand(Exchange(""), RoutingKey(testQueueName), MessageProperties.MINIMAL_PERSISTENT_BASIC, payload)).futureValue shouldBe published
-
-      eventually {
-        testQueue.allMessages shouldBe 'empty
-        testRequeue.allMessages shouldBe 'empty
-        stubHandler.receivedMessages.size shouldBe 1
-        testDeadletterQueue.allMessages.map(_.payload) shouldBe List(payload)
-      }(requeuePatienceConfig)
+        eventually {
+          stubHandler.receivedMessages.length should be >= requeuePolicy.maximumProcessAttempts
+        }(requeuePatienceConfig)
+      }
     }
-  }
 
+    test("It should deadletter the message after maximumProcessAttempts unsuccessful attempts to process") {
+      val testQueueName = "bucky-requeue-consumer-test" + Random.nextInt()
+      val (amqpClientConfig: AmqpClientConfig, _, _) = IntegrationUtils.configAndHttp
+
+      for {
+        amqpClient <- amqpClientConfig
+        queues <- IntegrationUtils.declareQueue(testQueueName)
+        (testQueue, testRequeue, testDeadletterQueue) = queues
+        publish <- amqpClient.publisher()
+        stubHandler = new StubRequeueHandler[Int]
+        consumer <- requeueHandlerOf(amqpClient)(QueueName(testQueueName), stubHandler, requeuePolicy, intMessageDeserializer)
+      } {
+        stubHandler.nextResponse = Future.successful(Requeue)
+        val payload = Blob.from(1)
+        publish(PublishCommand(ExchangeName(""), RoutingKey(testQueueName), MessageProperties.MINIMAL_PERSISTENT_BASIC, payload)).futureValue shouldBe published
+
+        eventually {
+          testQueue.allMessages shouldBe 'empty
+          testRequeue.allMessages shouldBe 'empty
+          stubHandler.receivedMessages.size shouldBe requeuePolicy.maximumProcessAttempts
+          testDeadletterQueue.allMessages.map(_.payload) shouldBe List(payload)
+        }(requeuePatienceConfig)
+      }
+    }
+
+    test("It should deadletter the message if requeued and maximumProcessAttempts is < 1") {
+      val testQueueName = "bucky-requeue-consumer-test" + Random.nextInt()
+      val (amqpClientConfig: AmqpClientConfig, _, _) = IntegrationUtils.configAndHttp
+
+      val negativeProcessAttemptsRequeuePolicy = RequeuePolicy(Random.nextInt(10) * -1)
+
+      println(negativeProcessAttemptsRequeuePolicy)
+
+      for {
+        amqpClient <- amqpClientConfig
+        queues <- IntegrationUtils.declareQueue(testQueueName)
+        (testQueue, testRequeue, testDeadletterQueue) = queues
+        publish <- amqpClient.publisher()
+        stubHandler = new StubRequeueHandler[Int]
+        consumer <- requeueHandlerOf(amqpClient)(QueueName(testQueueName), stubHandler, negativeProcessAttemptsRequeuePolicy, intMessageDeserializer)
+      } {
+        stubHandler.nextResponse = Future.successful(Requeue)
+        val payload = Blob.from(1)
+        publish(PublishCommand(ExchangeName(""), RoutingKey(testQueueName), MessageProperties.MINIMAL_PERSISTENT_BASIC, payload)).futureValue shouldBe published
+
+        eventually {
+          testQueue.allMessages shouldBe 'empty
+          testRequeue.allMessages shouldBe 'empty
+          stubHandler.receivedMessages.size shouldBe 1
+          testDeadletterQueue.allMessages.map(_.payload) shouldBe List(payload)
+        }(requeuePatienceConfig)
+      }
+    }
 }
 
 

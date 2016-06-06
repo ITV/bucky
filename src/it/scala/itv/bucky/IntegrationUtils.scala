@@ -1,12 +1,17 @@
 package itv.bucky
 
 import com.typesafe.config.ConfigFactory
+import itv.bucky.decl.{Declaration, Binding, Exchange, Queue}
+import itv.contentdelivery.lifecycle.Lifecycle
 import itv.contentdelivery.testutilities.rmq.{BrokerConfig, MessageQueue}
 import itv.httpyroraptor._
 import itv.utils.Blob
 import org.scalatest.Matchers._
+import scala.concurrent.{Await, Future}
 import scalaz.Id
 import scalaz.Id.Id
+import scala.concurrent.duration._
+import itv.contentdelivery.testutilities.SameThreadExecutionContext.implicitly
 
 object IntegrationUtils {
 
@@ -33,32 +38,66 @@ object IntegrationUtils {
     (amqpClientConfig, rmqAdminConfig, rmqAdminHhttp)
   }
 
-  def declareQueue(name: String): (MessageQueue, MessageQueue, MessageQueue) = {
+  def declareQueue(name: String): Lifecycle[(MessageQueue, MessageQueue, MessageQueue)] = {
     val (amqpClientConfig: AmqpClientConfig, rmqAdminConfig: BrokerConfig, rmqAdminHttp: AuthenticatedHttpClient[Id.Id]) = configAndHttp
 
-    rmqAdminHttp.handle(PUT(UriBuilder / "api" / "queues" / "/" / name).body("application/json", Blob.from(
-      s"""{"auto_delete": "true", "durable": "true", "arguments": {"x-dead-letter-exchange": "$name.dlx", "x-expires": 60000}}"""))) shouldBe 'successful
-    rmqAdminHttp.handle(PUT(UriBuilder / "api" / "queues" / "/" / s"$name.requeue").body("application/json", Blob.from(
-      s"""{"auto_delete": "true", "durable": "true", "arguments": {"x-dead-letter-exchange": "$name.redeliver", "x-expires": 60000, "x-message-ttl": 1000}}"""))) shouldBe 'successful
-    rmqAdminHttp.handle(PUT(UriBuilder / "api" / "queues" / "/" / s"$name.dlq").body("application/json", Blob.from(
-      """{"auto_delete": "true", "durable": "true", "arguments": {"x-expires": 60000}}"""))) shouldBe 'successful
+    val mainQueue = QueueName(name)
+    val deadletterQueue = QueueName(s"$name.dlq")
+    val requeueQueue = QueueName(s"$name.requeue")
 
-    rmqAdminHttp.handle(PUT(UriBuilder / "api" / "exchanges" / "/" / s"$name.dlx").body("application/json", Blob.from(
-      """{"type":"direct","auto_delete":true,"durable":true,"internal":false,"arguments":{"x-expires": 60000}}"""))) shouldBe 'successful
-    rmqAdminHttp.handle(PUT(UriBuilder / "api" / "exchanges" / "/" / s"$name.requeue").body("application/json", Blob.from(
-      """{"type":"direct","auto_delete":true,"durable":true,"internal":false,"arguments":{"x-expires": 60000}}"""))) shouldBe 'successful
-    rmqAdminHttp.handle(PUT(UriBuilder / "api" / "exchanges" / "/" / s"$name.redeliver").body("application/json", Blob.from(
-      """{"type":"direct","auto_delete":true,"durable":true,"internal":false,"arguments":{"x-expires": 60000}}"""))) shouldBe 'successful
+    val oneMinute = Int.box(60000)
+    val oneSecond = Int.box(1000)
 
-    rmqAdminHttp.handle(POST(UriBuilder / "api" / "bindings" / "/" / "e" / s"$name.redeliver" / "q" / name).body("application/json", Blob.from(
-      s"""{"routing_key":"$name","arguments":{}}"""))) shouldBe 'successful
-    rmqAdminHttp.handle(POST(UriBuilder / "api" / "bindings" / "/" / "e" / s"$name.requeue" / "q" / s"$name.requeue").body("application/json", Blob.from(
-      s"""{"routing_key":"$name","arguments":{}}"""))) shouldBe 'successful
-    rmqAdminHttp.handle(POST(UriBuilder / "api" / "bindings" / "/" / "e" / s"$name.dlx" / "q" / s"$name.dlq").body("application/json", Blob.from(
-      s"""{"routing_key":"$name","arguments":{}}"""))) shouldBe 'successful
+    val queues = List(Queue(mainQueue,
+      autoDelete = true,
+      durable = false,
+      internal = false,
+      Map("x-dead-letter-exchange" -> s"$name.dlx", "x-expires" -> oneMinute)),
+      Queue(deadletterQueue,
+        autoDelete = true,
+        durable = false,
+        internal = false,
+        Map("x-expires" -> oneMinute)),
+      Queue(requeueQueue,
+        autoDelete = true,
+        durable = false,
+        internal = false,
+        Map("x-dead-letter-exchange" -> s"$name.redeliver", "x-expires" -> oneMinute, "x-message-ttl" -> oneSecond)))
 
+    val deadletterExchange = ExchangeName(s"$name.dlx")
+    val requeueExchange = ExchangeName(s"$name.requeue")
+    val redeliverExchange = ExchangeName(s"$name.redeliver")
 
-    (MessageQueue(name, rmqAdminConfig), MessageQueue(name + ".requeue", rmqAdminConfig), MessageQueue(name + ".dlq", rmqAdminConfig))
+    val exchanges = List(Exchange(deadletterExchange,
+      autoDelete = false,
+      durable = true,
+      internal = false,
+      Map("x-expires" -> oneMinute)),
+      Exchange(requeueExchange,
+        autoDelete = false,
+        durable = true,
+        internal = false,
+        Map("x-expires" -> oneMinute)),
+      Exchange(redeliverExchange,
+      autoDelete = false,
+      durable = true,
+      internal = false,
+      Map("x-expires" -> oneMinute)))
+
+    val bindings = List(Binding(redeliverExchange, mainQueue, RoutingKey(name), Map.empty),
+    Binding(requeueExchange, requeueQueue, RoutingKey(name), Map.empty),
+    Binding(deadletterExchange, deadletterQueue, RoutingKey(name), Map.empty))
+
+    val configuration: List[Declaration] = queues ++ exchanges ++ bindings
+
+    for {
+      client <- amqpClientConfig
+      result = Declaration.applyAll(configuration, client)
+      _ = Await.result(result, 5.seconds)
+    }
+      yield (MessageQueue(mainQueue.value, rmqAdminConfig),
+        MessageQueue(requeueQueue.value, rmqAdminConfig),
+        MessageQueue(deadletterQueue.value, rmqAdminConfig))
   }
 
 

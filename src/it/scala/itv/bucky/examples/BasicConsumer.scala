@@ -54,7 +54,7 @@ object BasicConsumer extends App {
         message => Blob.from(message.foo)
       }
 
-      val myMessageSerializer = blobSerializer[MyMessage] using RoutingKey(targetQueueName.value) using Exchange("")
+      val myMessageSerializer = blobSerializer[MyMessage] using RoutingKey(targetQueueName.value) using ExchangeName("")
 
       lazy val (testQueues, amqpClientConfig, rmqAdminHhttp) = IntegrationUtils.setUp(QueueName(queueName.value), QueueName(targetQueueName.value))
 
