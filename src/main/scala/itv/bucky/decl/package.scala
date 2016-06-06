@@ -2,6 +2,7 @@ package itv.bucky
 
 import com.rabbitmq.client.Channel
 
+import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
 import scala.collection.JavaConverters._
 
@@ -30,12 +31,30 @@ package object decl {
 
   case class Exchange(name: ExchangeName,
                       exchangeType: ExchangeType = Direct,
-                      durable: Boolean = true,
-                      autoDelete: Boolean = false,
-                      internal: Boolean = false,
-                      arguments: Map[String, AnyRef] = Map.empty) extends Declaration {
-    override def applyTo(client: AmqpClient)(implicit ec: ExecutionContext): Future[Unit] =
-      declOperation(client, _.exchangeDeclare(name.value, exchangeType.value, durable, autoDelete, internal, arguments.toMap.asJava))
+                      isDurable: Boolean = true,
+                      shouldAutoDelete: Boolean = false,
+                      isInternal: Boolean = false,
+                      arguments: Map[String, AnyRef] = Map.empty,
+                      bindings: List[Binding] = List.empty) extends Declaration {
+
+    override def applyTo(client: AmqpClient)(implicit ec: ExecutionContext): Future[Unit] = {
+      val createExchange =
+       declOperation(client, _.exchangeDeclare(name.value, exchangeType.value, isDurable, shouldAutoDelete, isInternal, arguments.toMap.asJava))
+      val createBindings: List[Future[Unit]] =
+        bindings.map(_.applyTo(client))
+
+      Future.sequence(createBindings :+ createExchange).map(_ => ())
+    }
+
+    def notDurable: Exchange = copy(isDurable = false)
+    def autoDelete: Exchange = copy(shouldAutoDelete = true)
+    def internal: Exchange = copy(isInternal = true)
+
+    def argument(value: (String, AnyRef)): Exchange = copy(arguments = this.arguments + value)
+    def expires(value: FiniteDuration): Exchange = argument("x-expires" -> Long.box(value.toMillis))
+
+    def binding(routingKeyToQueue: (RoutingKey, QueueName), arguments: Map[String, AnyRef] = Map.empty): Exchange =
+      copy(bindings = this.bindings :+ Binding(name, routingKeyToQueue._2, routingKeyToQueue._1, arguments))
 
   }
 
@@ -49,12 +68,24 @@ package object decl {
   }
 
   case class Queue(queueName: QueueName,
-                   durable: Boolean = true,
-                   exclusive: Boolean = false,
-                   autoDelete: Boolean = false,
+                   isDurable: Boolean = true,
+                   isExclusive: Boolean = false,
+                   shouldAutoDelete: Boolean = false,
                    arguments: Map[String, AnyRef] = Map.empty) extends Declaration {
+    
     override def applyTo(client: AmqpClient)(implicit ec: ExecutionContext): Future[Unit] =
-      declOperation(client, _.queueDeclare(queueName.value, exclusive, exclusive, autoDelete, arguments.toMap.asJava))
+      declOperation(client, _.queueDeclare(queueName.value, isDurable, isExclusive, shouldAutoDelete, arguments.toMap.asJava))
+
+    def notDurable: Queue = copy(isDurable = false)
+    def exclusive: Queue = copy(isExclusive = true)
+    def autoDelete: Queue = copy(shouldAutoDelete = true)
+
+    def argument(value: (String, AnyRef)): Queue = copy(arguments = this.arguments + value)
+    def expires(value: FiniteDuration): Queue = argument("x-expires" -> Long.box(value.toMillis))
+
+    def deadLetterExchange(exchangeName: ExchangeName): Queue = argument("x-dead-letter-exchange" -> exchangeName.value)
+
+    def messageTTL(value: FiniteDuration): Queue = argument("x-message-ttl" -> Long.box(value.toMillis))
 
   }
 

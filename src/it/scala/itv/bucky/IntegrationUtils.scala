@@ -45,54 +45,23 @@ object IntegrationUtils {
     val deadletterQueue = QueueName(s"$name.dlq")
     val requeueQueue = QueueName(s"$name.requeue")
 
-    val oneMinute = Int.box(60000)
-    val oneSecond = Int.box(1000)
-
-    val queues = List(Queue(mainQueue,
-      durable = true,
-      exclusive = false,
-      autoDelete = true,
-      Map("x-dead-letter-exchange" -> s"$name.dlx", "x-expires" -> oneMinute)),
-      Queue(deadletterQueue,
-        durable = true,
-        exclusive = false,
-        autoDelete = true,
-        Map("x-expires" -> oneMinute)),
-      Queue(requeueQueue,
-        durable = true,
-        exclusive = false,
-        autoDelete = true,
-        Map("x-dead-letter-exchange" -> s"$name.redeliver", "x-expires" -> oneMinute, "x-message-ttl" -> oneSecond)))
-
-    val deadletterExchange = ExchangeName(s"$name.dlx")
+    val dlx = ExchangeName(s"$name.dlx")
     val requeueExchange = ExchangeName(s"$name.requeue")
     val redeliverExchange = ExchangeName(s"$name.redeliver")
 
-    val exchanges = List(Exchange(deadletterExchange,
-      durable = false,
-      autoDelete = true,
-      internal = false,
-      arguments = Map("x-expires" -> oneMinute)),
-      Exchange(requeueExchange,
-        durable = false,
-        autoDelete = true,
-        internal = false,
-        arguments = Map("x-expires" -> oneMinute)),
-      Exchange(redeliverExchange,
-      durable = false,
-      autoDelete = true,
-      internal = false,
-      arguments = Map("x-expires" -> oneMinute)))
+    val queues = List(Queue(mainQueue).autoDelete.deadLetterExchange(dlx).expires(1.minute),
+      Queue(deadletterQueue).autoDelete.expires(1.minute),
+      Queue(requeueQueue).autoDelete.deadLetterExchange(redeliverExchange).expires(1.minute).messageTTL(1.second))
 
-    val bindings = List(Binding(redeliverExchange, mainQueue, RoutingKey(name), Map.empty),
-    Binding(requeueExchange, requeueQueue, RoutingKey(name), Map.empty),
-    Binding(deadletterExchange, deadletterQueue, RoutingKey(name), Map.empty))
+    val routingKey = RoutingKey(name)
 
-    val configuration: List[Declaration] = queues ++ exchanges ++ bindings
+    val exchanges = List(Exchange(dlx).expires(1.minute).binding(routingKey -> deadletterQueue),
+      Exchange(requeueExchange).expires(1.minute).binding(routingKey -> requeueQueue),
+      Exchange(redeliverExchange).expires(1.minute).binding(routingKey -> mainQueue))
 
     for {
       client <- amqpClientConfig
-      result = Declaration.applyAll(configuration, client)
+      result = Declaration.applyAll(queues ++ exchanges, client)
       _ = Await.result(result, 5.seconds)
     }
       yield (MessageQueue(mainQueue.value, rmqAdminConfig),

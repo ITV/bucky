@@ -28,9 +28,9 @@ class DeclarationTest extends FunSuite with ScalaFutures {
 
     Lifecycle.using(amqpConfig) { amqpClient =>
       Queue(QueueName(queueName),
-        durable = true,
-        exclusive = true,
-        autoDelete = false,
+        isDurable = true,
+        isExclusive = true,
+        shouldAutoDelete = false,
         Map.empty).applyTo(amqpClient).futureValue
       rmqAdminHttp.handle(GET(UriBuilder / "api" / "queues" / "/" / queueName)).statusCode shouldBe 200
 
@@ -63,9 +63,9 @@ class DeclarationTest extends FunSuite with ScalaFutures {
 
     Lifecycle.using(amqpConfig) { amqpClient =>
       Exchange(ExchangeName(exchangeName),
-        durable = false,
-        autoDelete = true,
-        internal = false,
+        isDurable = false,
+        shouldAutoDelete = true,
+        isInternal = false,
         arguments = Map.empty).applyTo(amqpClient).futureValue
 
       eventually {
@@ -83,15 +83,15 @@ class DeclarationTest extends FunSuite with ScalaFutures {
 
     Lifecycle.using(amqpConfig) { amqpClient =>
       Exchange(exchangeName,
-        durable = false,
-        autoDelete = true,
-        internal = false,
+        isDurable = false,
+        shouldAutoDelete = true,
+        isInternal = false,
         arguments = Map.empty).applyTo(amqpClient).futureValue
 
       Queue(queueName,
-        durable = false,
-        exclusive = true,
-        autoDelete = false,
+        isDurable = false,
+        isExclusive = true,
+        shouldAutoDelete = false,
         Map.empty).applyTo(amqpClient).futureValue
 
       Binding(exchangeName,
