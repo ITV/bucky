@@ -21,13 +21,21 @@ package object decl {
       client withChannel thunk
     }.map(_ => ())
 
+  sealed trait ExchangeType {
+    def value: String
+  }
+  case object Direct extends ExchangeType {
+    override def value: String = "direct"
+  }
+
   case class Exchange(name: ExchangeName,
-                      autoDelete: Boolean,
-                      durable: Boolean,
-                      internal: Boolean,
-                      arguments: Map[String, AnyRef]) extends Declaration {
+                      exchangeType: ExchangeType = Direct,
+                      durable: Boolean = true,
+                      autoDelete: Boolean = false,
+                      internal: Boolean = false,
+                      arguments: Map[String, AnyRef] = Map.empty) extends Declaration {
     override def applyTo(client: AmqpClient)(implicit ec: ExecutionContext): Future[Unit] =
-      declOperation(client, _.exchangeDeclare(name.value, "direct", autoDelete, durable, internal, arguments.toMap.asJava))
+      declOperation(client, _.exchangeDeclare(name.value, exchangeType.value, durable, autoDelete, internal, arguments.toMap.asJava))
 
   }
 
@@ -41,12 +49,12 @@ package object decl {
   }
 
   case class Queue(queueName: QueueName,
-                   autoDelete: Boolean,
-                   durable: Boolean,
-                   internal: Boolean,
-                   arguments: Map[String, AnyRef]) extends Declaration {
+                   durable: Boolean = true,
+                   exclusive: Boolean = false,
+                   autoDelete: Boolean = false,
+                   arguments: Map[String, AnyRef] = Map.empty) extends Declaration {
     override def applyTo(client: AmqpClient)(implicit ec: ExecutionContext): Future[Unit] =
-      declOperation(client, _.queueDeclare(queueName.value, autoDelete, durable, internal, arguments.toMap.asJava))
+      declOperation(client, _.queueDeclare(queueName.value, exclusive, exclusive, autoDelete, arguments.toMap.asJava))
 
   }
 

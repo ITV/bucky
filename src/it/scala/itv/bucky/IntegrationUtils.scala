@@ -49,19 +49,19 @@ object IntegrationUtils {
     val oneSecond = Int.box(1000)
 
     val queues = List(Queue(mainQueue,
+      durable = true,
+      exclusive = false,
       autoDelete = true,
-      durable = false,
-      internal = false,
       Map("x-dead-letter-exchange" -> s"$name.dlx", "x-expires" -> oneMinute)),
       Queue(deadletterQueue,
+        durable = true,
+        exclusive = false,
         autoDelete = true,
-        durable = false,
-        internal = false,
         Map("x-expires" -> oneMinute)),
       Queue(requeueQueue,
+        durable = true,
+        exclusive = false,
         autoDelete = true,
-        durable = false,
-        internal = false,
         Map("x-dead-letter-exchange" -> s"$name.redeliver", "x-expires" -> oneMinute, "x-message-ttl" -> oneSecond)))
 
     val deadletterExchange = ExchangeName(s"$name.dlx")
@@ -69,20 +69,20 @@ object IntegrationUtils {
     val redeliverExchange = ExchangeName(s"$name.redeliver")
 
     val exchanges = List(Exchange(deadletterExchange,
-      autoDelete = false,
-      durable = true,
+      durable = false,
+      autoDelete = true,
       internal = false,
-      Map("x-expires" -> oneMinute)),
+      arguments = Map("x-expires" -> oneMinute)),
       Exchange(requeueExchange,
-        autoDelete = false,
-        durable = true,
+        durable = false,
+        autoDelete = true,
         internal = false,
-        Map("x-expires" -> oneMinute)),
+        arguments = Map("x-expires" -> oneMinute)),
       Exchange(redeliverExchange,
-      autoDelete = false,
-      durable = true,
+      durable = false,
+      autoDelete = true,
       internal = false,
-      Map("x-expires" -> oneMinute)))
+      arguments = Map("x-expires" -> oneMinute)))
 
     val bindings = List(Binding(redeliverExchange, mainQueue, RoutingKey(name), Map.empty),
     Binding(requeueExchange, requeueQueue, RoutingKey(name), Map.empty),
