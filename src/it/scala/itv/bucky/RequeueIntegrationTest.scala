@@ -142,14 +142,14 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
         amqpClient <- amqpClientConfig
         _ <- IntegrationUtils.declareQueue(testQueueName)
         publish <- amqpClient.publisher()
-        stubHandler = new StubRequeueHandler[Int]
-        consumer <- requeueHandlerOf(amqpClient)(QueueName(testQueueName), stubHandler, requeuePolicy, intMessageDeserializer)
+        requeueHandler = new StubRequeueHandler[Int]
+        consumer <- requeueHandlerOf(amqpClient)(QueueName(testQueueName), requeueHandler, requeuePolicy, intMessageDeserializer)
       } {
-        stubHandler.nextResponse = Future.successful(Requeue)
+        requeueHandler.nextResponse = Future.successful(Requeue)
         publish(PublishCommand(ExchangeName(""), RoutingKey(testQueueName), MessageProperties.MINIMAL_PERSISTENT_BASIC, Blob.from(1))).futureValue shouldBe published
 
         eventually {
-          stubHandler.receivedMessages.length should be >= requeuePolicy.maximumProcessAttempts
+          requeueHandler.receivedMessages.length should be >= requeuePolicy.maximumProcessAttempts
         }(requeuePatienceConfig)
       }
     }
@@ -163,17 +163,17 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
         queues <- IntegrationUtils.declareQueue(testQueueName)
         (testQueue, testRequeue, testDeadletterQueue) = queues
         publish <- amqpClient.publisher()
-        stubHandler = new StubRequeueHandler[Int]
-        consumer <- requeueHandlerOf(amqpClient)(QueueName(testQueueName), stubHandler, requeuePolicy, intMessageDeserializer)
+        requeueHandler = new StubRequeueHandler[Int]
+        consumer <- requeueHandlerOf(amqpClient)(QueueName(testQueueName), requeueHandler, requeuePolicy, intMessageDeserializer)
       } {
-        stubHandler.nextResponse = Future.successful(Requeue)
+        requeueHandler.nextResponse = Future.successful(Requeue)
         val payload = Blob.from(1)
         publish(PublishCommand(ExchangeName(""), RoutingKey(testQueueName), MessageProperties.MINIMAL_PERSISTENT_BASIC, payload)).futureValue shouldBe published
 
         eventually {
           testQueue.allMessages shouldBe 'empty
           testRequeue.allMessages shouldBe 'empty
-          stubHandler.receivedMessages.size shouldBe requeuePolicy.maximumProcessAttempts
+          requeueHandler.receivedMessages.size shouldBe requeuePolicy.maximumProcessAttempts
           testDeadletterQueue.allMessages.map(_.payload) shouldBe List(payload)
         }(requeuePatienceConfig)
       }
@@ -192,17 +192,17 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
         queues <- IntegrationUtils.declareQueue(testQueueName)
         (testQueue, testRequeue, testDeadletterQueue) = queues
         publish <- amqpClient.publisher()
-        stubHandler = new StubRequeueHandler[Int]
-        consumer <- requeueHandlerOf(amqpClient)(QueueName(testQueueName), stubHandler, negativeProcessAttemptsRequeuePolicy, intMessageDeserializer)
+        requeueHandler = new StubRequeueHandler[Int]
+        consumer <- requeueHandlerOf(amqpClient)(QueueName(testQueueName), requeueHandler, negativeProcessAttemptsRequeuePolicy, intMessageDeserializer)
       } {
-        stubHandler.nextResponse = Future.successful(Requeue)
+        requeueHandler.nextResponse = Future.successful(Requeue)
         val payload = Blob.from(1)
         publish(PublishCommand(ExchangeName(""), RoutingKey(testQueueName), MessageProperties.MINIMAL_PERSISTENT_BASIC, payload)).futureValue shouldBe published
 
         eventually {
           testQueue.allMessages shouldBe 'empty
           testRequeue.allMessages shouldBe 'empty
-          stubHandler.receivedMessages.size shouldBe 1
+          requeueHandler.receivedMessages.size shouldBe 1
           testDeadletterQueue.allMessages.map(_.payload) shouldBe List(payload)
         }(requeuePatienceConfig)
       }
