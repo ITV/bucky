@@ -46,6 +46,6 @@ case class RequeueTransformer(requeuePublisher: Publisher[PublishCommand],
               requeuePublisher(buildRequeuePublishCommand(delivery, initialRemainingAttempts)).map(_ => Ack)
             }
         }
-      case Consume(action) => Future.successful(action)
+      case action: ConsumeAction => Future.successful(action)
     }
 }

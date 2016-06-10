@@ -88,7 +88,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
   test("It should not requeue when the handler Acks") {
     val handler = new StubRequeueHandler[Int]
     Lifecycle.using(testLifecycle(handler, requeuePolicy, intMessageDeserializer)) { app =>
-      handler.nextResponse = Future.successful(Consume(Ack))
+      handler.nextResponse = Future.successful(Ack)
 
       app.publish(Blob.from(1)).futureValue shouldBe published
 
@@ -184,7 +184,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
 
 }
 
-object AlwaysRequeue extends RequeueHandler[String] {
+object ñinAlwaysRequeue extends RequeueHandler[String] {
   override def apply(message: String): Future[RequeueConsumeAction] =
     Future.successful(Requeue)
 }

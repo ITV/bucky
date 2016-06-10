@@ -1,27 +1,19 @@
 package itv.bucky
 
 import com.typesafe.config.ConfigFactory
-<<<<<<< HEAD
-import itv.bucky.decl.{Declaration, Exchange, Queue}
-=======
+import itv.bucky.decl._
 import itv.bucky.decl.pattern.Pattern
-import itv.bucky.decl.{Binding, Declaration, Exchange, Queue}
->>>>>>> Integration tests should use requeue pattern
 import itv.contentdelivery.lifecycle.Lifecycle
-import itv.contentdelivery.testutilities.SameThreadExecutionContext.implicitly
-import itv.contentdelivery.testutilities.rmq.{BrokerConfig, MessageQueue}
+import itv.contentdelivery.testutilities.rmq._
 import itv.httpyroraptor._
 import itv.utils.Blob
 import org.scalatest.Matchers._
 
-<<<<<<< HEAD
-import scala.concurrent.Await
 import scala.concurrent.duration._
-=======
-import scala.concurrent.{Await, Future}
->>>>>>> Integration tests should use requeue pattern
-import scalaz.Id
-import scalaz.Id.Id
+import scalaz._
+import Scalaz._
+import scala.concurrent.Await
+import itv.contentdelivery.testutilities.SameThreadExecutionContext.implicitly
 
 object IntegrationUtils {
 

@@ -19,13 +19,12 @@ package object bucky {
   case class QueueName(value: String)
 
   sealed trait ConsumeAction
-  case object Ack extends ConsumeAction
-  case object DeadLetter extends ConsumeAction
-  case object RequeueImmediately extends ConsumeAction
-
   sealed trait RequeueConsumeAction
+
+  case object Ack extends ConsumeAction with RequeueConsumeAction
+  case object DeadLetter extends ConsumeAction with RequeueConsumeAction
+  case object RequeueImmediately extends ConsumeAction with RequeueConsumeAction
   case object Requeue extends RequeueConsumeAction
-  case class Consume(action: ConsumeAction) extends RequeueConsumeAction
 
   case class ConsumerTag(value: String)
   object ConsumerTag {

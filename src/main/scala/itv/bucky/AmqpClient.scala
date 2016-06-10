@@ -137,7 +137,7 @@ object AmqpClient extends StrictLogging {
                                                   handler: RequeueHandler[T],
                                                   requeuePolicy: RequeuePolicy,
                                                   deserializer: BlobDeserializer[T],
-                                                  deserializationFailureAction: RequeueConsumeAction = Consume(DeadLetter))
+                                                  deserializationFailureAction: RequeueConsumeAction = DeadLetter)
                                                   (implicit ec: ExecutionContext): Lifecycle[Unit] =
     requeueOf(amqpClient)(queueName, handlerOf(handler, deserializer, deserializationFailureAction)(ec), requeuePolicy)
 

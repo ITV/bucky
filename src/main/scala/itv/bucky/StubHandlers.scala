@@ -16,4 +16,4 @@ class StubHandler[T, S](var nextResponse: Future[S]) extends (T => Future[S]) {
 
 class StubConsumeHandler[T] extends StubHandler[T, ConsumeAction](Future.successful(Ack))
 
-class StubRequeueHandler[T] extends StubHandler[T, RequeueConsumeAction](Future.successful(Consume(Ack)))
+class StubRequeueHandler[T] extends StubHandler[T, RequeueConsumeAction](Future.successful(Ack) )

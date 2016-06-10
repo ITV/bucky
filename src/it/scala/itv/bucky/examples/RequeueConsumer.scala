@@ -20,7 +20,7 @@ object RequeueIfNotMartinHandler extends RequeueHandler[Person] with StrictLoggi
   override def apply(person: Person): Future[RequeueConsumeAction] =
     if (person.name == "Martin") {
       logger.info("Person was Martin, cool")
-      Future.successful(Consume(Ack))
+      Future.successful(Ack)
     }
     else {
       logger.info(s"$person is not Martin, requeueing")
