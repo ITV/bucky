@@ -1,6 +1,7 @@
 package itv.bucky
 
 import com.rabbitmq.client.Channel
+import com.typesafe.scalalogging.StrictLogging
 
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
@@ -35,11 +36,14 @@ package object decl {
                       shouldAutoDelete: Boolean = false,
                       isInternal: Boolean = false,
                       arguments: Map[String, AnyRef] = Map.empty,
-                      bindings: List[Binding] = List.empty) extends Declaration {
+                      bindings: List[Binding] = List.empty) extends Declaration with StrictLogging {
 
     override def applyTo(client: AmqpClient)(implicit ec: ExecutionContext): Future[Unit] = {
       val createExchange =
-       declOperation(client, _.exchangeDeclare(name.value, exchangeType.value, isDurable, shouldAutoDelete, isInternal, arguments.toMap.asJava))
+       declOperation(client, {
+         logger.info(s"Declaring Exchange($name, $exchangeType, isDurable=$isDurable, shouldAutoDelete=$shouldAutoDelete, isInternal=$isInternal, arguments=$arguments)")
+         _.exchangeDeclare(name.value, exchangeType.value, isDurable, shouldAutoDelete, isInternal, arguments.asJava)
+       })
       val createBindings: List[Future[Unit]] =
         bindings.map(_.applyTo(client))
 
@@ -61,9 +65,12 @@ package object decl {
   case class Binding(exchangeName: ExchangeName,
                      queueName: QueueName,
                      routingKey: RoutingKey,
-                     arguments: Map[String, AnyRef]) extends Declaration {
+                     arguments: Map[String, AnyRef]) extends Declaration with StrictLogging {
     override def applyTo(client: AmqpClient)(implicit ec: ExecutionContext): Future[Unit] =
-      declOperation(client, _.queueBind(queueName.value, exchangeName.value, routingKey.value, arguments.toMap.asJava))
+      declOperation(client, {
+        logger.info(s"Declaring $this")
+        _.queueBind(queueName.value, exchangeName.value, routingKey.value, arguments.asJava)
+      })
 
   }
 
@@ -71,10 +78,13 @@ package object decl {
                    isDurable: Boolean = true,
                    isExclusive: Boolean = false,
                    shouldAutoDelete: Boolean = false,
-                   arguments: Map[String, AnyRef] = Map.empty) extends Declaration {
+                   arguments: Map[String, AnyRef] = Map.empty) extends Declaration with StrictLogging {
     
     override def applyTo(client: AmqpClient)(implicit ec: ExecutionContext): Future[Unit] =
-      declOperation(client, _.queueDeclare(queueName.value, isDurable, isExclusive, shouldAutoDelete, arguments.toMap.asJava))
+      declOperation(client, {
+        logger.info(s"Declaring $this")
+        _.queueDeclare(queueName.value, isDurable, isExclusive, shouldAutoDelete, arguments.asJava)
+      })
 
     def notDurable: Queue = copy(isDurable = false)
     def exclusive: Queue = copy(isExclusive = true)

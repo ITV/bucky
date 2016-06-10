@@ -29,6 +29,7 @@ class RawAmqpClient(channelFactory: Lifecycle[Channel], consumerTag: ConsumerTag
     for {
       channel <- channelFactory
     } yield {
+      logger.info(s"Starting consumer on $queueName")
       channel.basicConsume(queueName.value, false, consumerTag.value, new DefaultConsumer(channel) {
         override def handleDelivery(consumerTag: String, envelope: Envelope, properties: BasicProperties, body: Array[Byte]): Unit = {
           val delivery = Delivery(Blob(body), ConsumerTag(consumerTag), envelope, properties)
