@@ -1,17 +1,18 @@
 package itv.bucky
 
 import com.typesafe.config.ConfigFactory
-import itv.bucky.decl.{Declaration, Binding, Exchange, Queue}
+import itv.bucky.decl.{Declaration, Exchange, Queue}
 import itv.contentdelivery.lifecycle.Lifecycle
+import itv.contentdelivery.testutilities.SameThreadExecutionContext.implicitly
 import itv.contentdelivery.testutilities.rmq.{BrokerConfig, MessageQueue}
 import itv.httpyroraptor._
 import itv.utils.Blob
 import org.scalatest.Matchers._
-import scala.concurrent.{Await, Future}
+
+import scala.concurrent.Await
+import scala.concurrent.duration._
 import scalaz.Id
 import scalaz.Id.Id
-import scala.concurrent.duration._
-import itv.contentdelivery.testutilities.SameThreadExecutionContext.implicitly
 
 object IntegrationUtils {
 
@@ -49,22 +50,27 @@ object IntegrationUtils {
     val requeueExchange = ExchangeName(s"$name.requeue")
     val redeliverExchange = ExchangeName(s"$name.redeliver")
 
-    val queues = List(Queue(mainQueue).autoDelete.deadLetterExchange(dlx).expires(1.minute),
+    val queues = List(
+      Queue(mainQueue).autoDelete.deadLetterExchange(dlx).expires(1.minute),
       Queue(deadletterQueue).autoDelete.expires(1.minute),
-      Queue(requeueQueue).autoDelete.deadLetterExchange(redeliverExchange).expires(1.minute).messageTTL(1.second))
+      Queue(requeueQueue).autoDelete.deadLetterExchange(redeliverExchange).expires(1.minute).messageTTL(1.second)
+    )
 
     val routingKey = RoutingKey(name)
 
-    val exchanges = List(Exchange(dlx).expires(1.minute).binding(routingKey -> deadletterQueue),
+    val exchanges = List(
+      Exchange(dlx).expires(1.minute).binding(routingKey -> deadletterQueue),
       Exchange(requeueExchange).expires(1.minute).binding(routingKey -> requeueQueue),
-      Exchange(redeliverExchange).expires(1.minute).binding(routingKey -> mainQueue))
+      Exchange(redeliverExchange).expires(1.minute).binding(routingKey -> mainQueue)
+    )
 
     for {
       client <- amqpClientConfig
       result = Declaration.applyAll(queues ++ exchanges, client)
       _ = Await.result(result, 5.seconds)
     }
-      yield (MessageQueue(mainQueue.value, rmqAdminConfig),
+      yield (
+        MessageQueue(mainQueue.value, rmqAdminConfig),
         MessageQueue(requeueQueue.value, rmqAdminConfig),
         MessageQueue(deadletterQueue.value, rmqAdminConfig))
   }
