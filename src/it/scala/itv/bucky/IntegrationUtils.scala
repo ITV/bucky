@@ -1,7 +1,12 @@
 package itv.bucky
 
 import com.typesafe.config.ConfigFactory
+<<<<<<< HEAD
 import itv.bucky.decl.{Declaration, Exchange, Queue}
+=======
+import itv.bucky.decl.pattern.Pattern
+import itv.bucky.decl.{Binding, Declaration, Exchange, Queue}
+>>>>>>> Integration tests should use requeue pattern
 import itv.contentdelivery.lifecycle.Lifecycle
 import itv.contentdelivery.testutilities.SameThreadExecutionContext.implicitly
 import itv.contentdelivery.testutilities.rmq.{BrokerConfig, MessageQueue}
@@ -9,8 +14,12 @@ import itv.httpyroraptor._
 import itv.utils.Blob
 import org.scalatest.Matchers._
 
+<<<<<<< HEAD
 import scala.concurrent.Await
 import scala.concurrent.duration._
+=======
+import scala.concurrent.{Await, Future}
+>>>>>>> Integration tests should use requeue pattern
 import scalaz.Id
 import scalaz.Id.Id
 
@@ -42,37 +51,19 @@ object IntegrationUtils {
   def declareQueue(name: String): Lifecycle[(MessageQueue, MessageQueue, MessageQueue)] = {
     val (amqpClientConfig: AmqpClientConfig, rmqAdminConfig: BrokerConfig, rmqAdminHttp: AuthenticatedHttpClient[Id.Id]) = configAndHttp
 
-    val mainQueue = QueueName(name)
-    val deadletterQueue = QueueName(s"$name.dlq")
-    val requeueQueue = QueueName(s"$name.requeue")
-
-    val dlx = ExchangeName(s"$name.dlx")
-    val requeueExchange = ExchangeName(s"$name.requeue")
-    val redeliverExchange = ExchangeName(s"$name.redeliver")
-
-    val queues = List(
-      Queue(mainQueue).autoDelete.deadLetterExchange(dlx).expires(1.minute),
-      Queue(deadletterQueue).autoDelete.expires(1.minute),
-      Queue(requeueQueue).autoDelete.deadLetterExchange(redeliverExchange).expires(1.minute).messageTTL(1.second)
-    )
-
-    val routingKey = RoutingKey(name)
-
-    val exchanges = List(
-      Exchange(dlx).expires(1.minute).binding(routingKey -> deadletterQueue),
-      Exchange(requeueExchange).expires(1.minute).binding(routingKey -> requeueQueue),
-      Exchange(redeliverExchange).expires(1.minute).binding(routingKey -> mainQueue)
-    )
+    val declarations = Pattern.Requeue(QueueName(name), retryAfter = 1.second) collect {
+      case ex: Exchange => ex.autoDelete.expires(1.minute)
+      case q: Queue => q.autoDelete.expires(1.minute)
+    }
 
     for {
       client <- amqpClientConfig
-      result = Declaration.applyAll(queues ++ exchanges, client)
+      result = Declaration.applyAll(declarations, client)
       _ = Await.result(result, 5.seconds)
     }
-      yield (
-        MessageQueue(mainQueue.value, rmqAdminConfig),
-        MessageQueue(requeueQueue.value, rmqAdminConfig),
-        MessageQueue(deadletterQueue.value, rmqAdminConfig))
+      yield (MessageQueue(name, rmqAdminConfig),
+        MessageQueue(s"$name.requeue", rmqAdminConfig),
+        MessageQueue(s"$name.dlq", rmqAdminConfig))
   }
 
 
