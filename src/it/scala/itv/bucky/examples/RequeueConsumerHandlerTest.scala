@@ -7,15 +7,15 @@ import org.scalatest.Matchers._
 
 import scala.util.Random
 
-class RequeueConsumerTest extends FunSuite with ScalaFutures {
+class RequeueConsumerHandlerTest extends FunSuite with ScalaFutures {
 
-  test("should Ack Martin messages") {
-    RequeueIfNotMartinHandler(Person("Martin")).futureValue shouldBe Ack
+  test("should Ack Banana messages") {
+    RequeueIfNotBananaHandler(Fruit("Banana")).futureValue shouldBe Ack
   }
 
   test("should requeue any other message") {
     val message = Random.nextString(10)
-    RequeueIfNotMartinHandler(Person(message)).futureValue shouldBe Requeue
+    RequeueIfNotBananaHandler(Fruit(message)).futureValue shouldBe Requeue
   }
 
 }

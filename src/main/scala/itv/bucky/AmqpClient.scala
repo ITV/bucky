@@ -14,12 +14,14 @@ import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
 
 trait AmqpClient {
+
   def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): Lifecycle[Publisher[PublishCommand]]
 
   def consumer(queueName: QueueName, handler: Handler[Delivery], exceptionalAction: ConsumeAction = DeadLetter)
               (implicit executionContext: ExecutionContext): Lifecycle[Unit]
 
   def withChannel[T](thunk: Channel => T): T
+
 }
 
 class RawAmqpClient(channelFactory: Lifecycle[Channel], consumerTag: ConsumerTag = ConsumerTag.pidAndHost) extends AmqpClient with StrictLogging {
@@ -125,45 +127,8 @@ object AmqpClient extends StrictLogging {
       _ <- publisher(publishCommand)
     } yield ()
 
-  def handlerOf[T](handler: RequeueHandler[T], deserializer: BlobDeserializer[T], deserializationFailureAction: RequeueConsumeAction)
-                  (implicit ec: ExecutionContext): RequeueHandler[Delivery] =
-    new BlobDeserializationHandler[T, RequeueConsumeAction](deserializer)(handler, deserializationFailureAction)
-
   def handlerOf[T](handler: Handler[T], deserializer: BlobDeserializer[T], deserializationFailureAction: ConsumeAction = DeadLetter)
                   (implicit ec: ExecutionContext): Handler[Delivery] =
     new BlobDeserializationHandler[T, ConsumeAction](deserializer)(handler, deserializationFailureAction)
 
-  def requeueHandlerOf[T](amqpClient: AmqpClient)(queueName: QueueName,
-                                                  handler: RequeueHandler[T],
-                                                  requeuePolicy: RequeuePolicy,
-                                                  deserializer: BlobDeserializer[T],
-                                                  deserializationFailureAction: RequeueConsumeAction = DeadLetter)
-                                                  (implicit ec: ExecutionContext): Lifecycle[Unit] =
-    requeueOf(amqpClient)(queueName, handlerOf(handler, deserializer, deserializationFailureAction)(ec), requeuePolicy)
-
-  def requeueOf(amqpClient: AmqpClient)(queueName: QueueName,
-                                        handler: RequeueHandler[Delivery],
-                                        requeuePolicy: RequeuePolicy)
-                                        (implicit ec: ExecutionContext): Lifecycle[Unit] = {
-    //TODO: doesn't feel right to be calculating requeue exchange name here
-    val requeueExchange = ExchangeName(s"${queueName.value}.requeue")
-    for {
-      requeuePublish <- amqpClient.publisher()
-      consumer <- amqpClient.consumer(queueName, RequeueTransformer(requeuePublish, requeueExchange, requeuePolicy)(handler))
-    } yield consumer
-  }
-
-  class BlobDeserializationHandler[T, S](deserializer: BlobDeserializer[T])(handler: T => Future[S], deserializationFailureAction: S)
-                                        (implicit ec: ExecutionContext) extends (Delivery => Future[S]) {
-    override def apply(delivery: Delivery): Future[S] =
-      Future(deserializer(delivery.body)).flatMap {
-        case DeserializerResult.Success(message) => handler(message)
-        case DeserializerResult.Failure(reason) =>
-          logger.error(s"Cannot deserialize: ${delivery.body} because: '$reason' (will $deserializationFailureAction)")
-          Future.successful(deserializationFailureAction)
-      }.recoverWith { case error: Throwable =>
-        logger.error(s"Cannot deserialize: ${delivery.body} because: '${error.getMessage}' (will $deserializationFailureAction)", error)
-        Future.successful(deserializationFailureAction)
-      }
-  }
 }

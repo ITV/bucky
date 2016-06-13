@@ -2,7 +2,7 @@ package itv.bucky
 
 import com.typesafe.config.ConfigFactory
 import itv.bucky.decl._
-import itv.bucky.decl.pattern.Pattern
+import itv.bucky.pattern.requeue._
 import itv.contentdelivery.lifecycle.Lifecycle
 import itv.contentdelivery.testutilities.rmq._
 import itv.httpyroraptor._
@@ -12,7 +12,6 @@ import org.scalatest.Matchers._
 import scala.concurrent.duration._
 import scalaz._
 import Scalaz._
-import scala.concurrent.Await
 import itv.contentdelivery.testutilities.SameThreadExecutionContext.implicitly
 
 object IntegrationUtils {
@@ -43,15 +42,14 @@ object IntegrationUtils {
   def declareQueue(name: String): Lifecycle[(MessageQueue, MessageQueue, MessageQueue)] = {
     val (amqpClientConfig: AmqpClientConfig, rmqAdminConfig: BrokerConfig, rmqAdminHttp: AuthenticatedHttpClient[Id.Id]) = configAndHttp
 
-    val declarations = Pattern.Requeue(QueueName(name), retryAfter = 1.second) collect {
+    val declarations = requeueDeclarations(QueueName(name), retryAfter = 1.second) collect {
       case ex: Exchange => ex.autoDelete.expires(1.minute)
       case q: Queue => q.autoDelete.expires(1.minute)
     }
 
     for {
       client <- amqpClientConfig
-      result = Declaration.applyAll(declarations, client)
-      _ = Await.result(result, 5.seconds)
+      _ <- DeclLifecycle(declarations, client)
     }
       yield (MessageQueue(name, rmqAdminConfig),
         MessageQueue(s"$name.requeue", rmqAdminConfig),

@@ -1,7 +1,7 @@
 package itv.bucky
 
 import com.rabbitmq.client.{AMQP, MessageProperties}
-import itv.bucky.AmqpClient._
+import itv.bucky.pattern.requeue._
 import itv.contentdelivery.testutilities.SameThreadExecutionContext.implicitly
 import itv.utils.{Blob, BlobMarshaller}
 import org.scalatest.FunSuite
@@ -169,13 +169,13 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
 
   def testLifecycle[T](handler: RequeueHandler[T], requeuePolicy: RequeuePolicy, messageDeserializer: BlobDeserializer[T]): Lifecycle[TestFixture] = for {
     base <- baseTestLifecycle()
-    consumer <- requeueHandlerOf(base.amqpClient)(base.queueName, handler, requeuePolicy, messageDeserializer)
+    consumer <- base.amqpClient.requeueHandlerOf(base.queueName, handler, requeuePolicy, messageDeserializer)
   } yield base.testFixture
 
 
   def testLifecycle[T](handler: RequeueHandler[Delivery], requeuePolicy: RequeuePolicy): Lifecycle[TestFixture] = for {
     base <- baseTestLifecycle()
-    consumer <- requeueOf(base.amqpClient)(base.queueName, handler, requeuePolicy)
+    consumer <- base.amqpClient.requeueOf(base.queueName, handler, requeuePolicy)
   } yield base.testFixture
 
 
@@ -184,7 +184,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
 
 }
 
-object ñinAlwaysRequeue extends RequeueHandler[String] {
+object AlwaysRequeue extends RequeueHandler[String] {
   override def apply(message: String): Future[RequeueConsumeAction] =
     Future.successful(Requeue)
 }
