@@ -9,6 +9,8 @@ import scala.concurrent.duration.FiniteDuration
 
 package object requeue {
 
+  case class RequeuePolicy(maximumProcessAttempts: Int)
+
   def requeueDeclarations(queueName: QueueName, retryAfter: FiniteDuration): Iterable[Declaration] = {
     val deadLetterQueueName: QueueName = QueueName(s"${queueName.value}.dlq")
     val requeueQueueName: QueueName = QueueName(s"${queueName.value}.requeue")

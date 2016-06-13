@@ -114,8 +114,6 @@ class RawAmqpClient(channelFactory: Lifecycle[Channel], consumerTag: ConsumerTag
 
 }
 
-case class RequeuePolicy(maximumProcessAttempts: Int)
-
 object AmqpClient extends StrictLogging {
 
   def publisherOf[T](serializer: PublishCommandSerializer[T])(publisher: Publisher[PublishCommand])

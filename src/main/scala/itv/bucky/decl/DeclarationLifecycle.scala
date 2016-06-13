@@ -7,7 +7,7 @@ import scala.concurrent.{Await, ExecutionContext}
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.duration._
 
-case class DeclLifecycle(declarations: Iterable[Declaration], client: AmqpClient, timeout: FiniteDuration = 5.seconds)(implicit ec: ExecutionContext) extends VanillaLifecycle[Unit] {
+case class DeclarationLifecycle(declarations: Iterable[Declaration], client: AmqpClient, timeout: FiniteDuration = 5.seconds)(implicit ec: ExecutionContext) extends VanillaLifecycle[Unit] {
 
   override def start(): Unit = {
     val apply = Declaration.applyAll(declarations, client)

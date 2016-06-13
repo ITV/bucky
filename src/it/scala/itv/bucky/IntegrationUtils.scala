@@ -49,7 +49,7 @@ object IntegrationUtils {
 
     for {
       client <- amqpClientConfig
-      _ <- DeclLifecycle(declarations, client)
+      _ <- DeclarationLifecycle(declarations, client)
     }
       yield (MessageQueue(name, rmqAdminConfig),
         MessageQueue(s"$name.requeue", rmqAdminConfig),
