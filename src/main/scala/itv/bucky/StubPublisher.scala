@@ -3,7 +3,6 @@ package itv.bucky
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.Future
 
-
 class StubPublisher[A] extends Publisher[A] {
 
   val publishedEvents = ListBuffer[A]()

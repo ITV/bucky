@@ -12,7 +12,7 @@ class GenericPublisherTest extends FunSuite with ScalaFutures {
 
   test("Publishing only returns success once publication is acknowledged") {
     val client = createClient()
-    val expectedExchange = Exchange("")
+    val expectedExchange = ExchangeName("")
     val expectedRoutingKey = RoutingKey("mymessage")
     val expectedProperties = MessageProperties.TEXT_PLAIN
     val expectedBody = Blob.from("expected message")
@@ -25,7 +25,7 @@ class GenericPublisherTest extends FunSuite with ScalaFutures {
     implicit val bananaSerializer =
       blobSerializer[Banana.type] using expectedExchange using expectedRoutingKey using expectedProperties
 
-    val publish = AmqpClient.publisherOf[Banana.type](client)
+    val publish = AmqpClient.publisherOf[Banana.type](bananaSerializer)(client)
     val result = publish(Banana)
 
     result shouldBe 'completed
@@ -53,7 +53,7 @@ class GenericPublisherTest extends FunSuite with ScalaFutures {
 
     val client = createClient()
 
-    val publish = AmqpClient.publisherOf[Banana.type](client)
+    val publish = AmqpClient.publisherOf[Banana.type](serializer)(client)
     val result = publish(Banana).failed.futureValue
 
     result shouldBe expectedException

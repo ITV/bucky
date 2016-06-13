@@ -16,13 +16,13 @@ class GenericConsumerTest extends FunSuite with ScalaFutures {
     val client = createClient(channel)
 
     import DeserializerResult._
-    implicit val deserializer : BlobDeserializer[Blob] = new BlobDeserializer[Blob] {
+    val deserializer : BlobDeserializer[Blob] = new BlobDeserializer[Blob] {
       override def apply(message: Blob): DeserializerResult[Blob] = message.success
     }
 
-    val handler = new StubHandler[Blob]()
+    val handler = new StubConsumeHandler[Blob]()
 
-    Lifecycle.using(client.consumer("blah", AmqpClient.handlerOf[Blob](handler))) { _ =>
+    Lifecycle.using(client.consumer(QueueName("blah"), AmqpClient.handlerOf(handler, deserializer))) { _ =>
       channel.consumers should have size 1
       val msg = Blob.from("Hello World!")
 
@@ -43,9 +43,9 @@ class GenericConsumerTest extends FunSuite with ScalaFutures {
       override def apply(message: Blob): DeserializerResult[Blob] = "There is a problem".failure
     }
 
-    val handler = new StubHandler[Blob]()
+    val handler = new StubConsumeHandler[Blob]()
 
-    Lifecycle.using(client.consumer("blah", AmqpClient.handlerOf[Blob](handler))) { _ =>
+    Lifecycle.using(client.consumer(QueueName("blah"), AmqpClient.handlerOf(handler, deserializer))) { _ =>
       channel.consumers should have size 1
       val msg = Blob.from("Hello World!")
 
@@ -66,9 +66,9 @@ class GenericConsumerTest extends FunSuite with ScalaFutures {
       override def apply(message: Blob): DeserializerResult[Blob] = "There is a problem".failure
     }
 
-    val handler = new StubHandler[Blob]()
+    val handler = new StubConsumeHandler[Blob]()
 
-    Lifecycle.using(client.consumer("blah", AmqpClient.handlerOf[Blob](handler, Ack), DeadLetter)) { _ =>
+    Lifecycle.using(client.consumer(QueueName("blah"), AmqpClient.handlerOf(handler, deserializer, Ack), DeadLetter)) { _ =>
       channel.consumers should have size 1
       val msg = Blob.from("Hello World!")
 
@@ -88,9 +88,9 @@ class GenericConsumerTest extends FunSuite with ScalaFutures {
       override def apply(message: Blob): DeserializerResult[Blob] = throw new RuntimeException("Oh no")
     }
 
-    val handler = new StubHandler[Blob]()
+    val handler = new StubConsumeHandler[Blob]()
 
-    Lifecycle.using(client.consumer("blah", AmqpClient.handlerOf[Blob](handler))) { _ =>
+    Lifecycle.using(client.consumer(QueueName("blah"), AmqpClient.handlerOf(handler, deserializer))) { _ =>
       channel.consumers should have size 1
       val msg = Blob.from("Hello World!")
 

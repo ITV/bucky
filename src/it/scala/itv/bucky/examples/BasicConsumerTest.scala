@@ -39,23 +39,23 @@ class BasicConsumerTest extends FunSuite with ScalaFutures {
 
   def testLifecycle: Lifecycle[AppFixture] = {
     val amqpClient = new RabbitSimulator()
-    val requeueMessages = amqpClient.watchQueue("bucky-basicconsumer-example.requeue")
+    val requeueMessages = amqpClient.watchQueue(QueueName("bucky-basicconsumer-example.requeue"))
 
 
     implicit val messageMarshaller = BlobMarshaller[MyMessage] {
       message => Blob.from(message.foo)
     }
     import itv.bucky.BlobSerializer._
-    implicit val foo = blobSerializer[MyMessage] using RoutingKey("bucky-basicconsumer-example") using Exchange("")
+    implicit val myMessageSerializer = blobSerializer[MyMessage] using RoutingKey("bucky-basicconsumer-example") using ExchangeName("")
 
     import AmqpClient._
     for {
-      publisher <- amqpClient.publisher().map(publisherOf[MyMessage])
+      publisher <- amqpClient.publisher().map(publisherOf[MyMessage](myMessageSerializer))
       _ <- new BasicConsumerLifecycle {
         protected override def buildAmqpClient(amqpClientConfig: AmqpClientConfig): Lifecycle[AmqpClient] = {
           NoOpLifecycle(amqpClient)
         }
-      }.apply(Config("bucky-basicconsumer-example"))
+      }.apply(Config(QueueName("bucky-basicconsumer-example"),QueueName("bucky-basicconsumer-example.requeue"))) //FIXME Change the requeue name to target
     } yield AppFixture(amqpClient, publisher, requeueMessages)
   }
 

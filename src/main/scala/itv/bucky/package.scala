@@ -2,25 +2,29 @@ package itv
 
 import java.lang.management.ManagementFactory
 
+import com.rabbitmq.client.AMQP.BasicProperties
 import com.rabbitmq.client.Envelope
 import itv.utils.Blob
-import com.rabbitmq.client.AMQP.BasicProperties
 
 import scala.concurrent.Future
 
 package object bucky {
 
-  case class PublishCommand(exchange: Exchange, routingKey: RoutingKey, basicProperties: BasicProperties, body: Blob) {
+  case class PublishCommand(exchange: ExchangeName, routingKey: RoutingKey, basicProperties: BasicProperties, body: Blob) {
     def description = s"${exchange.value}:${routingKey.value} $body"
   }
 
   case class RoutingKey(value: String)
-  case class Exchange(value: String)
+  case class ExchangeName(value: String)
+  case class QueueName(value: String)
 
   sealed trait ConsumeAction
-  case object Ack extends ConsumeAction
-  case object DeadLetter extends ConsumeAction
-  case object RequeueImmediately extends ConsumeAction
+  sealed trait RequeueConsumeAction
+
+  case object Ack extends ConsumeAction with RequeueConsumeAction
+  case object DeadLetter extends ConsumeAction with RequeueConsumeAction
+  case object RequeueImmediately extends ConsumeAction with RequeueConsumeAction
+  case object Requeue extends RequeueConsumeAction
 
   case class ConsumerTag(value: String)
   object ConsumerTag {
@@ -53,6 +57,8 @@ package object bucky {
 
   type Publisher[-T] = T => Future[Unit]
   type Handler[-T] = T => Future[ConsumeAction]
+  type RequeueHandler[-T] = T => Future[RequeueConsumeAction]
 
   type Bindings = PartialFunction[RoutingKey, QueueName]
+
 }

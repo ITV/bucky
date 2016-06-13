@@ -13,7 +13,7 @@ import scala.concurrent.Future
 
 case class MyMessage(foo: String)
 
-case class PrintlnHandler(requeuePublisher: Publisher[MyMessage]) extends Handler[MyMessage] {
+case class PrintlnHandler(targetPublisher: Publisher[MyMessage]) extends Handler[MyMessage] {
 
   override def apply(message: MyMessage): Future[ConsumeAction] = {
     val s = message.foo
@@ -23,49 +23,48 @@ case class PrintlnHandler(requeuePublisher: Publisher[MyMessage]) extends Handle
       Future.successful(Ack)
     }
     else {
-      println("Requeue")
-      requeuePublisher(message).map(_ => Ack)
+      println(s"Target $message")
+      targetPublisher(message).map(_ => Ack)
     }
   }
 
 }
 
 object BasicConsumer extends App {
-  new BasicConsumerLifecycle().apply(Config("bucky-basicconsumer-example")).runUntilJvmShutdown()
+  new BasicConsumerLifecycle().apply(Config(QueueName("bucky-basicconsumer-example"), QueueName("target-bucky-basicconsumer-example"))).runUntilJvmShutdown()
 
   import BlobSerializer._
   import DeserializerResult._
 
 
-  case class Config(queueName: String) extends MicroServiceConfig {
+  case class Config(queueName: QueueName, targetQueueName: QueueName) extends MicroServiceConfig {
     override def webServer: WebServer = WebServer(8080)
 
     override def metaInfo: MetaInfo = MetaInfo(Active, None)
   }
   class BasicConsumerLifecycle extends MicroService[Config] {
     override protected def mainService(config: Config, registries: MetricsRegistries): Lifecycle[ServletBootstrap] = {
-        val queueName = config.queueName
+        import config._
 
-        implicit val messageDeserializer = new BlobDeserializer[MyMessage] {
+      val messageDeserializer = new BlobDeserializer[MyMessage] {
           override def apply(blob: Blob): DeserializerResult[MyMessage] = MyMessage(blob.to[String]).success
-        }
+      }
 
       implicit val messageMarshaller: BlobMarshaller[MyMessage] = BlobMarshaller[MyMessage] {
         message => Blob.from(message.foo)
       }
 
-      implicit val foo = blobSerializer[MyMessage] using RoutingKey(queueName + ".requeue") using Exchange("")
+      val myMessageSerializer = blobSerializer[MyMessage] using RoutingKey(targetQueueName.value) using ExchangeName("")
 
-
-      lazy val (testQueues, amqpClientConfig, rmqAdminHhttp) = IntegrationUtils.setUp(queueName, queueName + ".requeue")
+      lazy val (testQueues, amqpClientConfig, rmqAdminHhttp) = IntegrationUtils.setUp(QueueName(queueName.value), QueueName(targetQueueName.value))
 
         testQueues.foreach(_.purge())
 
         import AmqpClient._
         for {
           amqClient <- buildAmqpClient(amqpClientConfig)
-          publisher <- amqClient.publisher().map(publisherOf[MyMessage])
-          blah <- amqClient.consumer(queueName, handlerOf[MyMessage](PrintlnHandler(publisher)))
+          publisher <- amqClient.publisher().map(publisherOf(myMessageSerializer))
+          blah <- amqClient.consumer(queueName, handlerOf(PrintlnHandler(publisher), messageDeserializer))
         } yield {
           println("Started the consumer")
           ServletBootstrap.default

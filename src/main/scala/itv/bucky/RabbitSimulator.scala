@@ -4,7 +4,7 @@ import java.util.UUID
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 
-import com.rabbitmq.client.{MessageProperties, Envelope}
+import com.rabbitmq.client.{Channel, MessageProperties, Envelope}
 import com.typesafe.scalalogging.StrictLogging
 import itv.contentdelivery.lifecycle.{Lifecycle, NoOpLifecycle}
 import itv.utils.Blob
@@ -13,8 +13,6 @@ import scala.collection.concurrent.TrieMap
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration.{Duration, FiniteDuration}
-
-case class QueueName(value: String)
 
 case object IdentityBindings extends Bindings {
   def apply(routingQueue: RoutingKey): QueueName = QueueName(routingQueue.value)
@@ -38,11 +36,11 @@ class RabbitSimulator(bindings: Bindings = IdentityBindings)(implicit executionC
   private val messagesBeingProcessed: TrieMap[UUID, Publication] = TrieMap.empty
   private val deliveryTag = new AtomicLong()
 
-  def consumer(queueName: String, handler: Handler[Delivery], exceptionalAction: ConsumeAction = DeadLetter)(implicit executionContext: ExecutionContext): Lifecycle[Unit] = NoOpLifecycle {
+  def consumer(queueName: QueueName, handler: Handler[Delivery], exceptionalAction: ConsumeAction = DeadLetter)(implicit executionContext: ExecutionContext): Lifecycle[Unit] = NoOpLifecycle {
     val monitorHandler: Handler[Delivery] = delivery => {
       val key = UUID.randomUUID()
       val consumeActionValue = handler(delivery)
-      messagesBeingProcessed += key -> Publication(QueueName(queueName), delivery.body, consumeActionValue)
+      messagesBeingProcessed += key -> Publication(queueName, delivery.body, consumeActionValue)
       consumeActionValue.onComplete { _ =>
         val publication = messagesBeingProcessed(key)
         messagesBeingProcessed -= key
@@ -50,7 +48,7 @@ class RabbitSimulator(bindings: Bindings = IdentityBindings)(implicit executionC
       }
       consumeActionValue
     }
-    consumers += (QueueName(queueName) -> monitorHandler)
+    consumers += (queueName -> monitorHandler)
   }
 
   def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): Lifecycle[Publisher[PublishCommand]] =
@@ -71,7 +69,7 @@ class RabbitSimulator(bindings: Bindings = IdentityBindings)(implicit executionC
       Future.failed(new RuntimeException("No queue defined for" + routingKey))
   }
 
-  def watchQueue(queueName: String): ListBuffer[Blob] = {
+  def watchQueue(queueName: QueueName): ListBuffer[Blob] = {
     val messages = new ListBuffer[Blob]()
     this.consumer(queueName, { delivery =>
       messages += delivery.body
@@ -83,4 +81,6 @@ class RabbitSimulator(bindings: Bindings = IdentityBindings)(implicit executionC
   def waitForMessagesToBeProcessed()(implicit timeout: Duration): Unit = {
     Await.result(Future.sequence(messagesBeingProcessed.values.map(_.consumeActionValue)), timeout)
   }
+
+  override def withChannel[T](thunk: (Channel) => T): T = ???
 }

@@ -16,10 +16,10 @@ class PublisherIntegrationTest extends FunSuite with ScalaFutures {
 
   val testQueueName = "bucky-publisher-test"
   val routingKey = RoutingKey(testQueueName)
-  val exchange = Exchange("")
-  lazy val (testQueue, amqpClientConfig, rmqAdminHhttp) = IntegrationUtils.setUp(testQueueName)
+  val exchange = ExchangeName("")
+  lazy val (testQueue, amqpClientConfig, rmqAdminHhttp) = IntegrationUtils.setUp(QueueName(testQueueName))
 
-  ignore("Can publish messages to a (pre-existing) queue") {
+  test("Can publish messages to a (pre-existing) queue") {
     testQueue.head.purge()
 
     for {
@@ -27,14 +27,14 @@ class PublisherIntegrationTest extends FunSuite with ScalaFutures {
       publish <- amqpClient.publisher()
     } {
       val body = Blob.from("Hello World!")
-      publish(PublishCommand(Exchange(""), routingKey, MessageProperties.MINIMAL_PERSISTENT_BASIC, body)).asTry.futureValue shouldBe 'success
+      publish(PublishCommand(ExchangeName(""), routingKey, MessageProperties.MINIMAL_PERSISTENT_BASIC, body)).asTry.futureValue shouldBe 'success
 
       testQueue.head.getNextMessage().payload shouldBe body
     }
 
   }
 
-  ignore("Publisher can recover from connection failure") {
+  test("Publisher can recover from connection failure") {
     testQueue.head.purge()
 
     for {

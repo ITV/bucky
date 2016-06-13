@@ -5,7 +5,9 @@ import java.util.concurrent.{TimeoutException, ScheduledExecutorService}
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
-class TimeoutPublisher(delegate: Publisher[PublishCommand], timeout: FiniteDuration)(ec: ScheduledExecutorService) extends Publisher[PublishCommand] {
+class TimeoutPublisher(delegate: Publisher[PublishCommand],
+                       timeout: FiniteDuration)
+                      (ec: ScheduledExecutorService) extends Publisher[PublishCommand] {
   override def apply(cmd: PublishCommand): Future[Unit] = {
     val promise = Promise[Unit]
     ec.schedule(
@@ -17,7 +19,6 @@ class TimeoutPublisher(delegate: Publisher[PublishCommand], timeout: FiniteDurat
       timeout.length,
       timeout.unit
     )
-
     delegate(cmd).onComplete(result =>
       promise.complete(result)
     )(ExecutionContext.fromExecutor(ec))
