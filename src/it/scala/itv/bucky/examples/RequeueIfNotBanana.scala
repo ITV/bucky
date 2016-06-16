@@ -6,17 +6,32 @@ import itv.bucky._
 import itv.bucky.pattern.requeue._
 import itv.bucky.decl.DeclarationLifecycle
 import itv.contentdelivery.lifecycle.Lifecycle
-import itv.utils.Blob
+import itv.utils.{Blob, BlobMarshaller}
+import itv.bucky.BlobSerializer._
 
 import scala.concurrent.Future
 import itv.contentdelivery.testutilities.SameThreadExecutionContext.implicitly
+import org.joda.time.DateTime
 
 import scala.concurrent.duration._
+import argonaut._
+import Argonaut._
+
+/*
+Don't like:
+
+Fruit deserializer should come in implicitly
+BlobDeserailizer / BlobMarshaller naming is inconsistent (BlobUnmarshaller does exist, but doesn't handle unmarshalling failure very well)
+Should be able to define a Json => Blob marshaller, a DeliveryRequest => Json marshaller and have them automatically compose
+No easy way to change the retryAfter property of a queue - will throw a RTE
+publisher().map(AmqpClient.publisherOf(???)) seems like it would be a common occurance
+
+ */
 
 case class Fruit(name: String)
 
 object Fruit {
-  val deserializer: BlobDeserializer[Fruit] = new BlobDeserializer[Fruit] {
+  implicit val deserializer: BlobDeserializer[Fruit] = new BlobDeserializer[Fruit] {
     override def apply(blob: Blob): DeserializerResult[Fruit] = {
       import DeserializerResult._
       Fruit(blob.to[String]).success
@@ -24,13 +39,26 @@ object Fruit {
   }
 }
 
-object RequeueIfNotBananaHandler extends RequeueHandler[Fruit] with StrictLogging {
+case class DeliveryRequest(fruit: Fruit, timeOfRequest: DateTime)
+
+object DeliveryRequest {
+  implicit val marshaller: BlobMarshaller[DeliveryRequest] = new BlobMarshaller[DeliveryRequest](dr => {
+    Blob.from(jObjectFields(
+      "name" -> jString(dr.fruit.name),
+      "timeOfRequest" -> jString(dr.timeOfRequest.toString)
+    ).nospaces)
+  })
+}
+
+case class RequeueIfNotBananaHandler(requestDelivery: Publisher[DeliveryRequest]) extends RequeueHandler[Fruit] with StrictLogging {
 
   override def apply(fruit: Fruit): Future[RequeueConsumeAction] =
     fruit match {
-      case Fruit("Banana") => {
+      case fruit@Fruit("Banana") => {
         logger.info("Fruit was Banana, cool")
-        Future.successful(Ack)
+
+        val deliveryRequest = DeliveryRequest(fruit, DateTime.now())
+        requestDelivery(deliveryRequest).map(_ => Ack)
       }
       case _ => {
         logger.info(s"$fruit is not Banana, requeueing")
@@ -44,14 +72,18 @@ case class RequeueIfNotBanana(clientLifecycle: Lifecycle[AmqpClient]) {
 
   val queueName = QueueName("requeue.consumer.example")
 
+  val deliveryRequestPublishSerializer =
+    blobSerializer[DeliveryRequest] using ExchangeName("") using RoutingKey("fruit.delivery")
+
   val consumerLifecycle =
     for {
       client <- clientLifecycle
       _ <- DeclarationLifecycle(requeueDeclarations(queueName, retryAfter = 10.seconds), client)
-      _ <- client.requeueHandlerOf(queueName,
-        RequeueIfNotBananaHandler,
-        RequeuePolicy(maximumProcessAttempts = 3),
-        Fruit.deserializer)
+
+      requestDelivery <- client.publisher().map(AmqpClient.publisherOf(deliveryRequestPublishSerializer))
+
+      handler = RequeueIfNotBananaHandler(requestDelivery)
+      _ <- client.requeueHandlerOf(queueName, handler, RequeuePolicy(maximumProcessAttempts = 3), Fruit.deserializer)
     }
       yield ()
 
