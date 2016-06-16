@@ -161,7 +161,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
 
     for {
       amqpClient <- amqpClientConfig
-      queues <- IntegrationUtils.declareQueue(testQueueName)
+      queues <- IntegrationUtils.declareRequeueQueues(testQueueName)
       (testQueue, testRequeue, testDeadletterQueue) = queues
       publish <- amqpClient.publisher()
     } yield BaseTextFixture(amqpClient, QueueName(testQueueName), TestFixture(testQueue, testRequeue, testDeadletterQueue, publish))

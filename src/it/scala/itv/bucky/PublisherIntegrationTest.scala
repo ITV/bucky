@@ -17,7 +17,7 @@ class PublisherIntegrationTest extends FunSuite with ScalaFutures {
   val testQueueName = "bucky-publisher-test"
   val routingKey = RoutingKey(testQueueName)
   val exchange = ExchangeName("")
-  lazy val (testQueue, amqpClientConfig, rmqAdminHhttp) = IntegrationUtils.setUp(QueueName(testQueueName))
+  lazy val (testQueue, amqpClientConfig, rmqAdminHhttp) = IntegrationUtils.declareQueues(QueueName(testQueueName))
 
   test("Can publish messages to a (pre-existing) queue") {
     testQueue.head.purge()

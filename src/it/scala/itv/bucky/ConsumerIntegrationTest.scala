@@ -13,7 +13,7 @@ import scala.collection.JavaConverters._
 
 class ConsumerIntegrationTest extends FunSuite with ScalaFutures {
 
-  lazy val (Seq(consumerQueue, rawConsumerQueue, headersQueue), amqpClientConfig, rmqAdminHhttp) = IntegrationUtils.setUp(
+  lazy val (Seq(consumerQueue, rawConsumerQueue, headersQueue), amqpClientConfig, rmqAdminHhttp) = IntegrationUtils.declareQueues(
     List("bucky-consumer-test" , "bucky-consumer-raw-test", "bucky-consumer-headers-test").map(QueueName) : _*)
 
 

@@ -16,15 +16,19 @@ import itv.contentdelivery.testutilities.SameThreadExecutionContext.implicitly
 
 object IntegrationUtils {
 
-  def setUp(testQueueNames: QueueName*): (Seq[MessageQueue], AmqpClientConfig, HttpClient[Id]) = {
+  def declareQueues(testQueueNames: QueueName*): (Seq[MessageQueue], AmqpClientConfig, HttpClient[Id]) = {
     val (amqpClientConfig: AmqpClientConfig, rmqAdminConfig: BrokerConfig, rmqAdminHhttp: AuthenticatedHttpClient[Id.Id]) = configAndHttp
 
-    val testQueues = testQueueNames.map { testQueueName =>
-      rmqAdminHhttp.handle(PUT(UriBuilder / "api" / "queues" / "/" / testQueueName.value).body("application/json", Blob.from(
-        """{"auto_delete": "true", "durable": "true", "arguments": {"x-expires": 120000}}"""))) shouldBe 'successful
-      MessageQueue(testQueueName.value, rmqAdminConfig)
+    val queues = for {
+      client <- amqpClientConfig
+      declarations = testQueueNames.map(qn => Queue(qn).autoDelete.expires(2.minutes))
+      _ <- DeclarationLifecycle(declarations, client)
     }
-    (testQueues, amqpClientConfig, rmqAdminHhttp)
+      yield testQueueNames.map(qn => MessageQueue(qn.value, rmqAdminConfig))
+
+    Lifecycle.using(queues) { queues =>
+      (queues, amqpClientConfig, rmqAdminHhttp)
+    }
   }
 
   def configAndHttp: (AmqpClientConfig, BrokerConfig, AuthenticatedHttpClient[Id.Id]) = {
@@ -39,7 +43,7 @@ object IntegrationUtils {
     (amqpClientConfig, rmqAdminConfig, rmqAdminHhttp)
   }
 
-  def declareQueue(name: String): Lifecycle[(MessageQueue, MessageQueue, MessageQueue)] = {
+  def declareRequeueQueues(name: String): Lifecycle[(MessageQueue, MessageQueue, MessageQueue)] = {
     val (amqpClientConfig: AmqpClientConfig, rmqAdminConfig: BrokerConfig, rmqAdminHttp: AuthenticatedHttpClient[Id.Id]) = configAndHttp
 
     val declarations = requeueDeclarations(QueueName(name), retryAfter = 1.second) collect {
