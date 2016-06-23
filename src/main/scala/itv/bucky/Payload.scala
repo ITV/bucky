@@ -1,5 +1,7 @@
 package itv.bucky
 
+import itv.bucky.UnmarshalResult.{Failure, Success}
+
 import scala.collection.mutable
 
 class Payload(val value: Array[Byte]) {
@@ -28,7 +30,7 @@ class Payload(val value: Array[Byte]) {
   }
 
   def to[T](implicit unmarshaller: PayloadUnmarshaller[T]): UnmarshalResult[T] =
-    unmarshaller(this)
+    unmarshaller.unmarshal(this)
 
 }
 
@@ -40,23 +42,55 @@ object Payload {
 }
 
 
-sealed trait UnmarshalResult[+T]
+sealed trait UnmarshalResult[+T] {
+
+  def flatMap[U](f: T => UnmarshalResult[U]): UnmarshalResult[U]
+  def map[U](f: T => U): UnmarshalResult[U]
+
+}
+
 object UnmarshalResult {
 
-  case class Success[T](value: T) extends UnmarshalResult[T]
-  case class Failure[T](reason: String) extends UnmarshalResult[T]
+  case class Success[T](value: T) extends UnmarshalResult[T] {
+    override def flatMap[U](f: (T) => UnmarshalResult[U]): UnmarshalResult[U] = f(value)
+    override def map[U](f: (T) => U): UnmarshalResult[U] = Success(f(value))
+  }
+  case class Failure(reason: String, throwable: Option[Throwable] = None) extends UnmarshalResult[Nothing] {
+    override def flatMap[U](f: (Nothing) => UnmarshalResult[U]): UnmarshalResult[U] = this
+    override def map[U](f: (Nothing) => U): UnmarshalResult[U] = this
+  }
 
   implicit class SuccessConverter[T](val value: T) {
-    def success: UnmarshalResult[T] = Success(value)
+    def unmarshalSuccess: UnmarshalResult[T] = Success(value)
   }
 
   implicit class FailureConverter[T](val reason: String) {
-    def failure: UnmarshalResult[T] = Failure(reason)
+    def unmarshalFailure: UnmarshalResult[T] = Failure(reason)
+  }
+
+  implicit class FailureThrowableConverter[T](val throwable: Throwable) {
+    def unmarshalFailure(reason: String = throwable.getMessage): UnmarshalResult[T] = Failure(reason, Some(throwable))
   }
 
 }
 
-trait PayloadUnmarshaller[+T] extends (Payload => UnmarshalResult[T])
+trait PayloadUnmarshaller[+T] { self =>
+
+  def unmarshal(payload: Payload): UnmarshalResult[T]
+
+  def map[U](f: T => U): PayloadUnmarshaller[U] =
+    new PayloadUnmarshaller[U] {
+      override def unmarshal(payload: Payload) = self.unmarshal(payload) map f
+    }
+
+  def flatMap[U](f: T => PayloadUnmarshaller[U]): PayloadUnmarshaller[U] =
+    new PayloadUnmarshaller[U] {
+      override def unmarshal(payload: Payload): UnmarshalResult[U] =
+        self.unmarshal(payload) flatMap { result => f(result).unmarshal(payload) }
+    }
+
+}
+
 trait PayloadMarshaller[-T] extends (T => Payload)
 
 object PayloadMarshaller {
@@ -69,8 +103,13 @@ object PayloadMarshaller {
 object PayloadUnmarshaller {
   import UnmarshalResult._
 
-  implicit val UTF8StringPayloadUnmarshaller: PayloadUnmarshaller[String] = new PayloadUnmarshaller[String] {
-    override def apply(payload: Payload): UnmarshalResult[String] =
-      new String(payload.value, "UTF-8").success
+  implicit object StringPayloadUnmarshaller extends PayloadUnmarshaller[String] {
+    override def unmarshal(payload: Payload): UnmarshalResult[String] =
+      new String(payload.value, "UTF-8").unmarshalSuccess
   }
+
+  def liftResult[T](result: UnmarshalResult[T]): PayloadUnmarshaller[T] = new PayloadUnmarshaller[T] {
+    override def unmarshal(payload: Payload): UnmarshalResult[T] = result
+  }
+
 }
