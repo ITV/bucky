@@ -32,7 +32,7 @@ class StubChannel extends ChannelN(null, 0, new ConsumerWorkService(MoreExecutor
     handleCompleteInboundCommand(new AMQCommand(method))
   }
 
-  def deliver(delivery: AMQP.Basic.Deliver, body: Blob, properties: AMQP.BasicProperties = MessageProperties.BASIC): Unit = {
-    handleCompleteInboundCommand(new AMQCommand(delivery, properties, body.content))
+  def deliver(delivery: AMQP.Basic.Deliver, body: Payload, properties: AMQP.BasicProperties = MessageProperties.BASIC): Unit = {
+    handleCompleteInboundCommand(new AMQCommand(delivery, properties, body.value))
   }
 }

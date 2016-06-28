@@ -7,7 +7,6 @@ import java.util.concurrent.atomic.AtomicLong
 import com.rabbitmq.client.{Channel, MessageProperties, Envelope}
 import com.typesafe.scalalogging.StrictLogging
 import itv.contentdelivery.lifecycle.{Lifecycle, NoOpLifecycle}
-import itv.utils.Blob
 
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable.ListBuffer
@@ -30,7 +29,7 @@ case object IdentityBindings extends Bindings {
   */
 class RabbitSimulator(bindings: Bindings = IdentityBindings)(implicit executionContext: ExecutionContext) extends AmqpClient with StrictLogging {
 
-  case class Publication(queueName: QueueName, message: Blob, consumeActionValue: Future[ConsumeAction])
+  case class Publication(queueName: QueueName, message: Payload, consumeActionValue: Future[ConsumeAction])
 
   private val consumers = new scala.collection.mutable.HashMap[QueueName, Handler[Delivery]]()
   private val messagesBeingProcessed: TrieMap[UUID, Publication] = TrieMap.empty
@@ -58,7 +57,7 @@ class RabbitSimulator(bindings: Bindings = IdentityBindings)(implicit executionC
       }
     }
 
-  def publish(message: Blob)(routingKey: RoutingKey): Future[ConsumeAction] = {
+  def publish(message: Payload)(routingKey: RoutingKey): Future[ConsumeAction] = {
     logger.debug(s"Publish message [${message.to[String]}] with $routingKey")
     if (bindings.isDefinedAt(routingKey)) {
       val queueName = bindings(routingKey)
@@ -69,8 +68,8 @@ class RabbitSimulator(bindings: Bindings = IdentityBindings)(implicit executionC
       Future.failed(new RuntimeException("No queue defined for" + routingKey))
   }
 
-  def watchQueue(queueName: QueueName): ListBuffer[Blob] = {
-    val messages = new ListBuffer[Blob]()
+  def watchQueue(queueName: QueueName): ListBuffer[Payload] = {
+    val messages = new ListBuffer[Payload]()
     this.consumer(queueName, { delivery =>
       messages += delivery.body
       Future.successful(Ack)

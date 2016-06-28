@@ -33,10 +33,10 @@ package object requeue {
     def requeueHandlerOf[T](queueName: QueueName,
                             handler: RequeueHandler[T],
                             requeuePolicy: RequeuePolicy,
-                            deserializer: BlobDeserializer[T],
-                            deserializationFailureAction: RequeueConsumeAction = DeadLetter)
+                            unmarshaller: PayloadUnmarshaller[T],
+                            unmarshalFailureAction: RequeueConsumeAction = DeadLetter)
                            (implicit ec: ExecutionContext): Lifecycle[Unit] = {
-      val deserializeHandler = new BlobDeserializationHandler[T, RequeueConsumeAction](deserializer)(handler, deserializationFailureAction)
+      val deserializeHandler = new PayloadUnmarshalHandler[T, RequeueConsumeAction](unmarshaller)(handler, unmarshalFailureAction)
       requeueOf(queueName, deserializeHandler, requeuePolicy)
     }
 

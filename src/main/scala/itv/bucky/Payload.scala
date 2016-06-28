@@ -91,13 +91,26 @@ trait PayloadUnmarshaller[+T] { self =>
 
 }
 
-trait PayloadMarshaller[-T] extends (T => Payload)
+trait PayloadMarshaller[-T] extends (T => Payload) { self =>
+
+  def contramap[U](f: U => T): PayloadMarshaller[U] =
+    new PayloadMarshaller[U] {
+      override def apply(u: U): Payload =
+        self(f(u))
+    }
+
+}
 
 object PayloadMarshaller {
-  implicit val UTF8StringPayloadMarshaller: PayloadMarshaller[String] = new PayloadMarshaller[String] {
+  implicit object StringPayloadMarshaller extends PayloadMarshaller[String] {
     override def apply(s: String): Payload =
       Payload(s.getBytes("UTF-8"))
   }
+
+  def apply[T](f: T => Payload): PayloadMarshaller[T] =
+    new PayloadMarshaller[T] {
+      override def apply(t: T): Payload = f(t)
+    }
 }
 
 object PayloadUnmarshaller {

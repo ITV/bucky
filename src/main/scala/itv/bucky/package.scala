@@ -4,13 +4,11 @@ import java.lang.management.ManagementFactory
 
 import com.rabbitmq.client.AMQP.BasicProperties
 import com.rabbitmq.client.Envelope
-import itv.utils.Blob
-
 import scala.concurrent.Future
 
 package object bucky {
 
-  case class PublishCommand(exchange: ExchangeName, routingKey: RoutingKey, basicProperties: BasicProperties, body: Blob) {
+  case class PublishCommand(exchange: ExchangeName, routingKey: RoutingKey, basicProperties: BasicProperties, body: Payload) {
     def description = s"${exchange.value}:${routingKey.value} $body"
   }
 
@@ -31,29 +29,7 @@ package object bucky {
     val pidAndHost: ConsumerTag = ConsumerTag(ManagementFactory.getRuntimeMXBean.getName)
   }
 
-  sealed trait DeserializerResult[T]
-  object DeserializerResult {
-
-    case class Success[T](value: T) extends DeserializerResult[T]
-    case class Failure[T](reason: String) extends DeserializerResult[T]
-
-    implicit class SuccessConverter[T](val value: T) {
-      def success: DeserializerResult[T] = Success(value)
-    }
-
-    implicit class FailureConverter[T](val reason: String) {
-      def failure: DeserializerResult[T] = Failure(reason)
-    }
-
-  }
-
-  trait BlobDeserializer[T] extends (Blob => DeserializerResult[T])
-
-  trait PublishCommandSerializer[T] {
-    def toPublishCommand(t: T): PublishCommand
-  }
-
-  case class Delivery(body: Blob, consumerTag: ConsumerTag, envelope: Envelope, properties: BasicProperties)
+  case class Delivery(body: Payload, consumerTag: ConsumerTag, envelope: Envelope, properties: BasicProperties)
 
   type Publisher[-T] = T => Future[Unit]
   type Handler[-T] = T => Future[ConsumeAction]

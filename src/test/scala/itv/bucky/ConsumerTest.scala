@@ -19,7 +19,7 @@ class ConsumerTest extends FunSuite {
 
     Lifecycle.using(client.consumer(QueueName("blah"), handler)) { _ =>
       channel.consumers should have size 1
-      val msg = Blob.from("Hello World!")
+      val msg = Payload.from("Hello World!")
 
       handler.nextResponse = Future.successful(Ack)
       channel.deliver(new Basic.Deliver(channel.consumers.head.getConsumerTag, 1L, false, "exchange", "routingKey"), msg)
@@ -47,7 +47,7 @@ class ConsumerTest extends FunSuite {
 
     Lifecycle.using(client.consumer(QueueName("blah"), handler, actionOnFailure = DeadLetter)) { _ =>
       channel.consumers should have size 1
-      val msg = Blob.from("Hello World!")
+      val msg = Payload.from("Hello World!")
 
       handler.nextResponse = Future.failed(new RuntimeException("Blah"))
       channel.deliver(new Basic.Deliver(channel.consumers.head.getConsumerTag, 1L, false, "exchange", "routingKey"), msg)

@@ -26,10 +26,10 @@ class PublisherIntegrationTest extends FunSuite with ScalaFutures {
       amqpClient <- amqpClientConfig
       publish <- amqpClient.publisher()
     } {
-      val body = Blob.from("Hello World!")
+      val body = Payload.from("Hello World!")
       publish(PublishCommand(ExchangeName(""), routingKey, MessageProperties.MINIMAL_PERSISTENT_BASIC, body)).asTry.futureValue shouldBe 'success
 
-      testQueue.head.getNextMessage().payload shouldBe body
+      testQueue.head.getNextMessage().payload.content shouldBe body.value
     }
 
   }
@@ -42,16 +42,16 @@ class PublisherIntegrationTest extends FunSuite with ScalaFutures {
       publish <- amqpClient.publisher()
     } {
       // Publish before failure
-      publish(PublishCommand(exchange, routingKey, MessageProperties.MINIMAL_PERSISTENT_BASIC, Blob.from("Before"))).asTry.futureValue shouldBe 'success
+      publish(PublishCommand(exchange, routingKey, MessageProperties.MINIMAL_PERSISTENT_BASIC, Payload.from("Before"))).asTry.futureValue shouldBe 'success
 
       killRabbitConnection()
 
       // Publish fails until connection is re-established
-      publish(PublishCommand(exchange, routingKey, MessageProperties.MINIMAL_PERSISTENT_BASIC, Blob.from("Immediately after"))).asTry.futureValue shouldBe 'failure
+      publish(PublishCommand(exchange, routingKey, MessageProperties.MINIMAL_PERSISTENT_BASIC, Payload.from("Immediately after"))).asTry.futureValue shouldBe 'failure
 
       // Publish succeeds once connection is re-established
       Thread.sleep(600L)
-      publish(PublishCommand(exchange, routingKey, MessageProperties.MINIMAL_PERSISTENT_BASIC, Blob.from("A while after"))).asTry.futureValue shouldBe 'success
+      publish(PublishCommand(exchange, routingKey, MessageProperties.MINIMAL_PERSISTENT_BASIC, Payload.from("A while after"))).asTry.futureValue shouldBe 'success
 
       testQueue.head.consumeAllMessages() should have size 2
     }

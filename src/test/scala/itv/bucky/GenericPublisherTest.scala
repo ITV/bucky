@@ -15,15 +15,15 @@ class GenericPublisherTest extends FunSuite with ScalaFutures {
     val expectedExchange = ExchangeName("")
     val expectedRoutingKey = RoutingKey("mymessage")
     val expectedProperties = MessageProperties.TEXT_PLAIN
-    val expectedBody = Blob.from("expected message")
+    val expectedBody = Payload.from("expected message")
 
     object Banana
 
-    import BlobSerializer._
+    import PublishCommandBuilder._
 
-    implicit val bananaMarshaller: BlobMarshaller[Banana.type] = BlobMarshaller(_ => Blob.from(expectedBody))
+    implicit val bananaMarshaller: PayloadMarshaller[Banana.type] = PayloadMarshaller(_ => expectedBody)
     implicit val bananaSerializer =
-      blobSerializer[Banana.type] using expectedExchange using expectedRoutingKey using expectedProperties
+      publishCommandBuilder[Banana.type] using expectedExchange using expectedRoutingKey using expectedProperties
 
     val publish = AmqpClient.publisherOf[Banana.type](bananaSerializer)(client)
     val result = publish(Banana)
@@ -46,7 +46,7 @@ class GenericPublisherTest extends FunSuite with ScalaFutures {
     val expectedException = new RuntimeException("What's a banana?")
 
 
-    implicit val serializer = new PublishCommandSerializer[Banana.type] {
+    implicit val serializer = new PublishCommandBuilder[Banana.type] {
       def toPublishCommand(t: Banana.type): PublishCommand =
         throw expectedException
     }

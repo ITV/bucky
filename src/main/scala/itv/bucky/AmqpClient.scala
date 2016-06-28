@@ -6,8 +6,6 @@ import com.rabbitmq.client.AMQP.BasicProperties
 import com.rabbitmq.client._
 import com.typesafe.scalalogging.StrictLogging
 import itv.contentdelivery.lifecycle.{ExecutorLifecycles, Lifecycle, NoOpLifecycle}
-import itv.utils.Blob
-
 import scala.collection.convert.wrapAsScala.collectionAsScalaIterable
 import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.concurrent.{ExecutionContext, Future, Promise}
@@ -34,7 +32,7 @@ class RawAmqpClient(channelFactory: Lifecycle[Channel], consumerTag: ConsumerTag
       logger.info(s"Starting consumer on $queueName")
       channel.basicConsume(queueName.value, false, consumerTag.value, new DefaultConsumer(channel) {
         override def handleDelivery(consumerTag: String, envelope: Envelope, properties: BasicProperties, body: Array[Byte]): Unit = {
-          val delivery = Delivery(Blob(body), ConsumerTag(consumerTag), envelope, properties)
+          val delivery = Delivery(Payload(body), ConsumerTag(consumerTag), envelope, properties)
           logger.debug("Received {} on {}", delivery, queueName)
           handler(delivery).onComplete { result =>
             val action = result match {
@@ -90,7 +88,7 @@ class RawAmqpClient(channelFactory: Lifecycle[Channel], consumerTag: ConsumerTag
         logger.debug("Publishing with delivery tag {}L to {}:{} with {}: {}", box(deliveryTag), cmd.exchange, cmd.routingKey, cmd.basicProperties, cmd.body)
         unconfirmedPublications.put(deliveryTag, promise)
         try {
-          channel.basicPublish(cmd.exchange.value, cmd.routingKey.value, false, false, cmd.basicProperties, cmd.body.content)
+          channel.basicPublish(cmd.exchange.value, cmd.routingKey.value, false, false, cmd.basicProperties, cmd.body.value)
         } catch {
           case exception: Exception =>
             logger.error(s"Failed to publish message with delivery tag ${deliveryTag}L to ${cmd.description}", exception)
@@ -116,7 +114,7 @@ class RawAmqpClient(channelFactory: Lifecycle[Channel], consumerTag: ConsumerTag
 
 object AmqpClient extends StrictLogging {
 
-  def publisherOf[T](serializer: PublishCommandSerializer[T])(publisher: Publisher[PublishCommand])
+  def publisherOf[T](serializer: PublishCommandBuilder[T])(publisher: Publisher[PublishCommand])
                     (implicit executionContext: ExecutionContext): Publisher[T] = (message: T) =>
     for {
       publishCommand <- Future {
@@ -125,8 +123,8 @@ object AmqpClient extends StrictLogging {
       _ <- publisher(publishCommand)
     } yield ()
 
-  def handlerOf[T](handler: Handler[T], deserializer: BlobDeserializer[T], deserializationFailureAction: ConsumeAction = DeadLetter)
+  def handlerOf[T](handler: Handler[T], deserializer: PayloadUnmarshaller[T], unmarshalFailureAction: ConsumeAction = DeadLetter)
                   (implicit ec: ExecutionContext): Handler[Delivery] =
-    new BlobDeserializationHandler[T, ConsumeAction](deserializer)(handler, deserializationFailureAction)
+    new PayloadUnmarshalHandler[T, ConsumeAction](deserializer)(handler, unmarshalFailureAction)
 
 }

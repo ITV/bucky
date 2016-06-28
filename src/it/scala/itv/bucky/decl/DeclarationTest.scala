@@ -8,7 +8,7 @@ import org.scalatest.FunSuite
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.Matchers._
 import itv.contentdelivery.testutilities.SameThreadExecutionContext.implicitly
-import BlobSerializer._
+import PublishCommandBuilder._
 import org.scalatest.concurrent.Eventually
 import Eventually._
 import scala.concurrent.duration._
@@ -39,7 +39,7 @@ class DeclarationTest extends FunSuite with ScalaFutures {
         for {
           _ <- amqpClient.consumer(QueueName(queueName), handler)
           marshaller = new BlobMarshaller[String](Blob.from)
-          serializer = blobSerializer[String] using RoutingKey(queueName) using ExchangeName("")
+          serializer = publishCommandBuilder[String] using RoutingKey(queueName) using ExchangeName("")
           publisher <- amqpClient.publisher().map(AmqpClient.publisherOf(serializer))
         }
           yield publisher
@@ -104,7 +104,7 @@ class DeclarationTest extends FunSuite with ScalaFutures {
         for {
           _ <- amqpClient.consumer(queueName, handler)
           marshaller = new BlobMarshaller[String](Blob.from)
-          serializer = blobSerializer[String] using routingKey using exchangeName
+          serializer = publishCommandBuilder[String] using routingKey using exchangeName
           publisher <- amqpClient.publisher().map(AmqpClient.publisherOf(serializer))
         }
           yield publisher

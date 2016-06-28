@@ -1,10 +1,11 @@
 package itv.bucky.examples
 
+import itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import itv.bucky._
 import itv.bucky.examples.BasicConsumer.{BasicConsumerLifecycle, Config}
 import itv.contentdelivery.lifecycle.{Lifecycle, NoOpLifecycle}
 import itv.contentdelivery.testutilities.SameThreadExecutionContext.implicitly
-import itv.utils.{Blob, BlobMarshaller}
+import UnmarshalResult._
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.ScalaFutures
@@ -21,7 +22,7 @@ class BasicConsumerTest extends FunSuite with ScalaFutures {
 
       app.requeueMessages should have size 1
       val message = app.requeueMessages.head
-      message.to[String] shouldBe "Hello"
+      message.to[String] shouldBe "Hello".unmarshalSuccess
     }
   }
 
@@ -29,24 +30,23 @@ class BasicConsumerTest extends FunSuite with ScalaFutures {
     Lifecycle.using(testLifecycle) { app =>
       app.publisher(MyMessage("Foo")).futureValue
 
-      app.rabbit.publish(Blob.from("Foo"))(RoutingKey("bucky-basicconsumer-example")).futureValue shouldBe Ack
+      app.rabbit.publish(Payload.from("Foo"))(RoutingKey("bucky-basicconsumer-example")).futureValue shouldBe Ack
 
       app.requeueMessages should have size 0
     }
   }
 
-  case class AppFixture(rabbit: RabbitSimulator, publisher: Publisher[MyMessage], requeueMessages: ListBuffer[Blob])
+  case class AppFixture(rabbit: RabbitSimulator, publisher: Publisher[MyMessage], requeueMessages: ListBuffer[Payload])
 
   def testLifecycle: Lifecycle[AppFixture] = {
     val amqpClient = new RabbitSimulator()
     val requeueMessages = amqpClient.watchQueue(QueueName("bucky-basicconsumer-example.requeue"))
 
 
-    implicit val messageMarshaller = BlobMarshaller[MyMessage] {
-      message => Blob.from(message.foo)
-    }
-    import itv.bucky.BlobSerializer._
-    implicit val myMessageSerializer = blobSerializer[MyMessage] using RoutingKey("bucky-basicconsumer-example") using ExchangeName("")
+    implicit val messageMarshaller: PayloadMarshaller[MyMessage] = StringPayloadMarshaller.contramap(_.foo)
+
+    import itv.bucky.PublishCommandBuilder._
+    implicit val myMessageSerializer = publishCommandBuilder[MyMessage] using RoutingKey("bucky-basicconsumer-example") using ExchangeName("")
 
     import AmqpClient._
     for {

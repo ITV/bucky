@@ -1,13 +1,14 @@
 package itv.bucky
 
-import itv.akka.rmq.{AmqpMessageProperties, AmqpMessage}
+import itv.akka.rmq.{AmqpMessage, AmqpMessageProperties}
 import itv.contentdelivery.testutilities.SameThreadExecutionContext.implicitly
 import itv.utils.Blob
-import org.scalatest.{Inside, FunSuite}
+import org.scalatest.{FunSuite, Inside}
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.Eventually.eventually
 import org.scalatest.concurrent.ScalaFutures
 import Inside._
+import itv.bucky.PayloadUnmarshaller.StringPayloadUnmarshaller
 
 import scala.collection.JavaConverters._
 
@@ -18,9 +19,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures {
 
 
   case class Message(value: String)
-  val messageDeserializer = new BlobDeserializer[Message] {
-    override def apply(blob: Blob): DeserializerResult[Message] = DeserializerResult.Success(Message(blob.to[String]))
-  }
+  val messageUnmarshaller = StringPayloadUnmarshaller map Message
   
   test("Can consume messages from a (pre-existing) queue") {
     consumerQueue.purge()
@@ -28,7 +27,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures {
     val handler = new StubConsumeHandler[Message]()
     for {
       amqpClient <- amqpClientConfig
-      consumer <- amqpClient.consumer(QueueName(consumerQueue.name), AmqpClient.handlerOf(handler, messageDeserializer))
+      consumer <- amqpClient.consumer(QueueName(consumerQueue.name), AmqpClient.handlerOf(handler, messageUnmarshaller))
     } {
       handler.receivedMessages shouldBe 'empty
 
@@ -59,7 +58,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures {
       eventually {
         handler.receivedMessages should have size 1
         inside(handler.receivedMessages.head) {
-          case Delivery(body, _, _, _) => body shouldBe msg
+          case Delivery(body, _, _, _) => body.value shouldBe msg.content
         }
       }
     }

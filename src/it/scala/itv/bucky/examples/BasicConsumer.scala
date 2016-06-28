@@ -1,13 +1,13 @@
 package itv.bucky.examples
 
-import itv.bucky.BlobSerializer.{BlobSerializer => _}
+import itv.bucky.PayloadMarshaller.StringPayloadMarshaller
+import itv.bucky.PayloadUnmarshaller.StringPayloadUnmarshaller
 import itv.bucky._
 import itv.contentdelivery._
 import itv.contentdelivery.lifecycle.Lifecycle
 import itv.contentdelivery.metrics.MetricsRegistries
 import itv.contentdelivery.scalatra.ServletBootstrap
 import itv.contentdelivery.testutilities.SameThreadExecutionContext.implicitly
-import itv.utils.{Blob, BlobMarshaller}
 
 import scala.concurrent.Future
 
@@ -33,8 +33,7 @@ case class PrintlnHandler(targetPublisher: Publisher[MyMessage]) extends Handler
 object BasicConsumer extends App {
   new BasicConsumerLifecycle().apply(Config(QueueName("bucky-basicconsumer-example"), QueueName("target-bucky-basicconsumer-example"))).runUntilJvmShutdown()
 
-  import BlobSerializer._
-  import DeserializerResult._
+  import PublishCommandBuilder._
 
 
   case class Config(queueName: QueueName, targetQueueName: QueueName) extends MicroServiceConfig {
@@ -46,15 +45,11 @@ object BasicConsumer extends App {
     override protected def mainService(config: Config, registries: MetricsRegistries): Lifecycle[ServletBootstrap] = {
         import config._
 
-      val messageDeserializer = new BlobDeserializer[MyMessage] {
-          override def apply(blob: Blob): DeserializerResult[MyMessage] = MyMessage(blob.to[String]).success
-      }
+      val payloadUnmarshaller = StringPayloadUnmarshaller.map(MyMessage)
 
-      implicit val messageMarshaller: BlobMarshaller[MyMessage] = BlobMarshaller[MyMessage] {
-        message => Blob.from(message.foo)
-      }
+      implicit val messageMarshaller: PayloadMarshaller[MyMessage] = StringPayloadMarshaller.contramap(_.foo)
 
-      val myMessageSerializer = blobSerializer[MyMessage] using RoutingKey(targetQueueName.value) using ExchangeName("")
+      val myMessageSerializer = publishCommandBuilder[MyMessage] using RoutingKey(targetQueueName.value) using ExchangeName("")
 
       lazy val (testQueues, amqpClientConfig, rmqAdminHhttp) = IntegrationUtils.declareQueues(QueueName(queueName.value), QueueName(targetQueueName.value))
 
@@ -64,7 +59,7 @@ object BasicConsumer extends App {
         for {
           amqClient <- buildAmqpClient(amqpClientConfig)
           publisher <- amqClient.publisher().map(publisherOf(myMessageSerializer))
-          blah <- amqClient.consumer(queueName, handlerOf(PrintlnHandler(publisher), messageDeserializer))
+          blah <- amqClient.consumer(queueName, handlerOf(PrintlnHandler(publisher), payloadUnmarshaller))
         } yield {
           println("Started the consumer")
           ServletBootstrap.default

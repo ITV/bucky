@@ -27,7 +27,7 @@ libraryDependencies ++= Seq(
   "itv.contentdelivery" %% "contentdelivery-shared-httpyroraptor" % contentDeliverySharedVersion % "test,it",
   "itv.contentdelivery" %% "contentdelivery-shared-test-utilities" % contentDeliverySharedVersion % "test,it",
   "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
-  "itv.cps" %% "cps-utils" % commonPlatformServicesSharedVersion,
+  "itv.cps" %% "cps-utils" % commonPlatformServicesSharedVersion % "test,it",
   "org.scalatest" %% "scalatest" % scalaTestVersion % "test,it",
   "org.mockito" % "mockito-core" % mockitoVersion)
 

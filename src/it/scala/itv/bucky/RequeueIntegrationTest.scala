@@ -10,6 +10,8 @@ import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.concurrent.Eventually
 import Eventually._
 import com.rabbitmq.client.AMQP.BasicProperties
+import itv.bucky.PayloadMarshaller.StringPayloadMarshaller
+import itv.bucky.PayloadUnmarshaller.StringPayloadUnmarshaller
 
 import scala.collection.JavaConverters
 import scala.concurrent.Future
@@ -21,36 +23,17 @@ import itv.contentdelivery.testutilities.rmq.MessageQueue
 
 class RequeueIntegrationTest extends FunSuite with ScalaFutures {
 
-  import DeserializerResult._
-
   private val published = ()
 
-  val stringMessageDeserializer = new BlobDeserializer[String] {
-    override def apply(blob: Blob): DeserializerResult[String] = blob.to[String].success
-  }
+  implicit val intMessageDeserializer = StringPayloadUnmarshaller.map(_.toInt)
 
-  implicit val intMessageDeserializer = new BlobDeserializer[Int] {
-    override def apply(blob: Blob): DeserializerResult[Int] = blob.to[String].toInt.success
-  }
-
-  implicit val intBlobMarshaller: BlobMarshaller[Int] = BlobMarshaller[Int] { i: Int => Blob(i.toString.getBytes("UTF-8")) }
+  implicit val intMarshaller: PayloadMarshaller[Int] = StringPayloadMarshaller.contramap(_.toString)
 
   val requeuePatienceConfig: Eventually.PatienceConfig = Eventually.PatienceConfig(timeout = 5.second, interval = 100.millis)
 
   val exchange = ExchangeName("")
 
   val requeuePolicy = RequeuePolicy(3)
-
-  test("Can publish messages to a (pre-existing) queue") {
-    Lifecycle.using(testLifecycle(AlwaysRequeue, requeuePolicy, stringMessageDeserializer)) { app =>
-      val body = Blob.from("Hello World!")
-      app.publish(body).futureValue shouldBe published
-
-      eventually {
-        app.requeue.allMessages.map(_.payload) shouldBe List(body)
-      }(requeuePatienceConfig)
-    }
-  }
 
   test("Should retain any custom headers when republishing") {
     val handler = new StubRequeueHandler[Delivery]
@@ -60,7 +43,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
       val headers: java.util.Map[String, AnyRef] = Map[String, AnyRef]("foo" -> "bar").asJava
       val properties = MessageProperties.MINIMAL_PERSISTENT_BASIC.builder().headers(headers).build()
 
-      app.publish(Blob.from("Hello World!"), properties).futureValue shouldBe published
+      app.publish(Payload.from("Hello World!"), properties).futureValue shouldBe published
 
       eventually {
         val headersOfReceived = handler.receivedMessages.map(d => getHeader("foo", d.properties))
@@ -76,7 +59,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
 
       val expectedCorrelationId: String = "banana"
       val properties = MessageProperties.MINIMAL_PERSISTENT_BASIC.builder().correlationId(expectedCorrelationId).build()
-      app.publish(Blob.from("Hello World!"), properties).futureValue shouldBe published
+      app.publish(Payload.from("Hello World!"), properties).futureValue shouldBe published
 
       eventually {
         handler.receivedMessages.count(_.properties.getCorrelationId == expectedCorrelationId) should be > 1
@@ -90,7 +73,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
     Lifecycle.using(testLifecycle(handler, requeuePolicy, intMessageDeserializer)) { app =>
       handler.nextResponse = Future.successful(Ack)
 
-      app.publish(Blob.from(1)).futureValue shouldBe published
+      app.publish(Payload.from(1)).futureValue shouldBe published
 
       eventually {
         app.queue.allMessages shouldBe 'empty
@@ -105,7 +88,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
     val handler = new StubRequeueHandler[Int]
     Lifecycle.using(testLifecycle(handler, requeuePolicy, intMessageDeserializer)) { app =>
       handler.nextResponse = Future.successful(Requeue)
-      app.publish(Blob.from(1)).futureValue shouldBe published
+      app.publish(Payload.from(1)).futureValue shouldBe published
 
       eventually {
         handler.receivedMessages.length should be >= requeuePolicy.maximumProcessAttempts
@@ -117,14 +100,14 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
     val handler = new StubRequeueHandler[Int]
     Lifecycle.using(testLifecycle(handler, requeuePolicy, intMessageDeserializer)) { app =>
       handler.nextResponse = Future.successful(Requeue)
-      val payload = Blob.from(1)
-      app.publish(Blob.from(1)).futureValue shouldBe published
+      val payload = Payload.from(1)
+      app.publish(payload).futureValue shouldBe published
 
       eventually {
         app.queue.allMessages shouldBe 'empty
         app.requeue.allMessages shouldBe 'empty
         handler.receivedMessages.size shouldBe requeuePolicy.maximumProcessAttempts
-        app.deadletterQueue.allMessages.map(_.payload) shouldBe List(payload)
+        app.deadletterQueue.allMessages.map(b => Payload(b.payload.content)) shouldBe List(payload)
       }(requeuePatienceConfig)
     }
   }
@@ -135,20 +118,20 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
     Lifecycle.using(testLifecycle(handler, negativeProcessAttemptsRequeuePolicy, intMessageDeserializer)) { app =>
 
       handler.nextResponse = Future.successful(Requeue)
-      val payload = Blob.from(1)
+      val payload = Payload.from(1)
       app.publish(payload).futureValue shouldBe published
 
       eventually {
         app.queue.allMessages shouldBe 'empty
         app.requeue.allMessages shouldBe 'empty
         handler.receivedMessages.size shouldBe 1
-        app.deadletterQueue.allMessages.map(_.payload) shouldBe List(payload)
+        app.deadletterQueue.allMessages.map(b => Payload(b.payload.content)) shouldBe List(payload)
       }(requeuePatienceConfig)
     }
   }
 
   case class TestFixture(queue: MessageQueue, requeue: MessageQueue, deadletterQueue: MessageQueue, publisher: Publisher[PublishCommand]) {
-    def publish(body: Blob, properties: BasicProperties = MessageProperties.MINIMAL_PERSISTENT_BASIC): Future[Unit] = publisher(
+    def publish(body: Payload, properties: BasicProperties = MessageProperties.MINIMAL_PERSISTENT_BASIC): Future[Unit] = publisher(
       PublishCommand(ExchangeName(""), RoutingKey(queue.name), properties, body))
   }
 
@@ -167,13 +150,13 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
     } yield BaseTextFixture(amqpClient, QueueName(testQueueName), TestFixture(testQueue, testRequeue, testDeadletterQueue, publish))
   }
 
-  def testLifecycle[T](handler: RequeueHandler[T], requeuePolicy: RequeuePolicy, messageDeserializer: BlobDeserializer[T]): Lifecycle[TestFixture] = for {
+  def testLifecycle[T](handler: RequeueHandler[T], requeuePolicy: RequeuePolicy, unmarshaller: PayloadUnmarshaller[T]): Lifecycle[TestFixture] = for {
     base <- baseTestLifecycle()
-    consumer <- base.amqpClient.requeueHandlerOf(base.queueName, handler, requeuePolicy, messageDeserializer)
+    consumer <- base.amqpClient.requeueHandlerOf(base.queueName, handler, requeuePolicy, unmarshaller)
   } yield base.testFixture
 
 
-  def testLifecycle[T](handler: RequeueHandler[Delivery], requeuePolicy: RequeuePolicy): Lifecycle[TestFixture] = for {
+  def testLifecycle(handler: RequeueHandler[Delivery], requeuePolicy: RequeuePolicy): Lifecycle[TestFixture] = for {
     base <- baseTestLifecycle()
     consumer <- base.amqpClient.requeueOf(base.queueName, handler, requeuePolicy)
   } yield base.testFixture

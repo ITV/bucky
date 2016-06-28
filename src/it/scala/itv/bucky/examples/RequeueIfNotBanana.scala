@@ -7,7 +7,7 @@ import itv.bucky.pattern.requeue._
 import itv.bucky.decl.DeclarationLifecycle
 import itv.contentdelivery.lifecycle.Lifecycle
 import itv.utils.{Blob, BlobMarshaller}
-import itv.bucky.BlobSerializer._
+import itv.bucky.PublishCommandBuilder._
 
 import scala.concurrent.Future
 import itv.contentdelivery.testutilities.SameThreadExecutionContext.implicitly
@@ -16,6 +16,8 @@ import org.joda.time.DateTime
 import scala.concurrent.duration._
 import argonaut._
 import Argonaut._
+import itv.bucky.PayloadMarshaller.StringPayloadMarshaller
+import itv.bucky.PayloadUnmarshaller.StringPayloadUnmarshaller
 
 /*
 Don't like:
@@ -31,23 +33,19 @@ publisher().map(AmqpClient.publisherOf(???)) seems like it would be a common occ
 case class Fruit(name: String)
 
 object Fruit {
-  implicit val deserializer: BlobDeserializer[Fruit] = new BlobDeserializer[Fruit] {
-    override def apply(blob: Blob): DeserializerResult[Fruit] = {
-      import DeserializerResult._
-      Fruit(blob.to[String]).success
-    }
-  }
+  implicit val deserializer: PayloadUnmarshaller[Fruit] = StringPayloadUnmarshaller.map(Fruit.apply)
 }
 
 case class DeliveryRequest(fruit: Fruit, timeOfRequest: DateTime)
 
 object DeliveryRequest {
-  implicit val marshaller: BlobMarshaller[DeliveryRequest] = new BlobMarshaller[DeliveryRequest](dr => {
-    Blob.from(jObjectFields(
-      "name" -> jString(dr.fruit.name),
-      "timeOfRequest" -> jString(dr.timeOfRequest.toString)
-    ).nospaces)
-  })
+  implicit val marshaller: PayloadMarshaller[DeliveryRequest] =
+    StringPayloadMarshaller contramap { request =>
+      jObjectFields(
+        "name" -> jString(request.fruit.name),
+        "timeOfRequest" -> jString(request.timeOfRequest.toString)
+      ).nospaces
+    }
 }
 
 case class RequeueIfNotBananaHandler(requestDelivery: Publisher[DeliveryRequest]) extends RequeueHandler[Fruit] with StrictLogging {
@@ -72,15 +70,15 @@ case class RequeueIfNotBanana(clientLifecycle: Lifecycle[AmqpClient]) {
 
   val queueName = QueueName("requeue.consumer.example")
 
-  val deliveryRequestPublishSerializer =
-    blobSerializer[DeliveryRequest] using ExchangeName("") using RoutingKey("fruit.delivery")
+  val deliveryRequestPublishCommandBuilder =
+    publishCommandBuilder[DeliveryRequest] using ExchangeName("") using RoutingKey("fruit.delivery")
 
   val consumerLifecycle =
     for {
       client <- clientLifecycle
       _ <- DeclarationLifecycle(requeueDeclarations(queueName, retryAfter = 10.seconds), client)
 
-      requestDelivery <- client.publisher().map(AmqpClient.publisherOf(deliveryRequestPublishSerializer))
+      requestDelivery <- client.publisher().map(AmqpClient.publisherOf(deliveryRequestPublishCommandBuilder))
 
       handler = RequeueIfNotBananaHandler(requestDelivery)
       _ <- client.requeueHandlerOf(queueName, handler, RequeuePolicy(maximumProcessAttempts = 3), Fruit.deserializer)

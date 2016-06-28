@@ -2,104 +2,88 @@ package itv.bucky
 
 import com.rabbitmq.client.impl.AMQImpl.Basic
 import itv.contentdelivery.lifecycle.{Lifecycle, NoOpLifecycle}
-import itv.utils.Blob
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.ScalaFutures
 
 class GenericConsumerTest extends FunSuite with ScalaFutures {
 
+  import UnmarshalResult._
+
   import itv.contentdelivery.testutilities.SameThreadExecutionContext.implicitly
 
   test("Runs callback with delivered messages") {
-    val channel = new StubChannel()
-    val client = createClient(channel)
-
-    import DeserializerResult._
-    val deserializer : BlobDeserializer[Blob] = new BlobDeserializer[Blob] {
-      override def apply(message: Blob): DeserializerResult[Blob] = message.success
+    val unmarshaller : PayloadUnmarshaller[Payload] = new PayloadUnmarshaller[Payload] {
+      override def unmarshal(payload: Payload): UnmarshalResult[Payload] =
+        payload.unmarshalSuccess
     }
+    Lifecycle.using(testLifecycle(unmarshaller)) { test =>
+      test.channel.consumers should have size 1
+      val msg = Payload.from("Hello World!")
 
-    val handler = new StubConsumeHandler[Blob]()
+      test.channel.deliver(new Basic.Deliver(test.channel.consumers.head.getConsumerTag, 1L, false, "exchange", "routingKey"), msg)
+      test.channel.deliver(new Basic.Deliver(test.channel.consumers.head.getConsumerTag, 1L, false, "exchange", "routingKey"), msg)
 
-    Lifecycle.using(client.consumer(QueueName("blah"), AmqpClient.handlerOf(handler, deserializer))) { _ =>
-      channel.consumers should have size 1
-      val msg = Blob.from("Hello World!")
-
-      channel.deliver(new Basic.Deliver(channel.consumers.head.getConsumerTag, 1L, false, "exchange", "routingKey"), msg)
-
-      channel.deliver(new Basic.Deliver(channel.consumers.head.getConsumerTag, 1L, false, "exchange", "routingKey"), msg)
-
-      handler.receivedMessages should have size 2
+      test.handler.receivedMessages should have size 2
     }
   }
 
   test("should fail when there is a deserialization problem") {
-    val channel = new StubChannel()
-    val client = createClient(channel)
-
-    import DeserializerResult._
-    implicit val deserializer : BlobDeserializer[Blob] = new BlobDeserializer[Blob] {
-      override def apply(message: Blob): DeserializerResult[Blob] = "There is a problem".failure
+    val unmarshaller: PayloadUnmarshaller[Payload] = new PayloadUnmarshaller[Payload] {
+      override def unmarshal(payload: Payload): UnmarshalResult[Payload] =
+        "There is a problem".unmarshalFailure
     }
 
-    val handler = new StubConsumeHandler[Blob]()
+    Lifecycle.using(testLifecycle(unmarshaller)) { test =>
+      test.channel.consumers should have size 1
+      val msg = Payload.from("Hello World!")
 
-    Lifecycle.using(client.consumer(QueueName("blah"), AmqpClient.handlerOf(handler, deserializer))) { _ =>
-      channel.consumers should have size 1
-      val msg = Blob.from("Hello World!")
+      test.channel.deliver(new Basic.Deliver(test.channel.consumers.head.getConsumerTag, 1L, false, "exchange", "routingKey"), msg)
 
-      channel.deliver(new Basic.Deliver(channel.consumers.head.getConsumerTag, 1L, false, "exchange", "routingKey"), msg)
-
-      channel.transmittedCommands.last shouldBe a[Basic.Nack]
-
-      handler.receivedMessages should have size 0
+      test.channel.transmittedCommands.last shouldBe a[Basic.Nack]
+      test.handler.receivedMessages should have size 0
     }
   }
 
   test("should perform deserialization action when there is a an exception during deserialization") {
-    val channel = new StubChannel()
-    val client = createClient(channel)
-
-    import DeserializerResult._
-    implicit val deserializer : BlobDeserializer[Blob] = new BlobDeserializer[Blob] {
-      override def apply(message: Blob): DeserializerResult[Blob] = "There is a problem".failure
+    val unmarshaller : PayloadUnmarshaller[Payload] = new PayloadUnmarshaller[Payload] {
+      override def unmarshal(payload: Payload): UnmarshalResult[Payload] =
+        "There is a problem".unmarshalFailure
     }
 
-    val handler = new StubConsumeHandler[Blob]()
-
-    Lifecycle.using(client.consumer(QueueName("blah"), AmqpClient.handlerOf(handler, deserializer, Ack), DeadLetter)) { _ =>
-      channel.consumers should have size 1
-      val msg = Blob.from("Hello World!")
-
-      channel.deliver(new Basic.Deliver(channel.consumers.head.getConsumerTag, 1L, false, "exchange", "routingKey"), msg)
-
-      channel.transmittedCommands.last shouldBe a[Basic.Ack]
-
-      handler.receivedMessages should have size 0
+    Lifecycle.using(testLifecycle(unmarshaller, Ack, DeadLetter)) { test =>
+      test.channel.consumers should have size 1
+      val msg = Payload.from("Hello World!")
+      test.channel.deliver(new Basic.Deliver(test.channel.consumers.head.getConsumerTag, 1L, false, "exchange", "routingKey"), msg)
+      test.channel.transmittedCommands.last shouldBe a[Basic.Ack]
+      test.handler.receivedMessages should have size 0
     }
   }
 
   test("should nack by default when there is a an exception during deserialization") {
+    val unmarshaller : PayloadUnmarshaller[Payload] = new PayloadUnmarshaller[Payload] {
+      override def unmarshal(payload: Payload): UnmarshalResult[Payload] =
+        throw new RuntimeException("Oh No!")
+    }
+
+    Lifecycle.using(testLifecycle(unmarshaller)) { test =>
+      test.channel.consumers should have size 1
+      val msg = Payload.from("Hello World!")
+
+      test.channel.deliver(new Basic.Deliver(test.channel.consumers.head.getConsumerTag, 1L, false, "exchange", "routingKey"), msg)
+      test.channel.transmittedCommands.last shouldBe a[Basic.Nack]
+      test.handler.receivedMessages should have size 0
+    }
+  }
+
+  case class TestFixture(channel: StubChannel, handler: StubConsumeHandler[Payload])
+
+  def testLifecycle(unmarshaller: PayloadUnmarshaller[Payload], unmarshalFailureAction: ConsumeAction = DeadLetter, actionOnFailure: ConsumeAction = DeadLetter): Lifecycle[TestFixture] = {
     val channel = new StubChannel()
     val client = createClient(channel)
+    val handler = new StubConsumeHandler[Payload]()
 
-    implicit val deserializer : BlobDeserializer[Blob] = new BlobDeserializer[Blob] {
-      override def apply(message: Blob): DeserializerResult[Blob] = throw new RuntimeException("Oh no")
-    }
-
-    val handler = new StubConsumeHandler[Blob]()
-
-    Lifecycle.using(client.consumer(QueueName("blah"), AmqpClient.handlerOf(handler, deserializer))) { _ =>
-      channel.consumers should have size 1
-      val msg = Blob.from("Hello World!")
-
-      channel.deliver(new Basic.Deliver(channel.consumers.head.getConsumerTag, 1L, false, "exchange", "routingKey"), msg)
-
-      channel.transmittedCommands.last shouldBe a[Basic.Nack]
-
-      handler.receivedMessages should have size 0
-    }
+    client.consumer(QueueName("blah"), AmqpClient.handlerOf(handler, unmarshaller, unmarshalFailureAction), actionOnFailure).map(_ => TestFixture(channel, handler))
   }
 
   private def createClient(channel: StubChannel): RawAmqpClient = {
