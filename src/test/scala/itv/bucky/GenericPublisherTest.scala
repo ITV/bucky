@@ -23,9 +23,9 @@ class GenericPublisherTest extends FunSuite with ScalaFutures {
 
     implicit val bananaMarshaller: PayloadMarshaller[Banana.type] = PayloadMarshaller(_ => expectedBody)
     implicit val bananaSerializer =
-      publishCommandBuilder[Banana.type] using expectedExchange using expectedRoutingKey using expectedProperties
+      publishCommandBuilder(bananaMarshaller) using expectedExchange using expectedRoutingKey using expectedProperties
 
-    val publish = AmqpClient.publisherOf[Banana.type](bananaSerializer)(client)
+    val publish = AmqpClient.publisherOf(bananaSerializer)(client)
     val result = publish(Banana)
 
     result shouldBe 'completed

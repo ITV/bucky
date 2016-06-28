@@ -2,7 +2,7 @@ package itv.bucky.decl
 
 import itv.bucky._
 import itv.contentdelivery.lifecycle.Lifecycle
-import itv.httpyroraptor.{UriBuilder, GET}
+import itv.httpyroraptor.{GET, UriBuilder}
 import itv.utils.{Blob, BlobMarshaller}
 import org.scalatest.FunSuite
 import org.scalatest.concurrent.ScalaFutures
@@ -11,8 +11,9 @@ import itv.contentdelivery.testutilities.SameThreadExecutionContext.implicitly
 import PublishCommandBuilder._
 import org.scalatest.concurrent.Eventually
 import Eventually._
-import scala.concurrent.duration._
+import itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 
+import scala.concurrent.duration._
 import scala.util.Random
 
 class DeclarationTest extends FunSuite with ScalaFutures {
@@ -38,8 +39,7 @@ class DeclarationTest extends FunSuite with ScalaFutures {
       val lifecycle =
         for {
           _ <- amqpClient.consumer(QueueName(queueName), handler)
-          marshaller = new BlobMarshaller[String](Blob.from)
-          serializer = publishCommandBuilder[String] using RoutingKey(queueName) using ExchangeName("")
+          serializer = publishCommandBuilder(StringPayloadMarshaller) using RoutingKey(queueName) using ExchangeName("")
           publisher <- amqpClient.publisher().map(AmqpClient.publisherOf(serializer))
         }
           yield publisher
@@ -103,8 +103,7 @@ class DeclarationTest extends FunSuite with ScalaFutures {
       val lifecycle =
         for {
           _ <- amqpClient.consumer(queueName, handler)
-          marshaller = new BlobMarshaller[String](Blob.from)
-          serializer = publishCommandBuilder[String] using routingKey using exchangeName
+          serializer = publishCommandBuilder(StringPayloadMarshaller) using routingKey using exchangeName
           publisher <- amqpClient.publisher().map(AmqpClient.publisherOf(serializer))
         }
           yield publisher

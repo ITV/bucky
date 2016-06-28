@@ -9,7 +9,7 @@ trait PublishCommandBuilder[T] {
 
 object PublishCommandBuilder {
 
-  def publishCommandBuilder[T](implicit marshaller: PayloadMarshaller[T]) = NothingSet[T](marshaller)
+  def publishCommandBuilder[T](marshaller: PayloadMarshaller[T]) = NothingSet[T](marshaller)
 
   case class NothingSet[T](marshaller: PayloadMarshaller[T], properties: Option[BasicProperties] = None) {
 

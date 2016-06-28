@@ -47,9 +47,9 @@ object BasicConsumer extends App {
 
       val payloadUnmarshaller = StringPayloadUnmarshaller.map(MyMessage)
 
-      implicit val messageMarshaller: PayloadMarshaller[MyMessage] = StringPayloadMarshaller.contramap(_.foo)
+      val messageMarshaller: PayloadMarshaller[MyMessage] = StringPayloadMarshaller.contramap(_.foo)
 
-      val myMessageSerializer = publishCommandBuilder[MyMessage] using RoutingKey(targetQueueName.value) using ExchangeName("")
+      val myMessageSerializer = publishCommandBuilder(messageMarshaller) using RoutingKey(targetQueueName.value) using ExchangeName("")
 
       lazy val (testQueues, amqpClientConfig, rmqAdminHhttp) = IntegrationUtils.declareQueues(QueueName(queueName.value), QueueName(targetQueueName.value))
 

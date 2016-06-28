@@ -43,10 +43,10 @@ class BasicConsumerTest extends FunSuite with ScalaFutures {
     val requeueMessages = amqpClient.watchQueue(QueueName("bucky-basicconsumer-example.requeue"))
 
 
-    implicit val messageMarshaller: PayloadMarshaller[MyMessage] = StringPayloadMarshaller.contramap(_.foo)
+    val messageMarshaller: PayloadMarshaller[MyMessage] = StringPayloadMarshaller.contramap(_.foo)
 
     import itv.bucky.PublishCommandBuilder._
-    implicit val myMessageSerializer = publishCommandBuilder[MyMessage] using RoutingKey("bucky-basicconsumer-example") using ExchangeName("")
+    val myMessageSerializer = publishCommandBuilder(messageMarshaller) using RoutingKey("bucky-basicconsumer-example") using ExchangeName("")
 
     import AmqpClient._
     for {

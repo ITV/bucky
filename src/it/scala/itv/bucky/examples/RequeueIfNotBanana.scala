@@ -22,9 +22,6 @@ import itv.bucky.PayloadUnmarshaller.StringPayloadUnmarshaller
 /*
 Don't like:
 
-Fruit deserializer should come in implicitly
-BlobDeserailizer / BlobMarshaller naming is inconsistent (BlobUnmarshaller does exist, but doesn't handle unmarshalling failure very well)
-Should be able to define a Json => Blob marshaller, a DeliveryRequest => Json marshaller and have them automatically compose
 No easy way to change the retryAfter property of a queue - will throw a RTE
 publisher().map(AmqpClient.publisherOf(???)) seems like it would be a common occurance
 
@@ -33,13 +30,13 @@ publisher().map(AmqpClient.publisherOf(???)) seems like it would be a common occ
 case class Fruit(name: String)
 
 object Fruit {
-  implicit val deserializer: PayloadUnmarshaller[Fruit] = StringPayloadUnmarshaller.map(Fruit.apply)
+  val deserializer: PayloadUnmarshaller[Fruit] = StringPayloadUnmarshaller.map(Fruit.apply)
 }
 
 case class DeliveryRequest(fruit: Fruit, timeOfRequest: DateTime)
 
 object DeliveryRequest {
-  implicit val marshaller: PayloadMarshaller[DeliveryRequest] =
+  val marshaller: PayloadMarshaller[DeliveryRequest] =
     StringPayloadMarshaller contramap { request =>
       jObjectFields(
         "name" -> jString(request.fruit.name),
@@ -71,7 +68,7 @@ case class RequeueIfNotBanana(clientLifecycle: Lifecycle[AmqpClient]) {
   val queueName = QueueName("requeue.consumer.example")
 
   val deliveryRequestPublishCommandBuilder =
-    publishCommandBuilder[DeliveryRequest] using ExchangeName("") using RoutingKey("fruit.delivery")
+    publishCommandBuilder(DeliveryRequest.marshaller) using ExchangeName("") using RoutingKey("fruit.delivery")
 
   val consumerLifecycle =
     for {
