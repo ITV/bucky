@@ -13,6 +13,10 @@ import scala.util.{Failure, Success}
 
 trait AmqpClient {
 
+  def publisherOf[T](builder: PublishCommandBuilder[T], timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS))
+                    (implicit executionContext: ExecutionContext): Lifecycle[Publisher[T]] =
+    publisher(timeout).map(AmqpClient.publisherOf(builder))
+
   def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): Lifecycle[Publisher[PublishCommand]]
 
   def consumer(queueName: QueueName, handler: Handler[Delivery], exceptionalAction: ConsumeAction = DeadLetter)
@@ -114,11 +118,11 @@ class RawAmqpClient(channelFactory: Lifecycle[Channel], consumerTag: ConsumerTag
 
 object AmqpClient extends StrictLogging {
 
-  def publisherOf[T](serializer: PublishCommandBuilder[T])(publisher: Publisher[PublishCommand])
+  def publisherOf[T](commandBuilder: PublishCommandBuilder[T])(publisher: Publisher[PublishCommand])
                     (implicit executionContext: ExecutionContext): Publisher[T] = (message: T) =>
     for {
       publishCommand <- Future {
-        serializer.toPublishCommand(message)
+        commandBuilder.toPublishCommand(message)
       }
       _ <- publisher(publishCommand)
     } yield ()

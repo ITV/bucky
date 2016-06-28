@@ -6,7 +6,6 @@ import itv.bucky._
 import itv.bucky.pattern.requeue._
 import itv.bucky.decl.DeclarationLifecycle
 import itv.contentdelivery.lifecycle.Lifecycle
-import itv.utils.{Blob, BlobMarshaller}
 import itv.bucky.PublishCommandBuilder._
 
 import scala.concurrent.Future
@@ -18,14 +17,6 @@ import argonaut._
 import Argonaut._
 import itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import itv.bucky.PayloadUnmarshaller.StringPayloadUnmarshaller
-
-/*
-Don't like:
-
-No easy way to change the retryAfter property of a queue - will throw a RTE
-publisher().map(AmqpClient.publisherOf(???)) seems like it would be a common occurance
-
- */
 
 case class Fruit(name: String)
 
@@ -75,7 +66,7 @@ case class RequeueIfNotBanana(clientLifecycle: Lifecycle[AmqpClient]) {
       client <- clientLifecycle
       _ <- DeclarationLifecycle(requeueDeclarations(queueName, retryAfter = 10.seconds), client)
 
-      requestDelivery <- client.publisher().map(AmqpClient.publisherOf(deliveryRequestPublishCommandBuilder))
+      requestDelivery <- client.publisherOf(deliveryRequestPublishCommandBuilder)
 
       handler = RequeueIfNotBananaHandler(requestDelivery)
       _ <- client.requeueHandlerOf(queueName, handler, RequeuePolicy(maximumProcessAttempts = 3), Fruit.deserializer)
