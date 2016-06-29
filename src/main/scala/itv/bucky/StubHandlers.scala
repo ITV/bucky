@@ -3,13 +3,13 @@ package itv.bucky
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.Future
 
-class StubHandler[T, S](var nextResponse: Future[S]) extends (T => Future[S]) {
+class StubHandler[T, S](var nextResponse: Future[S], var nextException: Option[Throwable] = None) extends (T => Future[S]) {
 
   val receivedMessages = ListBuffer[T]()
 
   override def apply(message: T): Future[S] = {
     receivedMessages += message
-    nextResponse
+    nextException.fold[Future[S]](nextResponse)(throw _)
   }
 
 }

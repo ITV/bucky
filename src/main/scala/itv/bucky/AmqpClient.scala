@@ -6,10 +6,11 @@ import com.rabbitmq.client.AMQP.BasicProperties
 import com.rabbitmq.client._
 import com.typesafe.scalalogging.StrictLogging
 import itv.contentdelivery.lifecycle.{ExecutorLifecycles, Lifecycle, NoOpLifecycle}
+
 import scala.collection.convert.wrapAsScala.collectionAsScalaIterable
 import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.concurrent.{ExecutionContext, Future, Promise}
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 
 trait AmqpClient {
 
@@ -38,7 +39,11 @@ class RawAmqpClient(channelFactory: Lifecycle[Channel], consumerTag: ConsumerTag
         override def handleDelivery(consumerTag: String, envelope: Envelope, properties: BasicProperties, body: Array[Byte]): Unit = {
           val delivery = Delivery(Payload(body), ConsumerTag(consumerTag), envelope, properties)
           logger.debug("Received {} on {}", delivery, queueName)
-          handler(delivery).onComplete { result =>
+          val handlerResult = Try(handler(delivery)) match {
+            case Success(future) => future
+            case Failure(throwable) => Future.failed(new RuntimeException("Handler threw an exception", throwable))
+          }
+          handlerResult.onComplete { result =>
             val action = result match {
               case Success(outcome) => outcome
               case Failure(error) =>

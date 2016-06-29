@@ -11,6 +11,7 @@ import Inside._
 import itv.bucky.PayloadUnmarshaller.StringPayloadUnmarshaller
 
 import scala.collection.JavaConverters._
+import scala.util.Random
 
 class ConsumerIntegrationTest extends FunSuite with ScalaFutures {
 
@@ -38,6 +39,30 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures {
         handler.receivedMessages should have size 1
 
         handler.receivedMessages.head shouldBe Message("Hello World!")
+      }
+    }
+  }
+
+  test("DeadLetter upon exception from handler") {
+    val queueName = QueueName("exception-from-handler" + Random.nextInt())
+
+    val handler = new StubConsumeHandler[Delivery]()
+    for {
+      client <- amqpClientConfig
+      queues <- IntegrationUtils.declareRequeueQueues(queueName.value)
+      consumer <- client.consumer(queueName, handler)
+    } {
+      val (mainQueue, _, dlq) = queues
+      handler.receivedMessages shouldBe 'empty
+      dlq.allMessages shouldBe 'empty
+
+      handler.nextException = Some(new RuntimeException("Hello, world"))
+
+      mainQueue.publish(Blob from "Are you there?")
+
+      eventually {
+        handler.receivedMessages should have size 1
+        dlq.allMessages should have size 1
       }
     }
   }
