@@ -34,6 +34,7 @@ package object requeue {
                             handler: RequeueHandler[T],
                             requeuePolicy: RequeuePolicy,
                             unmarshaller: PayloadUnmarshaller[T],
+                            onFailure: RequeueConsumeAction = Requeue,
                             unmarshalFailureAction: RequeueConsumeAction = DeadLetter)
                            (implicit ec: ExecutionContext): Lifecycle[Unit] = {
       val deserializeHandler = new PayloadUnmarshalHandler[T, RequeueConsumeAction](unmarshaller)(handler, unmarshalFailureAction)
@@ -42,12 +43,13 @@ package object requeue {
 
     def requeueOf(queueName: QueueName,
                   handler: RequeueHandler[Delivery],
-                  requeuePolicy: RequeuePolicy)
+                  requeuePolicy: RequeuePolicy,
+                  onFailure: RequeueConsumeAction = Requeue)
                  (implicit ec: ExecutionContext): Lifecycle[Unit] = {
       val requeueExchange = ExchangeName(s"${queueName.value}.requeue")
       for {
         requeuePublish <- amqpClient.publisher()
-        consumer <- amqpClient.consumer(queueName, RequeueTransformer(requeuePublish, requeueExchange, requeuePolicy)(handler))
+        consumer <- amqpClient.consumer(queueName, RequeueTransformer(requeuePublish, requeueExchange, requeuePolicy, onFailure)(handler))
       } yield consumer
     }
 

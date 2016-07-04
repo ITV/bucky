@@ -96,6 +96,42 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
     }
   }
 
+  test("It should requeue the message if handler returns a failed future and is configured to requeue on failure") {
+    val handler = new StubRequeueHandler[Int]
+    Lifecycle.using(testLifecycle(handler, requeuePolicy, intMessageDeserializer)) { app =>
+      handler.nextResponse = Future.failed(new RuntimeException("Handler problem"))
+      app.publish(Payload.from(1)).futureValue shouldBe published
+
+      eventually {
+        handler.receivedMessages.length should be >= requeuePolicy.maximumProcessAttempts
+      }(requeuePatienceConfig)
+    }
+  }
+
+  test("(Raw) requeue consumer should requeue the message if handler throws an exception and is configured to requeue on failure") {
+    val handler = new StubRequeueHandler[Delivery]
+    Lifecycle.using(testLifecycle(handler, requeuePolicy)) { app =>
+      handler.nextException = Some(new RuntimeException("Handler problem"))
+      app.publish(Payload.from(1)).futureValue shouldBe published
+
+      eventually {
+        handler.receivedMessages.length should be >= requeuePolicy.maximumProcessAttempts
+      }(requeuePatienceConfig)
+    }
+  }
+
+  test("Requeue consumer should requeue the message if handler throws an exception and is configured to requeue on failure") {
+    val handler = new StubRequeueHandler[Int]
+    Lifecycle.using(testLifecycle(handler, requeuePolicy, intMessageDeserializer)) { app =>
+      handler.nextException = Some(new RuntimeException("Handler problem"))
+      app.publish(Payload.from(1)).futureValue shouldBe published
+
+      eventually {
+        handler.receivedMessages.length should be >= requeuePolicy.maximumProcessAttempts
+      }(requeuePatienceConfig)
+    }
+  }
+
   test("It should deadletter the message after maximumProcessAttempts unsuccessful attempts to process") {
     val handler = new StubRequeueHandler[Int]
     Lifecycle.using(testLifecycle(handler, requeuePolicy, intMessageDeserializer)) { app =>
