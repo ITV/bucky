@@ -3,7 +3,6 @@ package itv.bucky
 import com.rabbitmq.client.{AMQP, MessageProperties}
 import itv.bucky.pattern.requeue._
 import itv.contentdelivery.testutilities.SameThreadExecutionContext.implicitly
-import itv.utils.{Blob, BlobMarshaller}
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.ScalaFutures
