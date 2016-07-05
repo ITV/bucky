@@ -22,7 +22,7 @@ class BasicConsumerTest extends FunSuite with ScalaFutures {
 
       app.requeueMessages should have size 1
       val message = app.requeueMessages.head
-      message.to[String] shouldBe "Hello".unmarshalSuccess
+      message.body.to[String] shouldBe "Hello".unmarshalSuccess
     }
   }
 
@@ -36,7 +36,7 @@ class BasicConsumerTest extends FunSuite with ScalaFutures {
     }
   }
 
-  case class AppFixture(rabbit: RabbitSimulator, publisher: Publisher[MyMessage], requeueMessages: ListBuffer[Payload])
+  case class AppFixture(rabbit: RabbitSimulator, publisher: Publisher[MyMessage], requeueMessages: ListBuffer[Delivery])
 
   def testLifecycle: Lifecycle[AppFixture] = {
     val amqpClient = new RabbitSimulator()

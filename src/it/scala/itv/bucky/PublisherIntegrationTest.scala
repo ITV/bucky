@@ -4,7 +4,6 @@ import com.rabbitmq.client.MessageProperties
 import itv.bucky.TestUtils._
 import itv.contentdelivery.testutilities.json.JsonResult
 import itv.httpyroraptor._
-import itv.utils.Blob
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.ScalaFutures

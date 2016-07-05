@@ -4,7 +4,8 @@ import java.util.UUID
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 
-import com.rabbitmq.client.{Channel, MessageProperties, Envelope}
+import com.rabbitmq.client.AMQP.BasicProperties
+import com.rabbitmq.client.{Channel, Envelope, MessageProperties}
 import com.typesafe.scalalogging.StrictLogging
 import itv.contentdelivery.lifecycle.{Lifecycle, NoOpLifecycle}
 
@@ -57,21 +58,29 @@ class RabbitSimulator(bindings: Bindings = IdentityBindings)(implicit executionC
       }
     }
 
-  def publish(message: Payload)(routingKey: RoutingKey): Future[ConsumeAction] = {
+  def publish(message: Payload)(routingKey: RoutingKey, headers: Map[String, AnyRef] = Map.empty[String, AnyRef]): Future[ConsumeAction] = {
     logger.debug(s"Publish message [${message.to[String]}] with $routingKey")
     if (bindings.isDefinedAt(routingKey)) {
       val queueName = bindings(routingKey)
       consumers.get(queueName).fold(Future.failed[ConsumeAction](new RuntimeException(s"No consumers found for $queueName!"))) { handler =>
-        handler(Delivery(message, ConsumerTag("ctag"), new Envelope(deliveryTag.getAndIncrement(), false, "", routingKey.value), MessageProperties.PERSISTENT_BASIC))
+        import scala.collection.convert.wrapAll._
+        handler(Delivery(message, ConsumerTag("ctag"), new Envelope(deliveryTag.getAndIncrement(), false, "", routingKey.value),
+          new BasicProperties.Builder()
+            .contentType(MessageProperties.PERSISTENT_BASIC.getContentType)
+            .deliveryMode(2)
+            .priority(0)
+            .headers(mapAsJavaMap(headers))
+            .build()))
       }
     } else
       Future.failed(new RuntimeException("No queue defined for" + routingKey))
   }
 
-  def watchQueue(queueName: QueueName): ListBuffer[Payload] = {
-    val messages = new ListBuffer[Payload]()
+  def watchQueue(queueName: QueueName): ListBuffer[Delivery] = {
+    val messages = new ListBuffer[Delivery]()
     this.consumer(queueName, { delivery =>
-      messages += delivery.body
+      messages += delivery
+      logger.debug(s"Watch queue consume message [$delivery]")
       Future.successful(Ack)
     })
     messages
