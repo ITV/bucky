@@ -51,12 +51,14 @@ case class RequeueTransformer(requeuePublisher: Publisher[PublishCommand],
         case other: ConsumeAction => Future.successful(other)
       }
 
-    Future(handler(delivery)).flatMap(identity) flatMap perform recoverWith {
+    safePerform(handler(delivery)) flatMap perform recoverWith {
       case t: Throwable => {
         logger.error(s"Unable to process ${delivery.body} due to handler failure, will $onFailure", t)
         perform(onFailure)
       }
     }
   }
+
+
 
 }
