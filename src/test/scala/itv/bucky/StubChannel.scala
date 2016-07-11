@@ -5,11 +5,10 @@ import com.rabbitmq.client.impl.AMQImpl.Basic.ConsumeOk
 import com.rabbitmq.client.impl.AMQImpl.Confirm.SelectOk
 import com.rabbitmq.client.impl.{AMQCommand, ChannelN, ConsumerWorkService}
 import com.rabbitmq.client.{MessageProperties, AMQP, Method}
-import itv.utils.Blob
 
 import scala.collection.mutable.ListBuffer
 
-class StubChannel extends ChannelN(null, 0, new ConsumerWorkService(MoreExecutors.sameThreadExecutor(), null)) {
+class StubChannel extends ChannelN(null, 0, new ConsumerWorkService(MoreExecutors.newDirectExecutorService(), null)) {
 
   val transmittedCommands: ListBuffer[Method] = ListBuffer.empty
   val consumers: ListBuffer[AMQP.Basic.Consume] = ListBuffer.empty

@@ -12,6 +12,9 @@
         <suffixPattern>content-delivery - work-order-to-workflow-translator - [%thread] %-5level %logger - "%msg"%n</suffixPattern>
     </appender>
 
+    <logger name="org.apache.qpid" level="ERROR"/>
+    <logger name="qpid" level="ERROR"/>
+
     <logger name="ch.qos.logback" level="WARN"/>
 
     <root level="DEBUG">
