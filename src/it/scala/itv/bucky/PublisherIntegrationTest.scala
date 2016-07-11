@@ -31,7 +31,7 @@ class PublisherIntegrationTest extends FunSuite with ScalaFutures {
     }
   }
 
-  test("Publisher can recover from connection failure") {
+  ignore("Publisher can recover from connection failure") {
     import IntegrationUtils._
     lazy val (testQueue, amqpClientConfig, rmqAdminHhttp) = IntegrationUtils.declareQueues(QueueName(testQueueName))
     testQueue.head.purge()

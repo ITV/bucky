@@ -44,7 +44,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures {
     }
   }
 
-  test("DeadLetter upon exception from handler") {
+  ignore("DeadLetter upon exception from handler") {
     val queueName = QueueName("exception-from-handler" + Random.nextInt())
     val handler = new StubConsumeHandler[Delivery]()
     val dlqHandler = new QueueWatcher[Delivery]

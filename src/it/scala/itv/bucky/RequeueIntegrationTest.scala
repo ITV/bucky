@@ -34,7 +34,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
 
   val requeuePolicy = RequeuePolicy(3)
 
-  test("Should retain any custom headers when republishing") {
+  ignore("Should retain any custom headers when republishing") {
     val handler = new StubRequeueHandler[Delivery]
     Lifecycle.using(testLifecycle(handler, requeuePolicy)) { app =>
       handler.nextResponse = Future.successful(Requeue)
@@ -51,7 +51,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
     }
   }
 
-  test("Should retain any custom amqp properties when republishing") {
+  ignore("Should retain any custom amqp properties when republishing") {
     val handler = new StubRequeueHandler[Delivery]
     Lifecycle.using(testLifecycle(handler, requeuePolicy)) { app =>
       handler.nextResponse = Future.successful(Requeue)
@@ -67,7 +67,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
     }
   }
 
-  test("It should not requeue when the handler Acks") {
+  ignore("It should not requeue when the handler Acks") {
     val handler = new StubRequeueHandler[Int]
     Lifecycle.using(testLifecycle(handler, requeuePolicy, intMessageDeserializer)) { app =>
       handler.nextResponse = Future.successful(Ack)
@@ -83,7 +83,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
     }
   }
 
-  test("It should reprocess the message at least maximumProcessAttempts times upon repeated requeue") {
+  ignore("It should reprocess the message at least maximumProcessAttempts times upon repeated requeue") {
     val handler = new StubRequeueHandler[Int]
     Lifecycle.using(testLifecycle(handler, requeuePolicy, intMessageDeserializer)) { app =>
       handler.nextResponse = Future.successful(Requeue)
@@ -95,7 +95,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
     }
   }
 
-  test("It should requeue the message if handler returns a failed future and is configured to requeue on failure") {
+  ignore("It should requeue the message if handler returns a failed future and is configured to requeue on failure") {
     val handler = new StubRequeueHandler[Int]
     Lifecycle.using(testLifecycle(handler, requeuePolicy, intMessageDeserializer)) { app =>
       handler.nextResponse = Future.failed(new RuntimeException("Handler problem"))
@@ -107,7 +107,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
     }
   }
 
-  test("(Raw) requeue consumer should requeue the message if handler throws an exception and is configured to requeue on failure") {
+  ignore("(Raw) requeue consumer should requeue the message if handler throws an exception and is configured to requeue on failure") {
     val handler = new StubRequeueHandler[Delivery]
     Lifecycle.using(testLifecycle(handler, requeuePolicy)) { app =>
       handler.nextException = Some(new RuntimeException("Handler problem"))
@@ -119,7 +119,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
     }
   }
 
-  test("Requeue consumer should requeue the message if handler throws an exception and is configured to requeue on failure") {
+  ignore("Requeue consumer should requeue the message if handler throws an exception and is configured to requeue on failure") {
     val handler = new StubRequeueHandler[Int]
     Lifecycle.using(testLifecycle(handler, requeuePolicy, intMessageDeserializer)) { app =>
       handler.nextException = Some(new RuntimeException("Handler problem"))
@@ -131,7 +131,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
     }
   }
 
-  test("It should deadletter the message after maximumProcessAttempts unsuccessful attempts to process") {
+  ignore("It should deadletter the message after maximumProcessAttempts unsuccessful attempts to process") {
     val handler = new StubRequeueHandler[Int]
     Lifecycle.using(testLifecycle(handler, requeuePolicy, intMessageDeserializer)) { app =>
       handler.nextResponse = Future.successful(Requeue)
@@ -147,7 +147,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
     }
   }
 
-  test("It should deadletter the message if requeued and maximumProcessAttempts is < 1") {
+  ignore("It should deadletter the message if requeued and maximumProcessAttempts is < 1") {
     val handler = new StubRequeueHandler[Int]
     val negativeProcessAttemptsRequeuePolicy = RequeuePolicy(Random.nextInt(10) * -1)
     Lifecycle.using(testLifecycle(handler, negativeProcessAttemptsRequeuePolicy, intMessageDeserializer)) { app =>
