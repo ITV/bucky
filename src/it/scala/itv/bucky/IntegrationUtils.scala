@@ -6,8 +6,6 @@ import itv.bucky.pattern.requeue._
 import itv.contentdelivery.lifecycle.Lifecycle
 import itv.contentdelivery.testutilities.rmq._
 import itv.httpyroraptor._
-import itv.utils.Blob
-import org.scalatest.Matchers._
 
 import scala.concurrent.duration._
 import scalaz._
@@ -15,6 +13,13 @@ import Scalaz._
 import itv.contentdelivery.testutilities.SameThreadExecutionContext.implicitly
 
 object IntegrationUtils {
+
+
+
+
+  def defaultDeclaration(queueName: QueueName): List[Queue] =
+    List(queueName).map(Queue(_).autoDelete.expires(2.minutes))
+
 
   def declareQueues(testQueueNames: QueueName*): (Seq[MessageQueue], AmqpClientConfig, HttpClient[Id]) = {
     val (amqpClientConfig: AmqpClientConfig, rmqAdminConfig: BrokerConfig, rmqAdminHhttp: AuthenticatedHttpClient[Id.Id]) = configAndHttp

@@ -1,7 +1,5 @@
 package itv.bucky
 
-import itv.bucky.UnmarshalResult.{Failure, Success}
-
 import scala.collection.mutable
 
 class Payload(val value: Array[Byte]) {

@@ -4,7 +4,8 @@ import java.lang.management.ManagementFactory
 
 import com.rabbitmq.client.AMQP.BasicProperties
 import com.rabbitmq.client.Envelope
-import scala.concurrent.Future
+
+import scala.concurrent.{ExecutionContext, Future}
 
 package object bucky {
 
@@ -36,5 +37,7 @@ package object bucky {
   type RequeueHandler[-T] = T => Future[RequeueConsumeAction]
 
   type Bindings = PartialFunction[RoutingKey, QueueName]
+
+  def safePerform[T](future : => Future[T])(implicit executionContext: ExecutionContext): Future[T] = Future(future).flatMap(identity)
 
 }

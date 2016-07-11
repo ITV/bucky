@@ -2,9 +2,9 @@ package itv.bucky
 
 import com.rabbitmq.client.MessageProperties
 import itv.bucky.TestUtils._
+import itv.contentdelivery.lifecycle.Lifecycle
 import itv.contentdelivery.testutilities.json.JsonResult
 import itv.httpyroraptor._
-import itv.utils.Blob
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.ScalaFutures
@@ -17,51 +17,56 @@ class PublisherIntegrationTest extends FunSuite with ScalaFutures {
   val testQueueName = "bucky-publisher-test"
   val routingKey = RoutingKey(testQueueName)
   val exchange = ExchangeName("")
-  lazy val (testQueue, amqpClientConfig, rmqAdminHhttp) = IntegrationUtils.declareQueues(QueueName(testQueueName))
+
+
+  import TestLifecycle._
 
   test("Can publish messages to a (pre-existing) queue") {
-    testQueue.head.purge()
-
-    for {
-      amqpClient <- amqpClientConfig
-      publish <- amqpClient.publisher()
-    } {
+    val handler = new QueueWatcher[Delivery]
+    Lifecycle.using(rawConsumer(QueueName(testQueueName), handler)) { publisher =>
       val body = Payload.from("Hello World!")
-      publish(PublishCommand(ExchangeName(""), routingKey, MessageProperties.MINIMAL_PERSISTENT_BASIC, body)).asTry.futureValue shouldBe 'success
+      publisher(PublishCommand(ExchangeName(""), routingKey, MessageProperties.MINIMAL_PERSISTENT_BASIC, body)).asTry.futureValue shouldBe 'success
 
-      testQueue.head.getNextMessage().payload.content shouldBe body.value
+      handler.nextMessage().futureValue.body.value shouldBe body.value
     }
-
   }
 
   test("Publisher can recover from connection failure") {
+    import IntegrationUtils._
+    lazy val (testQueue, amqpClientConfig, rmqAdminHhttp) = IntegrationUtils.declareQueues(QueueName(testQueueName))
     testQueue.head.purge()
+    val config = AmqpClientConfig("33.33.33.11", 5672, "guest", "guest", networkRecoveryInterval = Some(500.millis))
 
-    for {
-      amqpClient <- amqpClientConfig.copy(networkRecoveryInterval = Some(500.millis))
-      publish <- amqpClient.publisher()
-    } {
-      // Publish before failure
-      publish(PublishCommand(exchange, routingKey, MessageProperties.MINIMAL_PERSISTENT_BASIC, Payload.from("Before"))).asTry.futureValue shouldBe 'success
 
-      killRabbitConnection()
+
+    Lifecycle.using(base(defaultDeclaration(QueueName(testQueueName)), config)) { case (_, publisher) =>
+      val body = Payload.from("Hello World!")
+      publisher(PublishCommand(ExchangeName(""), routingKey, MessageProperties.MINIMAL_PERSISTENT_BASIC, body)).asTry.futureValue shouldBe 'success
+
+      killRabbitConnection(config)
 
       // Publish fails until connection is re-established
-      publish(PublishCommand(exchange, routingKey, MessageProperties.MINIMAL_PERSISTENT_BASIC, Payload.from("Immediately after"))).asTry.futureValue shouldBe 'failure
+      publisher(PublishCommand(exchange, routingKey, MessageProperties.MINIMAL_PERSISTENT_BASIC, Payload.from("Immediately after"))).asTry.futureValue shouldBe 'failure
 
       // Publish succeeds once connection is re-established
       Thread.sleep(600L)
-      publish(PublishCommand(exchange, routingKey, MessageProperties.MINIMAL_PERSISTENT_BASIC, Payload.from("A while after"))).asTry.futureValue shouldBe 'success
 
+      publisher(PublishCommand(exchange, routingKey, MessageProperties.MINIMAL_PERSISTENT_BASIC, Payload.from("A while after"))).asTry.futureValue shouldBe 'success
       testQueue.head.consumeAllMessages() should have size 2
+
     }
 
   }
 
-  private def killRabbitConnection(): Unit = {
-    val jsonResult = rmqAdminHhttp.handle(GET("/api/connections")).body.to[JsonResult]
+  private def killRabbitConnection(config: AmqpClientConfig): Unit = {
+    val rmqAdminHhttp = SyncHttpClient.forHost(config.host, 15672).withAuthentication(config.username, config.password)
+    val response = rmqAdminHhttp.handle(GET("/api/connections"))
+
+    println(response)
+
+    val jsonResult = response.body.to[JsonResult]
     for {
-      connection <- jsonResult.array if connection("user").string == amqpClientConfig.username
+      connection <- jsonResult.array if connection("user").string == defaultConfig.username
     } {
       val connectionName = connection("name").string
       println(s"Killing connection $connectionName")

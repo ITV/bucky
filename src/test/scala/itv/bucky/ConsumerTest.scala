@@ -3,7 +3,6 @@ package itv.bucky
 import com.rabbitmq.client.impl.AMQImpl.Basic
 import itv.contentdelivery.lifecycle.{Lifecycle, NoOpLifecycle}
 import itv.contentdelivery.testutilities.SameThreadExecutionContext.implicitly
-import itv.utils.Blob
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 

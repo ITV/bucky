@@ -3,7 +3,6 @@ package itv.bucky
 import com.rabbitmq.client.{AMQP, MessageProperties}
 import itv.bucky.pattern.requeue._
 import itv.contentdelivery.testutilities.SameThreadExecutionContext.implicitly
-import itv.utils.{Blob, BlobMarshaller}
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.ScalaFutures
@@ -88,6 +87,42 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
     val handler = new StubRequeueHandler[Int]
     Lifecycle.using(testLifecycle(handler, requeuePolicy, intMessageDeserializer)) { app =>
       handler.nextResponse = Future.successful(Requeue)
+      app.publish(Payload.from(1)).futureValue shouldBe published
+
+      eventually {
+        handler.receivedMessages.length should be >= requeuePolicy.maximumProcessAttempts
+      }(requeuePatienceConfig)
+    }
+  }
+
+  test("It should requeue the message if handler returns a failed future and is configured to requeue on failure") {
+    val handler = new StubRequeueHandler[Int]
+    Lifecycle.using(testLifecycle(handler, requeuePolicy, intMessageDeserializer)) { app =>
+      handler.nextResponse = Future.failed(new RuntimeException("Handler problem"))
+      app.publish(Payload.from(1)).futureValue shouldBe published
+
+      eventually {
+        handler.receivedMessages.length should be >= requeuePolicy.maximumProcessAttempts
+      }(requeuePatienceConfig)
+    }
+  }
+
+  test("(Raw) requeue consumer should requeue the message if handler throws an exception and is configured to requeue on failure") {
+    val handler = new StubRequeueHandler[Delivery]
+    Lifecycle.using(testLifecycle(handler, requeuePolicy)) { app =>
+      handler.nextException = Some(new RuntimeException("Handler problem"))
+      app.publish(Payload.from(1)).futureValue shouldBe published
+
+      eventually {
+        handler.receivedMessages.length should be >= requeuePolicy.maximumProcessAttempts
+      }(requeuePatienceConfig)
+    }
+  }
+
+  test("Requeue consumer should requeue the message if handler throws an exception and is configured to requeue on failure") {
+    val handler = new StubRequeueHandler[Int]
+    Lifecycle.using(testLifecycle(handler, requeuePolicy, intMessageDeserializer)) { app =>
+      handler.nextException = Some(new RuntimeException("Handler problem"))
       app.publish(Payload.from(1)).futureValue shouldBe published
 
       eventually {

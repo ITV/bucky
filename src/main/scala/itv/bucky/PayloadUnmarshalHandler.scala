@@ -12,8 +12,5 @@ class PayloadUnmarshalHandler[T, S](unmarshaller: PayloadUnmarshaller[T])(handle
       case UnmarshalResult.Failure(reason, throwable) =>
         logger.error(s"Cannot deserialize: ${delivery.body} because: '$reason' (will $deserializationFailureAction)")
         Future.successful(deserializationFailureAction)
-    }.recoverWith { case error: Throwable =>
-      logger.error(s"Cannot deserialize: ${delivery.body} because: '${error.getMessage}' (will $deserializationFailureAction)", error)
-      Future.successful(deserializationFailureAction)
     }
 }

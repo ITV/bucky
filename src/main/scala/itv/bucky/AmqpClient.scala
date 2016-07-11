@@ -39,11 +39,7 @@ class RawAmqpClient(channelFactory: Lifecycle[Channel], consumerTag: ConsumerTag
         override def handleDelivery(consumerTag: String, envelope: Envelope, properties: BasicProperties, body: Array[Byte]): Unit = {
           val delivery = Delivery(Payload(body), ConsumerTag(consumerTag), envelope, properties)
           logger.debug("Received {} on {}", delivery, queueName)
-          val handlerResult = Try(handler(delivery)) match {
-            case Success(future) => future
-            case Failure(throwable) => Future.failed(new RuntimeException("Handler threw an exception", throwable))
-          }
-          handlerResult.onComplete { result =>
+          safePerform(handler(delivery)).onComplete { result =>
             val action = result match {
               case Success(outcome) => outcome
               case Failure(error) =>
