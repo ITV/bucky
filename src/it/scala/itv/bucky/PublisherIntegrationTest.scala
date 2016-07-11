@@ -17,7 +17,7 @@ class PublisherIntegrationTest extends FunSuite with ScalaFutures {
   val testQueueName = "bucky-publisher-test"
   val routingKey = RoutingKey(testQueueName)
   val exchange = ExchangeName("")
-    lazy val (testQueue, amqpClientConfig, rmqAdminHhttp) = IntegrationUtils.declareQueues(QueueName(testQueueName))
+
 
   import TestLifecycle._
 
@@ -32,12 +32,14 @@ class PublisherIntegrationTest extends FunSuite with ScalaFutures {
   }
 
   test("Publisher can recover from connection failure") {
+    import IntegrationUtils._
+    lazy val (testQueue, amqpClientConfig, rmqAdminHhttp) = IntegrationUtils.declareQueues(QueueName(testQueueName))
     testQueue.head.purge()
-    val handler = new QueueWatcher[Delivery]
     val config = AmqpClientConfig("33.33.33.11", 5672, "guest", "guest", networkRecoveryInterval = Some(500.millis))
 
 
-    Lifecycle.using(rawConsumer(QueueName(testQueueName), handler, config)) { publisher =>
+
+    Lifecycle.using(base(defaultDeclaration(QueueName(testQueueName)), config)) { case (_, publisher) =>
       val body = Payload.from("Hello World!")
       publisher(PublishCommand(ExchangeName(""), routingKey, MessageProperties.MINIMAL_PERSISTENT_BASIC, body)).asTry.futureValue shouldBe 'success
 
@@ -46,17 +48,11 @@ class PublisherIntegrationTest extends FunSuite with ScalaFutures {
       // Publish fails until connection is re-established
       publisher(PublishCommand(exchange, routingKey, MessageProperties.MINIMAL_PERSISTENT_BASIC, Payload.from("Immediately after"))).asTry.futureValue shouldBe 'failure
 
-      println("Recovering")
       // Publish succeeds once connection is re-established
       Thread.sleep(600L)
 
-      println("Republishing ...")
-
       publisher(PublishCommand(exchange, routingKey, MessageProperties.MINIMAL_PERSISTENT_BASIC, Payload.from("A while after"))).asTry.futureValue shouldBe 'success
-      println("Published")
-      handler.receivedMessages should have size 2
-      println("Finish")
-//      testQueue.head.consumeAllMessages() should have size 2
+      testQueue.head.consumeAllMessages() should have size 2
 
     }
 

@@ -1,6 +1,6 @@
 package itv.bucky
 
-import itv.bucky.decl.Declaration
+import itv.bucky.decl.{Declaration, DeclarationLifecycle, Queue}
 import itv.contentdelivery.lifecycle.{Lifecycle, NoOpLifecycle}
 
 import scala.concurrent.ExecutionContext
@@ -15,6 +15,7 @@ object TestLifecycle {
     for {
       _ <- if (config.host == "localhost") LocalAmqpServer() else NoOpLifecycle(())
       amqpClient <- config
+      _ <- DeclarationLifecycle(declarations, amqpClient)
       publisher <- amqpClient.publisher()
     } yield (amqpClient, publisher)
   }
