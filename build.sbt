@@ -23,7 +23,6 @@ val mockitoVersion = "1.9.0"
 
 libraryDependencies ++= Seq(
   "com.rabbitmq" % "amqp-client" % amqpClientVersion,
-  "com.google.guava" % "guava" % "18.0",
   "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
   "itv.contentdelivery" %% "contentdelivery-shared-lifecycle" % contentDeliverySharedVersion,
   "itv.contentdelivery" %% "contentdelivery-shared-httpyroraptor" % contentDeliverySharedVersion % "test,it",
@@ -31,6 +30,7 @@ libraryDependencies ++= Seq(
   "io.netty" % "netty-all" % "4.1.2.Final" % "test,it",
   "org.apache.qpid" % "qpid-broker" % "6.0.4" % "test,it" excludeAll ExclusionRule(organization = "ch.qos.logback"),
   "itv.cps" %% "cps-utils" % commonPlatformServicesSharedVersion % "test,it",
+  "com.google.guava" % "guava" % "18.0" % "test,it",
   "org.scalatest" %% "scalatest" % scalaTestVersion % "test,it",
   "org.mockito" % "mockito-core" % mockitoVersion % "test" excludeAll ExclusionRule(organization = "com.google.guava"))
 
