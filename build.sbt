@@ -24,15 +24,15 @@ val mockitoVersion = "1.9.0"
 libraryDependencies ++= Seq(
   "com.rabbitmq" % "amqp-client" % amqpClientVersion,
   "com.google.guava" % "guava" % "18.0",
-  "io.netty" % "netty-all" % "4.1.2.Final" % "test,it",
+  "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
   "itv.contentdelivery" %% "contentdelivery-shared-lifecycle" % contentDeliverySharedVersion,
   "itv.contentdelivery" %% "contentdelivery-shared-httpyroraptor" % contentDeliverySharedVersion % "test,it",
   "itv.contentdelivery" %% "contentdelivery-shared-test-utilities" % contentDeliverySharedVersion % "test,it" excludeAll ExclusionRule(organization = "com.google.guava"),
-  "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
-  "org.apache.qpid" % "qpid-broker" % "6.0.4" % "it" excludeAll ExclusionRule(organization = "ch.qos.logback"),
+  "io.netty" % "netty-all" % "4.1.2.Final" % "test,it",
+  "org.apache.qpid" % "qpid-broker" % "6.0.4" % "test,it" excludeAll ExclusionRule(organization = "ch.qos.logback"),
   "itv.cps" %% "cps-utils" % commonPlatformServicesSharedVersion % "test,it",
   "org.scalatest" %% "scalatest" % scalaTestVersion % "test,it",
-  "org.mockito" % "mockito-core" % mockitoVersion  excludeAll ExclusionRule(organization = "com.google.guava"))
+  "org.mockito" % "mockito-core" % mockitoVersion % "test" excludeAll ExclusionRule(organization = "com.google.guava"))
 
 //grab some dependencies from on-premise artifactory for now, until they have been migrated over to artifactory-online
 resolvers += "ITV Libraries" at "http://cpp-artifactory.cpp.o.itv.net.uk:8081/artifactory/libs-release-local/"
