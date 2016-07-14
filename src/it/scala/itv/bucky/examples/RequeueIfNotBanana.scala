@@ -7,6 +7,7 @@ import itv.bucky.pattern.requeue._
 import itv.bucky.decl.DeclarationLifecycle
 import itv.contentdelivery.lifecycle.Lifecycle
 import itv.bucky.PublishCommandBuilder._
+import itv.bucky.Unmarshaller._
 
 import scala.concurrent.Future
 import itv.contentdelivery.testutilities.SameThreadExecutionContext.implicitly
@@ -16,7 +17,6 @@ import scala.concurrent.duration._
 import argonaut._
 import Argonaut._
 import itv.bucky.PayloadMarshaller.StringPayloadMarshaller
-import itv.bucky.PayloadUnmarshaller.StringPayloadUnmarshaller
 
 case class Fruit(name: String)
 

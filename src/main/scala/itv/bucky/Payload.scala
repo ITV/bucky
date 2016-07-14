@@ -27,7 +27,7 @@ class Payload(val value: Array[Byte]) {
     sb.append('"').toString()
   }
 
-  def to[T](implicit unmarshaller: PayloadUnmarshaller[T]): UnmarshalResult[T] =
+  def unmarshal[T](implicit unmarshaller: PayloadUnmarshaller[T]): UnmarshalResult[T] =
     unmarshaller.unmarshal(this)
 
 }
@@ -72,20 +72,28 @@ object UnmarshalResult {
 
 }
 
-trait PayloadUnmarshaller[+T] { self =>
+trait Unmarshaller[U, T] { self =>
 
-  def unmarshal(payload: Payload): UnmarshalResult[T]
+  def unmarshal(thing: U): UnmarshalResult[T]
 
-  def map[U](f: T => U): PayloadUnmarshaller[U] =
-    new PayloadUnmarshaller[U] {
-      override def unmarshal(payload: Payload) = self.unmarshal(payload) map f
+  def map[V](f: T => V): Unmarshaller[U, V] =
+    new Unmarshaller[U, V] {
+      override def unmarshal(thing: U): UnmarshalResult[V] = self.unmarshal(thing) map f
     }
 
-  def flatMap[U](f: T => PayloadUnmarshaller[U]): PayloadUnmarshaller[U] =
-    new PayloadUnmarshaller[U] {
-      override def unmarshal(payload: Payload): UnmarshalResult[U] =
-        self.unmarshal(payload) flatMap { result => f(result).unmarshal(payload) }
+  def flatMap[V](f: Unmarshaller[T, V]): Unmarshaller[U, V] =
+    new Unmarshaller[U, V] {
+      override def unmarshal(thing: U): UnmarshalResult[V] =
+        self.unmarshal(thing) flatMap { result => f.unmarshal(result) }
     }
+
+  def zip[V](other: Unmarshaller[U, V]): Unmarshaller[U, (T, V)] =
+    Unmarshaller.liftResult(thing =>
+      for {
+        t <- self.unmarshal(thing)
+        v <- other.unmarshal(thing)
+      }
+        yield (t, v))
 
 }
 
@@ -111,16 +119,21 @@ object PayloadMarshaller {
     }
 }
 
-object PayloadUnmarshaller {
+object Unmarshaller {
   import UnmarshalResult._
 
-  implicit object StringPayloadUnmarshaller extends PayloadUnmarshaller[String] {
-    override def unmarshal(payload: Payload): UnmarshalResult[String] =
-      new String(payload.value, "UTF-8").unmarshalSuccess
+  def payloadUnmarshallerToDeliveryUnmarshaller[T](unmarshaller: PayloadUnmarshaller[T]): DeliveryUnmarshaller[T] =
+    Unmarshaller.liftResult(d => unmarshaller.unmarshal(d.body))
+
+  implicit object StringPayloadUnmarshaller extends Unmarshaller[Payload, String] {
+      override def unmarshal(thing: Payload): UnmarshalResult[String] =
+        new String(thing.value, "UTF-8").unmarshalSuccess
   }
 
-  def liftResult[T](result: UnmarshalResult[T]): PayloadUnmarshaller[T] = new PayloadUnmarshaller[T] {
-    override def unmarshal(payload: Payload): UnmarshalResult[T] = result
-  }
+  def liftResult[U, T](f: U => UnmarshalResult[T]): Unmarshaller[U, T] =
+    new Unmarshaller[U, T] {
+      override def unmarshal(thing: U): UnmarshalResult[T] =
+        f(thing)
+    }
 
 }

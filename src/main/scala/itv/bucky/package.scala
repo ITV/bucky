@@ -40,4 +40,7 @@ package object bucky {
 
   def safePerform[T](future : => Future[T])(implicit executionContext: ExecutionContext): Future[T] = Future(future).flatMap(identity)
 
+  type PayloadUnmarshaller[T] = Unmarshaller[Payload, T]
+  type DeliveryUnmarshaller[T] = Unmarshaller[Delivery, T]
+
 }

@@ -11,6 +11,7 @@ import scala.collection.convert.wrapAsScala.collectionAsScalaIterable
 import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success, Try}
+import Unmarshaller._
 
 trait AmqpClient {
 
@@ -128,8 +129,13 @@ object AmqpClient extends StrictLogging {
       _ <- publisher(publishCommand)
     } yield ()
 
-  def handlerOf[T](handler: Handler[T], deserializer: PayloadUnmarshaller[T], unmarshalFailureAction: ConsumeAction = DeadLetter)
+
+  def deliveryHandlerOf[T](handler: Handler[T], unmarshaller: DeliveryUnmarshaller[T], unmarshalFailureAction: ConsumeAction = DeadLetter)
                   (implicit ec: ExecutionContext): Handler[Delivery] =
-    new PayloadUnmarshalHandler[T, ConsumeAction](deserializer)(handler, unmarshalFailureAction)
+    new DeliveryUnmarshalHandler[T, ConsumeAction](unmarshaller)(handler, unmarshalFailureAction)
+
+  def handlerOf[T](handler: Handler[T], unmarshaller: PayloadUnmarshaller[T], unmarshalFailureAction: ConsumeAction = DeadLetter)
+                  (implicit ec: ExecutionContext): Handler[Delivery] =
+    deliveryHandlerOf(handler, payloadUnmarshallerToDeliveryUnmarshaller(unmarshaller), unmarshalFailureAction)
 
 }

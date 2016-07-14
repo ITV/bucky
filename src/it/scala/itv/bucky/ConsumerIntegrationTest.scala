@@ -2,8 +2,8 @@ package itv.bucky
 
 import com.rabbitmq.client.AMQP.BasicProperties
 import com.rabbitmq.client.MessageProperties
-import itv.bucky.PayloadUnmarshaller.StringPayloadUnmarshaller
 import itv.bucky.UnmarshalResult.Success
+import itv.bucky.Unmarshaller._
 import itv.bucky.decl.{DeclarationLifecycle, Exchange, Queue}
 import itv.bucky.pattern.requeue._
 import itv.contentdelivery.lifecycle.Lifecycle
@@ -20,8 +20,8 @@ import scala.util.Random
 
 class ConsumerIntegrationTest extends FunSuite with ScalaFutures {
 
-  import TestLifecycle._
   import IntegrationUtils._
+  import TestLifecycle._
 
   case class Message(value: String)
 
@@ -30,7 +30,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures {
   test("Can consume messages from a (pre-existing) queue") {
     val handler = new StubConsumeHandler[Message]()
 
-    Lifecycle.using(messsageConsumer(QueueName("bucky-consumer-test"), handler)) { publisher =>
+    Lifecycle.using(messageConsumer(QueueName("bucky-consumer-test"), handler, payloadUnmarshallerToDeliveryUnmarshaller(messageUnmarshaller))) { publisher =>
       handler.receivedMessages shouldBe 'empty
 
       val expectedMessage = "Hello World!"
@@ -41,6 +41,46 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures {
 
         handler.receivedMessages.head shouldBe Message(expectedMessage)
       }
+    }
+  }
+
+  test("Can extract headers from consumed message") {
+    import UnmarshalResult._
+
+    case class Bar(value: String)
+    case class Baz(value: String)
+    case class Foo(bar: Bar, baz: Baz)
+
+    val barUnmarshaller: Unmarshaller[Delivery, Bar] =
+      Unmarshaller liftResult { delivery =>
+        if (delivery.properties.getHeaders.containsKey("bar"))
+          Bar(delivery.properties.getHeaders.get("bar").toString).unmarshalSuccess
+        else
+          "delivery did not contain bar header".unmarshalFailure
+      }
+
+    val bazUnmarshaller: Unmarshaller[Delivery, Baz] =
+      payloadUnmarshallerToDeliveryUnmarshaller(Unmarshaller liftResult (_.unmarshal[String].map(Baz)))
+
+    val fooUnmarshaller: Unmarshaller[Delivery, Foo] =
+      (barUnmarshaller zip bazUnmarshaller) map { case (bar, baz) => Foo(bar, baz) }
+
+    val handler = new StubConsumeHandler[Foo]
+
+    Lifecycle.using(messageConsumer(QueueName("bucky-consumer-header-test"), handler, fooUnmarshaller)) { publisher =>
+      handler.receivedMessages shouldBe 'empty
+
+      val expected = Foo(Bar("bar"), Baz("baz"))
+
+      val publishCommand = PublishCommand(ExchangeName(""),
+        RoutingKey("bucky-consumer-header-test"),
+        MessageProperties.MINIMAL_PERSISTENT_BASIC.builder().headers(Map[String, AnyRef]("bar" -> expected.bar.value).asJava).build(),
+        Payload.from(expected.baz.value))
+
+      publisher(publishCommand).futureValue
+
+      handler.receivedMessages should have size 1
+      handler.receivedMessages.head shouldBe expected
     }
   }
 
@@ -88,7 +128,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures {
         eventually {
           handler.receivedMessages should have size 1
           inside(handler.receivedMessages.head) {
-            case Delivery(body, _, _, _) => Payload(body.value).to[String] shouldBe Success(expectedMessage)
+            case Delivery(body, _, _, _) => Payload(body.value).unmarshal[String] shouldBe Success(expectedMessage)
           }
         }
     }
@@ -122,10 +162,10 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures {
     }
   }
 
-  def messsageConsumer[T](queueName: QueueName, handler: Handler[Message]) = for {
+  def messageConsumer[T](queueName: QueueName, handler: Handler[T], unmarshaller: DeliveryUnmarshaller[T]) = for {
     result <- base(defaultDeclaration(queueName))
     (amqClient, publisher) = result
-    consumer <- amqClient.consumer(queueName, AmqpClient.handlerOf(handler, messageUnmarshaller))
+    consumer <- amqClient.consumer(queueName, AmqpClient.deliveryHandlerOf(handler, unmarshaller))
   } yield publisher
 
 

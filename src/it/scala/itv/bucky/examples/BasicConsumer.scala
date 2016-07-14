@@ -1,13 +1,13 @@
 package itv.bucky.examples
 
 import itv.bucky.PayloadMarshaller.StringPayloadMarshaller
-import itv.bucky.PayloadUnmarshaller.StringPayloadUnmarshaller
 import itv.bucky._
 import itv.contentdelivery._
 import itv.contentdelivery.lifecycle.Lifecycle
 import itv.contentdelivery.metrics.MetricsRegistries
 import itv.contentdelivery.scalatra.ServletBootstrap
 import itv.contentdelivery.testutilities.SameThreadExecutionContext.implicitly
+import itv.bucky.Unmarshaller.StringPayloadUnmarshaller
 
 import scala.concurrent.Future
 
@@ -41,6 +41,7 @@ object BasicConsumer extends App {
 
     override def metaInfo: MetaInfo = MetaInfo(Active, None)
   }
+
   class BasicConsumerLifecycle extends MicroService[Config] {
     override protected def mainService(config: Config, registries: MetricsRegistries): Lifecycle[ServletBootstrap] = {
         import config._

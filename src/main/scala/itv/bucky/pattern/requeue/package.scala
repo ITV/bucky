@@ -6,6 +6,7 @@ import itv.contentdelivery.lifecycle.Lifecycle
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
+import itv.bucky.Unmarshaller._
 
 package object requeue {
 
@@ -37,7 +38,18 @@ package object requeue {
                             onFailure: RequeueConsumeAction = Requeue,
                             unmarshalFailureAction: RequeueConsumeAction = DeadLetter)
                            (implicit ec: ExecutionContext): Lifecycle[Unit] = {
-      val deserializeHandler = new PayloadUnmarshalHandler[T, RequeueConsumeAction](unmarshaller)(handler, unmarshalFailureAction)
+     requeueDeliveryHandlerOf(queueName, handler, requeuePolicy, payloadUnmarshallerToDeliveryUnmarshaller(unmarshaller), onFailure, unmarshalFailureAction)
+    }
+
+    def requeueDeliveryHandlerOf[T](
+                                   queueName: QueueName,
+                                   handler: RequeueHandler[T],
+                                   requeuePolicy: RequeuePolicy,
+                                   unmarshaller: DeliveryUnmarshaller[T],
+                                   onFailure: RequeueConsumeAction = Requeue,
+                                   unmarshalFailureAction: RequeueConsumeAction = DeadLetter)
+                                   (implicit ec: ExecutionContext): Lifecycle[Unit] = {
+      val deserializeHandler = new DeliveryUnmarshalHandler[T, RequeueConsumeAction](unmarshaller)(handler, unmarshalFailureAction)
       requeueOf(queueName, deserializeHandler, requeuePolicy)
     }
 
