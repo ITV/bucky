@@ -25,12 +25,12 @@ libraryDependencies ++= Seq(
   "com.rabbitmq" % "amqp-client" % amqpClientVersion,
   "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
   "itv.contentdelivery" %% "contentdelivery-shared-lifecycle" % contentDeliverySharedVersion,
+  "com.google.guava" % "guava" % "18.0",
   "itv.contentdelivery" %% "contentdelivery-shared-httpyroraptor" % contentDeliverySharedVersion % "test,it",
   "itv.contentdelivery" %% "contentdelivery-shared-test-utilities" % contentDeliverySharedVersion % "test,it" excludeAll ExclusionRule(organization = "com.google.guava"),
   "io.netty" % "netty-all" % "4.1.2.Final" % "test,it",
   "org.apache.qpid" % "qpid-broker" % "6.0.4" % "test,it" excludeAll ExclusionRule(organization = "ch.qos.logback"),
   "itv.cps" %% "cps-utils" % commonPlatformServicesSharedVersion % "test,it",
-  "com.google.guava" % "guava" % "18.0" % "test,it",
   "org.scalatest" %% "scalatest" % scalaTestVersion % "test,it",
   "org.mockito" % "mockito-core" % mockitoVersion % "test" excludeAll ExclusionRule(organization = "com.google.guava"))
 

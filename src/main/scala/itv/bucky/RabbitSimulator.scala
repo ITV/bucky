@@ -90,5 +90,6 @@ class RabbitSimulator(bindings: Bindings = IdentityBindings)(implicit executionC
     Await.result(Future.sequence(messagesBeingProcessed.values.map(_.consumeActionValue)), timeout)
   }
 
-  override def withChannel[T](thunk: (Channel) => T): T = ???
+  override def withChannel[T](thunk: (Channel) => T): T =
+    thunk(new StubChannel())
 }

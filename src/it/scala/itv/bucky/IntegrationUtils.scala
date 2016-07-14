@@ -14,12 +14,8 @@ import itv.contentdelivery.testutilities.SameThreadExecutionContext.implicitly
 
 object IntegrationUtils {
 
-
-
-
   def defaultDeclaration(queueName: QueueName): List[Queue] =
     List(queueName).map(Queue(_).autoDelete.expires(2.minutes))
-
 
   def declareQueues(testQueueNames: QueueName*): (Seq[MessageQueue], AmqpClientConfig, HttpClient[Id]) = {
     val (amqpClientConfig: AmqpClientConfig, rmqAdminConfig: BrokerConfig, rmqAdminHhttp: AuthenticatedHttpClient[Id.Id]) = configAndHttp
@@ -64,6 +60,4 @@ object IntegrationUtils {
         MessageQueue(s"$name.requeue", rmqAdminConfig),
         MessageQueue(s"$name.dlq", rmqAdminConfig))
   }
-
-
 }

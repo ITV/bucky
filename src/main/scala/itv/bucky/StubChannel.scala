@@ -4,7 +4,7 @@ import com.google.common.util.concurrent.MoreExecutors
 import com.rabbitmq.client.impl.AMQImpl.Basic.ConsumeOk
 import com.rabbitmq.client.impl.AMQImpl.Confirm.SelectOk
 import com.rabbitmq.client.impl.{AMQCommand, ChannelN, ConsumerWorkService}
-import com.rabbitmq.client.{MessageProperties, AMQP, Method}
+import com.rabbitmq.client.{AMQP, MessageProperties, Method}
 
 import scala.collection.mutable.ListBuffer
 
