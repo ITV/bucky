@@ -19,8 +19,8 @@ class RabbitSimulatorTest extends FunSuite with ScalaFutures {
     rabbit.waitForMessagesToBeProcessed()(1.second)
     messages should have size 2
 
-    messages.head.body.to[String] shouldBe "Hello".unmarshalSuccess
-    messages.last.body.to[String] shouldBe "world".unmarshalSuccess
+    messages.head.body.unmarshal[String] shouldBe "Hello".unmarshalSuccess
+    messages.last.body.unmarshal[String] shouldBe "world".unmarshalSuccess
   }
 
   test("it should not able to ack when the routing key does not found a queue") {
@@ -40,7 +40,7 @@ class RabbitSimulatorTest extends FunSuite with ScalaFutures {
     messages should have size 1
 
     val head = messages.head
-    head.body.to[String] shouldBe "Hello".unmarshalSuccess
+    head.body.unmarshal[String] shouldBe "Hello".unmarshalSuccess
     head.properties.getHeaders.get("my.header") shouldBe "hello"
   }
 
@@ -54,7 +54,7 @@ class RabbitSimulatorTest extends FunSuite with ScalaFutures {
     messages should have size 1
 
     val head = messages.head
-    head.body.to[String] shouldBe "Hello".unmarshalSuccess
+    head.body.unmarshal[String] shouldBe "Hello".unmarshalSuccess
     Option(head.properties.getHeaders.get("my.header")) shouldBe None
   }
 
@@ -66,7 +66,7 @@ class RabbitSimulatorTest extends FunSuite with ScalaFutures {
 
     rabbit.publish(Payload.from("a to b"))(RoutingKey("a")).futureValue shouldBe Ack
     aTobMessages should have size 1
-    aTobMessages.head.body.to[String] shouldBe "a to b".unmarshalSuccess
+    aTobMessages.head.body.unmarshal[String] shouldBe "a to b".unmarshalSuccess
 
     val cMessages = rabbit.watchQueue(QueueName("c"))
     cMessages shouldBe 'empty
@@ -74,7 +74,7 @@ class RabbitSimulatorTest extends FunSuite with ScalaFutures {
     rabbit.publish(Payload.from("c to c"))(RoutingKey("c")).futureValue shouldBe Ack
 
     cMessages should have size 1
-    cMessages.head.body.to[String] shouldBe "c to c".unmarshalSuccess
+    cMessages.head.body.unmarshal[String] shouldBe "c to c".unmarshalSuccess
   }
 
 

@@ -5,6 +5,7 @@ import itv.contentdelivery.lifecycle.{Lifecycle, NoOpLifecycle}
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.ScalaFutures
+import UnmarshalResult._
 
 class GenericConsumerTest extends FunSuite with ScalaFutures {
 
@@ -13,10 +14,7 @@ class GenericConsumerTest extends FunSuite with ScalaFutures {
   import itv.contentdelivery.testutilities.SameThreadExecutionContext.implicitly
 
   test("Runs callback with delivered messages") {
-    val unmarshaller : PayloadUnmarshaller[Payload] = new PayloadUnmarshaller[Payload] {
-      override def unmarshal(payload: Payload): UnmarshalResult[Payload] =
-        payload.unmarshalSuccess
-    }
+    val unmarshaller: Unmarshaller[Payload, Payload] = Unmarshaller.liftResult(_.unmarshalSuccess)
     Lifecycle.using(testLifecycle(unmarshaller)) { test =>
       test.channel.consumers should have size 1
       val msg = Payload.from("Hello World!")
@@ -29,10 +27,7 @@ class GenericConsumerTest extends FunSuite with ScalaFutures {
   }
 
   test("should fail when there is a deserialization problem") {
-    val unmarshaller: PayloadUnmarshaller[Payload] = new PayloadUnmarshaller[Payload] {
-      override def unmarshal(payload: Payload): UnmarshalResult[Payload] =
-        "There is a problem".unmarshalFailure
-    }
+    val unmarshaller: Unmarshaller[Payload, Payload] = Unmarshaller.liftResult(_ => "There is a problem".unmarshalFailure)
 
     Lifecycle.using(testLifecycle(unmarshaller)) { test =>
       test.channel.consumers should have size 1
@@ -46,10 +41,7 @@ class GenericConsumerTest extends FunSuite with ScalaFutures {
   }
 
   test("should perform deserialization action when there is a an exception during deserialization") {
-    val unmarshaller : PayloadUnmarshaller[Payload] = new PayloadUnmarshaller[Payload] {
-      override def unmarshal(payload: Payload): UnmarshalResult[Payload] =
-        "There is a problem".unmarshalFailure
-    }
+    val unmarshaller: Unmarshaller[Payload, Payload] = Unmarshaller.liftResult(_ => "There is a problem".unmarshalFailure)
 
     Lifecycle.using(testLifecycle(unmarshaller, Ack, DeadLetter)) { test =>
       test.channel.consumers should have size 1
@@ -61,10 +53,7 @@ class GenericConsumerTest extends FunSuite with ScalaFutures {
   }
 
   test("should nack by default when there is a an exception during deserialization") {
-    val unmarshaller : PayloadUnmarshaller[Payload] = new PayloadUnmarshaller[Payload] {
-      override def unmarshal(payload: Payload): UnmarshalResult[Payload] =
-        throw new RuntimeException("Oh No!")
-    }
+    val unmarshaller: Unmarshaller[Payload, Payload] = Unmarshaller.liftResult(_ => throw new RuntimeException("Oh No!"))
 
     Lifecycle.using(testLifecycle(unmarshaller)) { test =>
       test.channel.consumers should have size 1
@@ -78,7 +67,7 @@ class GenericConsumerTest extends FunSuite with ScalaFutures {
 
   case class TestFixture(channel: StubChannel, handler: StubConsumeHandler[Payload])
 
-  def testLifecycle(unmarshaller: PayloadUnmarshaller[Payload], unmarshalFailureAction: ConsumeAction = DeadLetter, actionOnFailure: ConsumeAction = DeadLetter): Lifecycle[TestFixture] = {
+  def testLifecycle(unmarshaller: Unmarshaller[Payload, Payload], unmarshalFailureAction: ConsumeAction = DeadLetter, actionOnFailure: ConsumeAction = DeadLetter): Lifecycle[TestFixture] = {
     val channel = new StubChannel()
     val client = createClient(channel)
     val handler = new StubConsumeHandler[Payload]()

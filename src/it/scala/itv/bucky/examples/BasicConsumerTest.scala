@@ -22,7 +22,7 @@ class BasicConsumerTest extends FunSuite with ScalaFutures {
 
       app.requeueMessages should have size 1
       val message = app.requeueMessages.head
-      message.body.to[String] shouldBe "Hello".unmarshalSuccess
+      message.body.unmarshal[String] shouldBe "Hello".unmarshalSuccess
     }
   }
 

@@ -45,7 +45,7 @@ class RabbitSimulator(bindings: Bindings = IdentityBindings)(implicit executionC
       consumeActionValue.onComplete { _ =>
         val publication = messagesBeingProcessed(key)
         messagesBeingProcessed -= key
-        logger.debug(s"Consume message [${publication.message.to[String]}] from ${publication.queueName}")
+        logger.debug(s"Consume message [${publication.message.unmarshal[String]}] from ${publication.queueName}")
       }
       consumeActionValue
     }
@@ -60,7 +60,7 @@ class RabbitSimulator(bindings: Bindings = IdentityBindings)(implicit executionC
     }
 
   def publish(message: Payload)(routingKey: RoutingKey, headers: Map[String, AnyRef] = Map.empty[String, AnyRef]): Future[ConsumeAction] = {
-    logger.debug(s"Publish message [${message.to[String]}] with $routingKey")
+    logger.debug(s"Publish message [${message.unmarshal[String]}] with $routingKey")
     if (bindings.isDefinedAt(routingKey)) {
       val queueName = bindings(routingKey)
       consumers.get(queueName).fold(Future.failed[ConsumeAction](new RuntimeException(s"No consumers found for $queueName!"))) { handler =>

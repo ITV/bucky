@@ -10,7 +10,6 @@ import org.scalatest.concurrent.Eventually
 import Eventually._
 import com.rabbitmq.client.AMQP.BasicProperties
 import itv.bucky.PayloadMarshaller.StringPayloadMarshaller
-import itv.bucky.PayloadUnmarshaller.StringPayloadUnmarshaller
 
 import scala.collection.JavaConverters
 import scala.concurrent.Future
@@ -19,6 +18,7 @@ import scala.util.Random
 import JavaConverters._
 import itv.contentdelivery.lifecycle.Lifecycle
 import itv.contentdelivery.testutilities.rmq.MessageQueue
+import itv.bucky.Unmarshaller._
 
 class RequeueIntegrationTest extends FunSuite with ScalaFutures {
 
