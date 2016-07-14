@@ -30,7 +30,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures {
   test("Can consume messages from a (pre-existing) queue") {
     val handler = new StubConsumeHandler[Message]()
 
-    Lifecycle.using(messageConsumer(QueueName("bucky-consumer-test"), handler, payloadUnmarshallerToDeliveryUnmarshaller(messageUnmarshaller))) { publisher =>
+    Lifecycle.using(messageConsumer(QueueName("bucky-consumer-test"), handler, toDeliveryUnmarshaller(messageUnmarshaller))) { publisher =>
       handler.receivedMessages shouldBe 'empty
 
       val expectedMessage = "Hello World!"
@@ -60,7 +60,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures {
       }
 
     val bazUnmarshaller: Unmarshaller[Delivery, Baz] =
-      payloadUnmarshallerToDeliveryUnmarshaller(Unmarshaller liftResult (_.unmarshal[String].map(Baz)))
+      toDeliveryUnmarshaller(Unmarshaller liftResult (_.unmarshal[String].map(Baz)))
 
     val fooUnmarshaller: Unmarshaller[Delivery, Foo] =
       (barUnmarshaller zip bazUnmarshaller) map { case (bar, baz) => Foo(bar, baz) }

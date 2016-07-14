@@ -136,6 +136,6 @@ object AmqpClient extends StrictLogging {
 
   def handlerOf[T](handler: Handler[T], unmarshaller: PayloadUnmarshaller[T], unmarshalFailureAction: ConsumeAction = DeadLetter)
                   (implicit ec: ExecutionContext): Handler[Delivery] =
-    deliveryHandlerOf(handler, payloadUnmarshallerToDeliveryUnmarshaller(unmarshaller), unmarshalFailureAction)
+    deliveryHandlerOf(handler, toDeliveryUnmarshaller(unmarshaller), unmarshalFailureAction)
 
 }

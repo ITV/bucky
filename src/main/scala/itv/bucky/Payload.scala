@@ -122,7 +122,7 @@ object PayloadMarshaller {
 object Unmarshaller {
   import UnmarshalResult._
 
-  def payloadUnmarshallerToDeliveryUnmarshaller[T](unmarshaller: PayloadUnmarshaller[T]): DeliveryUnmarshaller[T] =
+  def toDeliveryUnmarshaller[T](unmarshaller: PayloadUnmarshaller[T]): DeliveryUnmarshaller[T] =
     Unmarshaller.liftResult(d => unmarshaller.unmarshal(d.body))
 
   implicit object StringPayloadUnmarshaller extends Unmarshaller[Payload, String] {

@@ -38,7 +38,7 @@ package object requeue {
                             onFailure: RequeueConsumeAction = Requeue,
                             unmarshalFailureAction: RequeueConsumeAction = DeadLetter)
                            (implicit ec: ExecutionContext): Lifecycle[Unit] = {
-     requeueDeliveryHandlerOf(queueName, handler, requeuePolicy, payloadUnmarshallerToDeliveryUnmarshaller(unmarshaller), onFailure, unmarshalFailureAction)
+     requeueDeliveryHandlerOf(queueName, handler, requeuePolicy, toDeliveryUnmarshaller(unmarshaller), onFailure, unmarshalFailureAction)
     }
 
     def requeueDeliveryHandlerOf[T](
