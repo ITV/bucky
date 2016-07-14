@@ -1,11 +1,12 @@
 package itv.bucky
 
+import java.util
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 
-import com.rabbitmq.client.AMQP.BasicProperties
-import com.rabbitmq.client.{Channel, Envelope, MessageProperties}
+import com.rabbitmq.client.AMQP._
+import com.rabbitmq.client.{Channel, Command, ConfirmListener, Connection, Consumer, Envelope, FlowListener, GetResponse, MessageProperties, Method, ReturnListener, ShutdownListener, ShutdownSignalException, BasicProperties => _}
 import com.typesafe.scalalogging.StrictLogging
 import itv.contentdelivery.lifecycle.{Lifecycle, NoOpLifecycle}
 
@@ -90,6 +91,155 @@ class RabbitSimulator(bindings: Bindings = IdentityBindings)(implicit executionC
     Await.result(Future.sequence(messagesBeingProcessed.values.map(_.consumeActionValue)), timeout)
   }
 
-  override def withChannel[T](thunk: (Channel) => T): T =
-    thunk(new StubChannel())
+  override def withChannel[T](thunk: Channel => T): T = thunk(new Channel {
+
+      override def queueDeclarePassive(queue: String): Queue.DeclareOk = new Queue.DeclareOk.Builder().build()
+
+      override def flowBlocked(): Boolean = false
+
+      override def getDefaultConsumer: Consumer = ???
+
+      override def getNextPublishSeqNo: Long = 0
+
+      override def basicPublish(exchange: String, routingKey: String, props: BasicProperties, body: Array[Byte]): Unit = {}
+
+      override def basicPublish(exchange: String, routingKey: String, mandatory: Boolean, props: BasicProperties, body: Array[Byte]): Unit = {}
+
+      override def basicPublish(exchange: String, routingKey: String, mandatory: Boolean, immediate: Boolean, props: BasicProperties, body: Array[Byte]): Unit = {}
+
+      override def rpc(method: Method): Command = ???
+
+      override def addReturnListener(listener: ReturnListener):Unit = {}
+
+      override def basicCancel(consumerTag: String):Unit = {}
+
+      override def waitForConfirmsOrDie():Unit = {}
+
+      override def waitForConfirmsOrDie(timeout: Long):Unit = {}
+
+      override def basicAck(deliveryTag: Long, multiple: Boolean):Unit = {}
+
+      override def basicNack(deliveryTag: Long, multiple: Boolean, requeue: Boolean):Unit = {}
+
+      override def getChannelNumber: Int = 0
+
+      override def exchangeBind(destination: String, source: String, routingKey: String): Exchange.BindOk = ???
+
+      override def exchangeBind(destination: String, source: String, routingKey: String, arguments: util.Map[String, AnyRef]): Exchange.BindOk = ???
+
+      override def waitForConfirms(): Boolean = false
+
+      override def waitForConfirms(timeout: Long): Boolean = false
+
+      override def queueDeclare(): Queue.DeclareOk = new Queue.DeclareOk.Builder().build()
+
+      override def queueDeclare(queue: String, durable: Boolean, exclusive: Boolean, autoDelete: Boolean, arguments: util.Map[String, AnyRef]): Queue.DeclareOk = new Queue.DeclareOk.Builder().build()
+
+      override def clearFlowListeners():Unit = {}
+
+      override def basicReject(deliveryTag: Long, requeue: Boolean):Unit = {}
+
+      override def clearConfirmListeners():Unit = {}
+
+      override def exchangeUnbind(destination: String, source: String, routingKey: String): Exchange.UnbindOk = new Exchange.UnbindOk.Builder().build()
+
+      override def exchangeUnbind(destination: String, source: String, routingKey: String, arguments: util.Map[String, AnyRef]): Exchange.UnbindOk = new Exchange.UnbindOk.Builder().build()
+
+      override def exchangeDeclare(exchange: String, `type`: String): Exchange.DeclareOk = new Exchange.DeclareOk.Builder().build()
+
+      override def exchangeDeclare(exchange: String, `type`: String, durable: Boolean): Exchange.DeclareOk = new Exchange.DeclareOk.Builder().build()
+
+      override def exchangeDeclare(exchange: String, `type`: String, durable: Boolean, autoDelete: Boolean, arguments: util.Map[String, AnyRef]): Exchange.DeclareOk = new Exchange.DeclareOk.Builder().build()
+
+      override def exchangeDeclare(exchange: String, `type`: String, durable: Boolean, autoDelete: Boolean, internal: Boolean, arguments: util.Map[String, AnyRef]): Exchange.DeclareOk = new Exchange.DeclareOk.Builder().build()
+
+      override def txSelect(): Tx .SelectOk = ???
+
+      override def basicGet(queue: String, autoAck: Boolean): GetResponse = ???
+
+      override def removeReturnListener(listener: ReturnListener): Boolean =  false
+
+      override def addFlowListener(listener: FlowListener):Unit = {}
+
+      override def basicRecoverAsync(requeue: Boolean):Unit = {}
+
+      override def queuePurge(queue: String): Queue .PurgeOk = ???
+
+      override def queueUnbind(queue: String, exchange: String, routingKey: String): Queue .UnbindOk = ???
+
+      override def queueUnbind(queue: String, exchange: String, routingKey: String, arguments: util.Map[String, AnyRef]): Queue .UnbindOk = ???
+
+      override def exchangeDelete(exchange: String, ifUnused: Boolean): Exchange .DeleteOk = ???
+
+      override def exchangeDelete(exchange: String): Exchange .DeleteOk = ???
+
+      override def confirmSelect(): Confirm .SelectOk = ???
+
+      override def removeConfirmListener(listener: ConfirmListener): Boolean = false
+
+      override def basicConsume(queue: String, callback: Consumer): String = queue
+
+      override def basicConsume(queue: String, autoAck: Boolean, callback: Consumer): String = queue
+
+      override def basicConsume(queue: String, autoAck: Boolean, arguments: util.Map[String, AnyRef], callback: Consumer): String = queue
+
+      override def basicConsume(queue: String, autoAck: Boolean, consumerTag: String, callback: Consumer): String = queue
+
+      override def basicConsume(queue: String, autoAck: Boolean, consumerTag: String, noLocal: Boolean, exclusive: Boolean, arguments: util.Map[String, AnyRef], callback: Consumer): String = queue
+
+      override def abort():Unit = {}
+
+      override def abort(closeCode: Int, closeMessage: String):Unit = {}
+
+      override def close():Unit = {}
+
+      override def close(closeCode: Int, closeMessage: String):Unit = {}
+
+      override def setDefaultConsumer(consumer: Consumer):Unit = {}
+
+      override def queueBind(queue: String, exchange: String, routingKey: String): Queue.BindOk = ???
+
+      override def queueBind(queue: String, exchange: String, routingKey: String, arguments: util.Map[String, AnyRef]): Queue .BindOk = ???
+
+      override def txCommit(): Tx .CommitOk = ???
+
+      override def exchangeDeclarePassive(name: String): Exchange.DeclareOk = ???
+
+      override def basicRecover(): Basic .RecoverOk = ???
+
+      override def basicRecover(requeue: Boolean): Basic .RecoverOk = ???
+
+      override def addConfirmListener(listener: ConfirmListener):Unit = {}
+
+      override def basicQos(prefetchSize: Int, prefetchCount: Int, global: Boolean):Unit = {}
+
+      override def basicQos(prefetchCount: Int, global: Boolean):Unit = {}
+
+      override def basicQos(prefetchCount: Int):Unit = {}
+
+      override def asyncRpc(method: Method):Unit = {}
+
+      override def queueDelete(queue: String): Queue .DeleteOk = ???
+
+      override def queueDelete(queue: String, ifUnused: Boolean, ifEmpty: Boolean): Queue .DeleteOk = ???
+
+      override def removeFlowListener(listener: FlowListener): Boolean = false
+
+      override def getConnection: Connection = ???
+
+      override def txRollback(): Tx .RollbackOk = ???
+
+      override def clearReturnListeners():Unit = {}
+
+      override def removeShutdownListener(listener: ShutdownListener):Unit = {}
+
+      override def isOpen: Boolean = false
+
+      override def notifyListeners():Unit = {}
+
+      override def getCloseReason: ShutdownSignalException = ???
+
+      override def addShutdownListener(listener: ShutdownListener):Unit = {}
+    })
+
 }
