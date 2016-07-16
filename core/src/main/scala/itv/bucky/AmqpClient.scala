@@ -2,8 +2,8 @@ package itv.bucky
 
 import java.util.concurrent.TimeUnit
 
-import com.rabbitmq.client.Channel
 import com.typesafe.scalalogging.StrictLogging
+import itv.bucky.decl.{Binding, Exchange, Queue}
 import itv.contentdelivery.lifecycle.Lifecycle
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -20,8 +20,14 @@ trait AmqpClient {
   def consumer(queueName: QueueName, handler: Handler[Delivery], exceptionalAction: ConsumeAction = DeadLetter)
               (implicit executionContext: ExecutionContext): Lifecycle[Unit]
 
-  def withChannel[T](thunk: Channel => T): T
+  def withDeclarations[T](thunk: AmqpOps => T)(implicit executionContext: ExecutionContext): T
 
+}
+
+trait AmqpOps {
+  def declareQueue(queue: Queue): Future[Unit]
+  def declareExchange(echange: Exchange): Future[Unit]
+  def bindQueue(binding: Binding): Future[Unit]
 }
 
 

@@ -26,7 +26,6 @@ lazy val core = project
   .settings(kernelSettings: _*)
   .settings(
     libraryDependencies ++= Seq(
-      "com.rabbitmq" % "amqp-client" % amqpClientVersion,
       "itv.contentdelivery" %% "contentdelivery-shared-lifecycle" % contentDeliverySharedVersion,
       "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
       "org.scalatest" %% "scalatest" % scalaTestVersion % "test",

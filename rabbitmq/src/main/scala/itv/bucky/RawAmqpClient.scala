@@ -9,9 +9,10 @@ import itv.contentdelivery.lifecycle.{ExecutorLifecycles, Lifecycle, NoOpLifecyc
 
 import scala.collection.convert.wrapAsScala.collectionAsScalaIterable
 import scala.concurrent.duration.{Duration, FiniteDuration}
-import scala.concurrent.{ExecutionContext, Promise}
+import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
 import com.rabbitmq.client.{Envelope => RabbitMQEnvelope}
+import itv.bucky.decl.{Binding, Exchange, Queue}
 
 class RawAmqpClient(channelFactory: Lifecycle[Channel], consumerTag: ConsumerTag = ConsumerTag.pidAndHost) extends AmqpClient with StrictLogging {
 
@@ -153,8 +154,41 @@ class RawAmqpClient(channelFactory: Lifecycle[Channel], consumerTag: ConsumerTag
     case infinite => NoOpLifecycle(identity)
   }
 
-  override def withChannel[T](thunk: (Channel) => T): T =
-    Lifecycle.using(channelFactory)(thunk)
+  override def withDeclarations[T](thunk: (AmqpOps) => T)(implicit executionContext: ExecutionContext): T =
+    Lifecycle.using(channelFactory)(channel => thunk(ChannelAmqpOps(channel)))
+
+
+  case class ChannelAmqpOps(channel: Channel)(implicit executionContext: ExecutionContext) extends AmqpOps {
+
+    import scala.collection.JavaConverters._
+
+    override def declareExchange(exchange: Exchange): Future[Unit] = Future {
+      channel.exchangeDeclare(
+        exchange.name.value,
+        exchange.exchangeType.value,
+        exchange.isDurable,
+        exchange.shouldAutoDelete,
+        exchange.isInternal,
+        exchange.arguments.asJava)
+    }
+
+    override def bindQueue(binding: Binding): Future[Unit] = Future {
+      channel.queueBind(
+        binding.queueName.value,
+        binding.exchangeName.value,
+        binding.routingKey.value,
+        binding.arguments.asJava)
+    }
+
+    override def declareQueue(queue: Queue): Future[Unit] = Future {
+      channel.queueDeclare(
+        queue.queueName.value,
+        queue.isDurable,
+        queue.isExclusive,
+        queue.shouldAutoDelete,
+        queue.arguments.asJava)
+    }
+  }
 
 }
 

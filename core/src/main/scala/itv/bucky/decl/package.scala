@@ -1,11 +1,9 @@
 package itv.bucky
 
-import com.rabbitmq.client.Channel
 import com.typesafe.scalalogging.StrictLogging
 
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
-import scala.collection.JavaConverters._
 
 package object decl {
 
@@ -18,10 +16,8 @@ package object decl {
       Future.sequence(declaration.map(_.applyTo(client))).map(_ => ())
   }
 
-  private def declOperation(client: AmqpClient, thunk: Channel => Unit)(implicit ec: ExecutionContext): Future[Unit] =
-    Future {
-      client withChannel thunk
-    }.map(_ => ())
+  private def declOperation(client: AmqpClient, thunk: AmqpOps => Future[Unit])(implicit ec: ExecutionContext): Future[Unit] =
+    client withDeclarations thunk
 
   sealed trait ExchangeType {
     def value: String
@@ -42,7 +38,7 @@ package object decl {
       val createExchange =
        declOperation(client, {
          logger.info(s"Declaring Exchange($name, $exchangeType, isDurable=$isDurable, shouldAutoDelete=$shouldAutoDelete, isInternal=$isInternal, arguments=$arguments)")
-         _.exchangeDeclare(name.value, exchangeType.value, isDurable, shouldAutoDelete, isInternal, arguments.asJava)
+         _.declareExchange(this)
        })
       val createBindings: List[Future[Unit]] =
         bindings.map(_.applyTo(client))
@@ -69,7 +65,7 @@ package object decl {
     override def applyTo(client: AmqpClient)(implicit ec: ExecutionContext): Future[Unit] =
       declOperation(client, {
         logger.info(s"Declaring $this")
-        _.queueBind(queueName.value, exchangeName.value, routingKey.value, arguments.asJava)
+        _.bindQueue(this)
       })
 
   }
@@ -83,7 +79,7 @@ package object decl {
     override def applyTo(client: AmqpClient)(implicit ec: ExecutionContext): Future[Unit] =
       declOperation(client, {
         logger.info(s"Declaring $this")
-        _.queueDeclare(queueName.value, isDurable, isExclusive, shouldAutoDelete, arguments.asJava)
+        _.declareQueue(this)
       })
 
     def notDurable: Queue = copy(isDurable = false)
