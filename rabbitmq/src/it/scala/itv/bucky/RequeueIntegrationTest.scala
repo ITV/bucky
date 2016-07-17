@@ -24,7 +24,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
 
   implicit val intMarshaller: PayloadMarshaller[Int] = StringPayloadMarshaller.contramap(_.toString)
 
-  val requeuePatienceConfig: Eventually.PatienceConfig = Eventually.PatienceConfig(timeout = 5.second, interval = 100.millis)
+  val requeuePatienceConfig: Eventually.PatienceConfig = Eventually.PatienceConfig(timeout = 60.second, interval = 100.millis)
 
   val exchange = ExchangeName("")
 

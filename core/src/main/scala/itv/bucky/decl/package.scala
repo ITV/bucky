@@ -12,8 +12,16 @@ package object decl {
   }
 
   object Declaration {
-    def applyAll(declaration: Iterable[Declaration], client: AmqpClient)(implicit ec: ExecutionContext): Future[Unit] =
-      Future.sequence(declaration.map(_.applyTo(client))).map(_ => ())
+    def applyAll(declaration: Iterable[Declaration], client: AmqpClient)(implicit ec: ExecutionContext): Future[Unit] = {
+      val (bindings, rest) = declaration.partition {
+        case binding: Binding => true
+        case _ => false
+      }
+      for {
+        _ <- Future.sequence(rest.map(_.applyTo(client))).map(_ => ())
+        _ <- Future.sequence(bindings.map(_.applyTo(client))).map(_ => ())
+      } yield ()
+    }
   }
 
   private def declOperation(client: AmqpClient, thunk: AmqpOps => Future[Unit])(implicit ec: ExecutionContext): Future[Unit] =
@@ -22,6 +30,7 @@ package object decl {
   sealed trait ExchangeType {
     def value: String
   }
+
   case object Direct extends ExchangeType {
     override def value: String = "direct"
   }
@@ -36,10 +45,10 @@ package object decl {
 
     override def applyTo(client: AmqpClient)(implicit ec: ExecutionContext): Future[Unit] = {
       val createExchange =
-       declOperation(client, {
-         logger.info(s"Declaring Exchange($name, $exchangeType, isDurable=$isDurable, shouldAutoDelete=$shouldAutoDelete, isInternal=$isInternal, arguments=$arguments)")
-         _.declareExchange(this)
-       })
+        declOperation(client, {
+          logger.info(s"Declaring Exchange($name, $exchangeType, isDurable=$isDurable, shouldAutoDelete=$shouldAutoDelete, isInternal=$isInternal, arguments=$arguments)")
+          _.declareExchange(this)
+        })
       val createBindings: List[Future[Unit]] =
         bindings.map(_.applyTo(client))
 
@@ -47,10 +56,13 @@ package object decl {
     }
 
     def notDurable: Exchange = copy(isDurable = false)
+
     def autoDelete: Exchange = copy(shouldAutoDelete = true)
+
     def internal: Exchange = copy(isInternal = true)
 
     def argument(value: (String, AnyRef)): Exchange = copy(arguments = this.arguments + value)
+
     def expires(value: FiniteDuration): Exchange = argument("x-expires" -> Long.box(value.toMillis))
 
     def binding(routingKeyToQueue: (RoutingKey, QueueName), arguments: Map[String, AnyRef] = Map.empty): Exchange =
@@ -75,7 +87,7 @@ package object decl {
                    isExclusive: Boolean = false,
                    shouldAutoDelete: Boolean = false,
                    arguments: Map[String, AnyRef] = Map.empty) extends Declaration with StrictLogging {
-    
+
     override def applyTo(client: AmqpClient)(implicit ec: ExecutionContext): Future[Unit] =
       declOperation(client, {
         logger.info(s"Declaring $this")
@@ -83,10 +95,13 @@ package object decl {
       })
 
     def notDurable: Queue = copy(isDurable = false)
+
     def exclusive: Queue = copy(isExclusive = true)
+
     def autoDelete: Queue = copy(shouldAutoDelete = true)
 
     def argument(value: (String, AnyRef)): Queue = copy(arguments = this.arguments + value)
+
     def expires(value: FiniteDuration): Queue = argument("x-expires" -> Long.box(value.toMillis))
 
     def deadLetterExchange(exchangeName: ExchangeName): Queue = argument("x-dead-letter-exchange" -> exchangeName.value)
