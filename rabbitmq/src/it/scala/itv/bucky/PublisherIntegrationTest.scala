@@ -1,5 +1,6 @@
 package itv.bucky
 
+import com.typesafe.scalalogging.StrictLogging
 import itv.bucky.TestUtils._
 import itv.contentdelivery.lifecycle.Lifecycle
 import itv.contentdelivery.testutilities.json.JsonResult
@@ -11,7 +12,7 @@ import org.scalatest.concurrent.ScalaFutures
 import scala.concurrent.duration._
 import itv.bucky.SameThreadExecutionContext.implicitly
 
-class PublisherIntegrationTest extends FunSuite with ScalaFutures {
+class PublisherIntegrationTest extends FunSuite with ScalaFutures with StrictLogging {
 
   val testQueueName = "bucky-publisher-test"
   val routingKey = RoutingKey(testQueueName)
@@ -58,16 +59,17 @@ class PublisherIntegrationTest extends FunSuite with ScalaFutures {
 
   private def killRabbitConnection(config: AmqpClientConfig): Unit = {
     val rmqAdminHhttp = SyncHttpClient.forHost(config.host, 15672).withAuthentication(config.username, config.password)
-    val response = rmqAdminHhttp.handle(GET("/api/connections"))
+    val requestConnections = GET("/api/connections")
+    val response = rmqAdminHhttp.handle(requestConnections)
 
-    println(response)
+    logger.debug(s"$requestConnections -> $response")
 
     val jsonResult = response.body.to[JsonResult]
     for {
       connection <- jsonResult.array if connection("user").string == defaultConfig.username
     } {
       val connectionName = connection("name").string
-      println(s"Killing connection $connectionName")
+      logger.debug(s"Killing connection $connectionName")
       rmqAdminHhttp.handle(DELETE(UriBuilder / "api" / "connections" / connectionName)) shouldBe 'successful
     }
   }

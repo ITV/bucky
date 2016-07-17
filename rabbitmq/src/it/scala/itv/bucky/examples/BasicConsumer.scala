@@ -1,5 +1,6 @@
 package itv.bucky.examples
 
+import com.typesafe.scalalogging.StrictLogging
 import itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import itv.bucky._
 import itv.contentdelivery._
@@ -13,17 +14,17 @@ import scala.concurrent.Future
 
 case class MyMessage(foo: String)
 
-case class PrintlnHandler(targetPublisher: Publisher[MyMessage]) extends Handler[MyMessage] {
+case class PrintlnHandler(targetPublisher: Publisher[MyMessage]) extends Handler[MyMessage] with StrictLogging {
 
   override def apply(message: MyMessage): Future[ConsumeAction] = {
     val s = message.foo
 
     if (s contains "Foo") {
-      println(s)
+      logger.info(s)
       Future.successful(Ack)
     }
     else {
-      println(s"Target $message")
+      logger.info(s"Target $message")
       targetPublisher(message).map(_ => Ack)
     }
   }
@@ -42,7 +43,7 @@ object BasicConsumer extends App {
     override def metaInfo: MetaInfo = MetaInfo(Active, None)
   }
 
-  class BasicConsumerLifecycle extends MicroService[Config] {
+  class BasicConsumerLifecycle extends MicroService[Config] with StrictLogging {
     override protected def mainService(config: Config, registries: MetricsRegistries): Lifecycle[ServletBootstrap] = {
         import config._
 
@@ -62,7 +63,7 @@ object BasicConsumer extends App {
           publisher <- amqClient.publisher().map(publisherOf(myMessageSerializer))
           blah <- amqClient.consumer(queueName, handlerOf(PrintlnHandler(publisher), payloadUnmarshaller))
         } yield {
-          println("Started the consumer")
+          logger.info("Started the consumer")
           ServletBootstrap.default
 
         }
