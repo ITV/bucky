@@ -4,7 +4,7 @@ import com.google.common.util.concurrent.MoreExecutors
 import com.rabbitmq.client.impl.AMQImpl.Basic.ConsumeOk
 import com.rabbitmq.client.impl.AMQImpl.Confirm.SelectOk
 import com.rabbitmq.client.impl.{AMQCommand, ChannelN, ConsumerWorkService}
-import com.rabbitmq.client.{AMQP, MessageProperties, Method}
+import com.rabbitmq.client.{AMQP, MessageProperties => RMessageProperties, Method}
 
 import scala.collection.mutable.ListBuffer
 
@@ -31,7 +31,7 @@ class StubChannel extends ChannelN(null, 0, new ConsumerWorkService(MoreExecutor
     handleCompleteInboundCommand(new AMQCommand(method))
   }
 
-  def deliver(delivery: AMQP.Basic.Deliver, body: Payload, properties: AMQP.BasicProperties = MessageProperties.BASIC): Unit = {
+  def deliver(delivery: AMQP.Basic.Deliver, body: Payload, properties: AMQP.BasicProperties = RMessageProperties.BASIC): Unit = {
     handleCompleteInboundCommand(new AMQCommand(delivery, properties, body.value))
   }
 }

@@ -36,7 +36,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogg
       handler.receivedMessages shouldBe 'empty
 
       val expectedMessage = "Hello World!"
-      publisher(PublishCommand(ExchangeName(""), RoutingKey("bucky-consumer-test"), AmqpProperties(), Payload.from(expectedMessage)))
+      publisher(PublishCommand(ExchangeName(""), RoutingKey("bucky-consumer-test"), MessageProperties.textPlain, Payload.from(expectedMessage)))
 
       eventually {
         logger.info(s"Waiting Can consume messages from a (pre-existing) queue")
@@ -78,7 +78,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogg
 
         val publishCommand = PublishCommand(ExchangeName(""),
           RoutingKey("bucky-consumer-header-test"),
-          AmqpProperties().copy(headers = Map("bar" -> expected.bar.value)),
+          MessageProperties.persistentBasic.withHeader("bar" -> expected.bar.value),
           Payload.from(expected.baz.value))
 
         publisher(publishCommand).futureValue
@@ -112,7 +112,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogg
         handler.nextException = Some(new RuntimeException("Hello, world"))
 
         val expectedMessage = "Message to dlq"
-        publisher(PublishCommand(ExchangeName(""), RoutingKey(queueName.value), AmqpProperties(), Payload.from(expectedMessage)))
+        publisher(PublishCommand(ExchangeName(""), RoutingKey(queueName.value), MessageProperties.textPlain, Payload.from(expectedMessage)))
 
         eventually {
           handler.receivedMessages should have size 1
@@ -129,7 +129,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogg
           handler.receivedMessages shouldBe 'empty
 
           val expectedMessage = "Hello World!"
-          publisher(PublishCommand(ExchangeName(""), RoutingKey("bucky-consumer-raw-test"), AmqpProperties(), Payload.from(expectedMessage)))
+          publisher(PublishCommand(ExchangeName(""), RoutingKey("bucky-consumer-raw-test"), MessageProperties.textPlain, Payload.from(expectedMessage)))
 
           eventually {
             handler.receivedMessages should have size 1
@@ -148,10 +148,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogg
 
           val expectedMessage = "Hello World!"
 
-          import scala.collection.convert.wrapAll._
-
-          val messageProperties = AmqpProperties()
-            .copy(headers = Map("hello" -> "world"))
+          val messageProperties = MessageProperties.textPlain.withHeader("hello" -> "world")
 
 
           publisher(PublishCommand(ExchangeName(""), RoutingKey("bucky-consumer-headers-test"), messageProperties, Payload.from(expectedMessage)))

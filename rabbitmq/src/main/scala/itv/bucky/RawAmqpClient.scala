@@ -16,61 +16,6 @@ import itv.bucky.decl.{Binding, Exchange, Queue}
 
 class RawAmqpClient(channelFactory: Lifecycle[Channel], consumerTag: ConsumerTag = ConsumerTag.pidAndHost) extends AmqpClient with StrictLogging {
 
-  object RabbitConverters {
-
-    import scala.collection.JavaConverters._
-
-    def apply(envelope: RabbitMQEnvelope): Envelope = Envelope(
-      envelope.getDeliveryTag,
-      envelope.isRedeliver,
-      ExchangeName(envelope.getExchange),
-      RoutingKey(envelope.getRoutingKey))
-
-    def apply(properties: BasicProperties): AmqpProperties =
-      AmqpProperties(
-        contentType = Option(properties.getContentType),
-        contentEncoding = Option(properties.getContentEncoding),
-        headers = properties.getHeaders.asScala.toMap,
-        deliveryMode = Option(properties.getDeliveryMode),
-        priority = Option(properties.getPriority),
-        correlationId = Option(properties.getCorrelationId),
-        replyTo = Option(properties.getReplyTo),
-        expiration = Option(properties.getExpiration),
-        messageId = Option(properties.getMessageId),
-        timestamp = Option(properties.getTimestamp),
-        `type` = Option(properties.getType),
-        userId = Option(properties.getUserId),
-        appId = Option(properties.getAppId),
-        clusterId = Option(properties.getClusterId)
-      )
-
-    def apply(properties: AmqpProperties): BasicProperties =
-      new BasicProperties.Builder()
-        .contentType(toJString(properties.contentType))
-        .contentEncoding(toJString(properties.contentEncoding))
-        .headers(properties.headers.asJava)
-        .deliveryMode(toJInt(properties.deliveryMode))
-        .priority(toJInt(properties.priority))
-        .correlationId(toJString(properties.correlationId))
-        .replyTo(toJString(properties.replyTo))
-        .expiration(toJString(properties.expiration))
-        .messageId(toJString(properties.messageId))
-        .timestamp(toJDate(properties.timestamp))
-        .`type`(toJString(properties.`type`))
-        .userId(toJString(properties.userId))
-        .appId(toJString(properties.appId))
-        .clusterId(toJString(properties.clusterId))
-        .build()
-
-    import java.util.Date
-
-    private def toJInt(value: Option[Int]): Integer = value.fold[Integer](null)(value => value)
-
-    private def toJString(value: Option[String]): String = value.fold[String](null)(identity)
-
-    private def toJDate(value: Option[Date]): Date = value.fold[Date](null)(identity)
-  }
-
   def consumer(queueName: QueueName, handler: Handler[Delivery], actionOnFailure: ConsumeAction = DeadLetter)
               (implicit executionContext: ExecutionContext): Lifecycle[Unit] =
     for {
@@ -79,7 +24,7 @@ class RawAmqpClient(channelFactory: Lifecycle[Channel], consumerTag: ConsumerTag
       logger.info(s"Starting consumer on $queueName")
       channel.basicConsume(queueName.value, false, consumerTag.value, new DefaultConsumer(channel) {
         override def handleDelivery(consumerTag: String, envelope: RabbitMQEnvelope, properties: BasicProperties, body: Array[Byte]): Unit = {
-          val delivery = Delivery(Payload(body), ConsumerTag(consumerTag), RabbitConverters(envelope), RabbitConverters(properties))
+          val delivery = Delivery(Payload(body), ConsumerTag(consumerTag), MessagePropertiesConverters(envelope), MessagePropertiesConverters(properties))
           logger.debug("Received {} on {}", delivery, queueName)
           safePerform(handler(delivery)).onComplete { result =>
             val action = result match {
@@ -135,7 +80,7 @@ class RawAmqpClient(channelFactory: Lifecycle[Channel], consumerTag: ConsumerTag
         logger.debug("Publishing with delivery tag {}L to {}:{} with {}: {}", box(deliveryTag), cmd.exchange, cmd.routingKey, cmd.basicProperties, cmd.body)
         unconfirmedPublications.put(deliveryTag, promise)
         try {
-          channel.basicPublish(cmd.exchange.value, cmd.routingKey.value, false, false, RabbitConverters(cmd.basicProperties), cmd.body.value)
+          channel.basicPublish(cmd.exchange.value, cmd.routingKey.value, false, false, MessagePropertiesConverters(cmd.basicProperties), cmd.body.value)
         } catch {
           case exception: Exception =>
             logger.error(s"Failed to publish message with delivery tag ${deliveryTag}L to ${cmd.description}", exception)

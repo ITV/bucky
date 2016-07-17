@@ -1,6 +1,5 @@
 package itv.bucky
 
-import com.rabbitmq.client.{AMQP, MessageProperties}
 import itv.bucky.pattern.requeue._
 import itv.bucky.SameThreadExecutionContext.implicitly
 import org.scalatest.FunSuite
@@ -8,10 +7,8 @@ import org.scalatest.Matchers._
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.concurrent.Eventually
 import Eventually._
-import com.rabbitmq.client.AMQP.BasicProperties
 import itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 
-import scala.collection.JavaConverters
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.Random
@@ -38,7 +35,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
     Lifecycle.using(testLifecycle(handler, requeuePolicy)) { app =>
       handler.nextResponse = Future.successful(Requeue)
 
-      val properties =AmqpProperties().copy(headers = Map("foo" -> "bar"))
+      val properties = MessageProperties.persistentTextPlain.withHeader("foo" -> "bar")
 
       app.publish(Payload.from("Hello World!"), properties).futureValue shouldBe published
 
@@ -55,7 +52,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
       handler.nextResponse = Future.successful(Requeue)
 
       val expectedCorrelationId: Option[String] = Some("banana")
-      val properties = AmqpProperties().copy(correlationId = expectedCorrelationId)
+      val properties = MessageProperties.persistentTextPlain.copy(correlationId = expectedCorrelationId)
       app.publish(Payload.from("Hello World!"), properties).futureValue shouldBe published
 
       eventually {
@@ -164,7 +161,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
   }
 
   case class TestFixture(queue: MessageQueue, requeue: MessageQueue, deadletterQueue: MessageQueue, publisher: Publisher[PublishCommand]) {
-    def publish(body: Payload, properties: AmqpProperties = AmqpProperties()): Future[Unit] = publisher(
+    def publish(body: Payload, properties: MessageProperties = MessageProperties.persistentBasic): Future[Unit] = publisher(
       PublishCommand(ExchangeName(""), RoutingKey(queue.name), properties, body))
   }
 
@@ -195,7 +192,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
   } yield base.testFixture
 
 
-  private def getHeader(header: String, properties: AmqpProperties): Option[String] =
+  private def getHeader(header: String, properties: MessageProperties): Option[String] =
     properties.headers.get(header).map(_.toString)
 
 }

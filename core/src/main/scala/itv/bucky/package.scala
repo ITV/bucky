@@ -6,8 +6,16 @@ import java.util.Date
 import scala.concurrent.{ExecutionContext, Future}
 
 package object bucky {
+  type Publisher[-T] = T => Future[Unit]
+  type Handler[-T] = T => Future[ConsumeAction]
+  type RequeueHandler[-T] = T => Future[RequeueConsumeAction]
 
-  case class PublishCommand(exchange: ExchangeName, routingKey: RoutingKey, basicProperties: AmqpProperties, body: Payload) {
+  type Bindings = PartialFunction[RoutingKey, QueueName]
+
+  type PayloadUnmarshaller[T] = Unmarshaller[Payload, T]
+  type DeliveryUnmarshaller[T] = Unmarshaller[Delivery, T]
+
+  case class PublishCommand(exchange: ExchangeName, routingKey: RoutingKey, basicProperties: MessageProperties, body: Payload) {
     def description = s"${exchange.value}:${routingKey.value} $body"
   }
 
@@ -35,36 +43,80 @@ package object bucky {
     val pidAndHost: ConsumerTag = ConsumerTag(ManagementFactory.getRuntimeMXBean.getName)
   }
 
-  case class AmqpProperties(
-                             contentType: Option[String] = Some("application/octet-stream"),
-                             contentEncoding: Option[String] = None,
-                             headers: Map[String, AnyRef] = Map(),
-                             deliveryMode: Option[Int] = Some(2),
-                             priority: Option[Int] = Some(0),
-                             correlationId: Option[String] = None,
-                             replyTo: Option[String] = None,
-                             expiration: Option[String] = None,
-                             messageId: Option[String] = None,
-                             timestamp: Option[Date] = None,
-                             `type`: Option[String] = None,
-                             userId: Option[String] = None,
-                             appId: Option[String] = None,
-                             clusterId: Option[String] = None
-                           )
-
   case class Envelope(deliveryTag: Long, redeliver: Boolean, exchangeName: ExchangeName, routingKey: RoutingKey)
 
-  case class Delivery(body: Payload, consumerTag: ConsumerTag, envelope: Envelope, properties: AmqpProperties)
+  case class Delivery(body: Payload, consumerTag: ConsumerTag, envelope: Envelope, properties: MessageProperties)
 
-  type Publisher[-T] = T => Future[Unit]
-  type Handler[-T] = T => Future[ConsumeAction]
-  type RequeueHandler[-T] = T => Future[RequeueConsumeAction]
+  case class MessageProperties(
+                                contentType: Option[ContentType],
+                                contentEncoding: Option[ContentEncoding],
+                                headers: Map[String, AnyRef],
+                                deliveryMode: Option[DeliveryMode],
+                                priority: Option[Int],
+                                correlationId: Option[String],
+                                replyTo: Option[String],
+                                expiration: Option[String],
+                                messageId: Option[String],
+                                timestamp: Option[Date],
+                                messageType: Option[String],
+                                userId: Option[String],
+                                appId: Option[String],
+                                clusterId: Option[String]
+                              ) {
+    def withHeader(header: (String, AnyRef)): MessageProperties = this.copy(
+      headers = this.headers + header
+    )
+  }
 
-  type Bindings = PartialFunction[RoutingKey, QueueName]
+  case class DeliveryMode(value: Int)
+
+  object DeliveryMode {
+    val persistent = DeliveryMode(2)
+    val nonPersistent = DeliveryMode(1)
+  }
+
+  case class ContentType(value: String)
+
+  object ContentType {
+    val octetStream = ContentType("application/octet-stream")
+    val textPlain = ContentType("text/plain")
+  }
+
+  case class ContentEncoding(value: String)
+
+  object ContentEncoding {
+    val utf8 = ContentEncoding("utf-8")
+  }
+
+  object MessageProperties {
+    val minimalBasic = MessageProperties(None, None, Map(), None, None, None, None, None, None, None, None, None, None, None)
+
+    val minimalPersistentBasic = minimalBasic.copy(
+      deliveryMode = Some(DeliveryMode.persistent))
+
+    val basic = minimalBasic.copy(
+      contentType = Some(ContentType.octetStream),
+      deliveryMode = Some(DeliveryMode.nonPersistent),
+      priority = Some(0))
+
+    val persistentBasic = minimalBasic.copy(
+      contentType = Some(ContentType.octetStream),
+      deliveryMode = Some(DeliveryMode.persistent),
+      priority = Some(0))
+
+    val textPlain = minimalBasic.copy(
+      contentType = Some(ContentType.textPlain),
+      deliveryMode = Some(DeliveryMode.nonPersistent),
+      priority = Some(0)
+    )
+
+    val persistentTextPlain = minimalBasic.copy(
+      contentType = Some(ContentType.textPlain),
+      deliveryMode = Some(DeliveryMode.persistent),
+      priority = Some(0)
+    )
+  }
 
   def safePerform[T](future: => Future[T])(implicit executionContext: ExecutionContext): Future[T] = Future(future).flatMap(identity)
-
-  type PayloadUnmarshaller[T] = Unmarshaller[Payload, T]
-  type DeliveryUnmarshaller[T] = Unmarshaller[Delivery, T]
 
 }

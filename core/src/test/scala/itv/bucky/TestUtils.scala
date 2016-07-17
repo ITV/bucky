@@ -5,7 +5,7 @@ import scala.util.{Random, Try}
 
 object TestUtils {
 
-  def anyPublishCommand() = PublishCommand(ExchangeName("exchange"), RoutingKey("routing.key"), AmqpProperties(), Payload.from("msg" + Random.nextInt()))
+  def anyPublishCommand() = PublishCommand(ExchangeName("exchange"), RoutingKey("routing.key"), MessageProperties.persistentBasic, Payload.from("msg" + Random.nextInt()))
 
   implicit class FutureOps[T](f: Future[T]) {
     def asTry: Future[Try[T]] = {

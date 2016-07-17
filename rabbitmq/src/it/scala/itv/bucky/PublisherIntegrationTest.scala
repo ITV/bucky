@@ -1,6 +1,5 @@
 package itv.bucky
 
-import com.rabbitmq.client.MessageProperties
 import itv.bucky.TestUtils._
 import itv.contentdelivery.lifecycle.Lifecycle
 import itv.contentdelivery.testutilities.json.JsonResult
@@ -18,14 +17,13 @@ class PublisherIntegrationTest extends FunSuite with ScalaFutures {
   val routingKey = RoutingKey(testQueueName)
   val exchange = ExchangeName("")
 
-
   import TestLifecycle._
 
   test("Can publish messages to a (pre-existing) queue") {
     val handler = new QueueWatcher[Delivery]
     Lifecycle.using(rawConsumer(QueueName(testQueueName), handler)) { publisher =>
       val body = Payload.from("Hello World!")
-      publisher(PublishCommand(ExchangeName(""), routingKey, AmqpProperties(), body)).asTry.futureValue shouldBe 'success
+      publisher(PublishCommand(ExchangeName(""), routingKey, MessageProperties.textPlain, body)).asTry.futureValue shouldBe 'success
 
       handler.nextMessage().futureValue.body.value shouldBe body.value
     }
@@ -41,17 +39,17 @@ class PublisherIntegrationTest extends FunSuite with ScalaFutures {
 
     Lifecycle.using(base(defaultDeclaration(QueueName(testQueueName)), config)) { case (_, publisher) =>
       val body = Payload.from("Hello World!")
-      publisher(PublishCommand(ExchangeName(""), routingKey, AmqpProperties(), body)).asTry.futureValue shouldBe 'success
+      publisher(PublishCommand(ExchangeName(""), routingKey, MessageProperties.persistentBasic, body)).asTry.futureValue shouldBe 'success
 
       killRabbitConnection(config)
 
       // Publish fails until connection is re-established
-      publisher(PublishCommand(exchange, routingKey, AmqpProperties(), Payload.from("Immediately after"))).asTry.futureValue shouldBe 'failure
+      publisher(PublishCommand(exchange, routingKey, MessageProperties.persistentBasic, Payload.from("Immediately after"))).asTry.futureValue shouldBe 'failure
 
       // Publish succeeds once connection is re-established
       Thread.sleep(600L)
 
-      publisher(PublishCommand(exchange, routingKey, AmqpProperties(), Payload.from("A while after"))).asTry.futureValue shouldBe 'success
+      publisher(PublishCommand(exchange, routingKey, MessageProperties.persistentBasic, Payload.from("A while after"))).asTry.futureValue shouldBe 'success
       testQueue.head.consumeAllMessages() should have size 2
 
     }

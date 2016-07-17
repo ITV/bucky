@@ -63,7 +63,7 @@ class RabbitSimulator(bindings: Bindings = IdentityBindings)(implicit executionC
       val queueName = bindings(routingKey)
       consumers.get(queueName).fold(Future.failed[ConsumeAction](new RuntimeException(s"No consumers found for $queueName!"))) { handler =>
         handler(Delivery(message, ConsumerTag("ctag"), Envelope(deliveryTag.getAndIncrement(), false, ExchangeName(""), routingKey),
-          AmqpProperties(
+          MessageProperties.persistentBasic.copy(
             headers = headers
           )))
       }

@@ -20,9 +20,7 @@ case class RequeueTransformer(requeuePublisher: Publisher[PublishCommand],
   } yield requeueCount
 
   private def buildRequeuePublishCommand(delivery: Delivery, remainingAttempts: Int): PublishCommand = {
-    val newHeader: (String, AnyRef) = requeueCountHeaderName -> remainingAttempts.toString
-    val properties = delivery.properties
-      .copy(headers = delivery.properties.headers + newHeader)
+    val properties = delivery.properties.withHeader(requeueCountHeaderName -> remainingAttempts.toString)
     PublishCommand(requeueExchange, delivery.envelope.routingKey, properties, delivery.body)
 
   }

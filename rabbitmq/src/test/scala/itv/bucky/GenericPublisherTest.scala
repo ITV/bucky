@@ -1,6 +1,5 @@
 package itv.bucky
 
-import com.rabbitmq.client.MessageProperties
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.ScalaFutures
@@ -13,10 +12,7 @@ class GenericPublisherTest extends FunSuite with ScalaFutures {
     val client = createClient()
     val expectedExchange = ExchangeName("")
     val expectedRoutingKey = RoutingKey("mymessage")
-    val expectedProperties = AmqpProperties().copy(
-      contentType = Some("text/plain"),
-      deliveryMode = Some(1)
-    )
+    val expectedProperties = MessageProperties.textPlain
 
     val expectedBody = Payload.from("expected message")
 
