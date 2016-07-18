@@ -16,10 +16,12 @@ import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration.{Duration, FiniteDuration}
 
 case object IdentityBindings extends Bindings {
-  def apply(routingQueue: RoutingKey): QueueName = QueueName(routingQueue.value)
+  def apply(exchangeRoutingKey: ExchangeRoutingKey): QueueName = QueueName(exchangeRoutingKey.routingKey.value)
 
-  override def isDefinedAt(key: RoutingKey): Boolean = true
+  override def isDefinedAt(key: ExchangeRoutingKey): Boolean = key.exchangeName.value.isEmpty
 }
+
+case class ExchangeRoutingKey(routingKey: RoutingKey, exchangeName: ExchangeName = ExchangeName(""))
 
 /**
   * Provides an AmqpClient implementation that simulates RabbitMQ server with one main difference:
@@ -55,17 +57,17 @@ class RabbitSimulator(bindings: Bindings = IdentityBindings)(implicit executionC
   def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): Lifecycle[Publisher[PublishCommand]] =
     NoOpLifecycle[Publisher[PublishCommand]] {
       (command: PublishCommand) => {
-        publish(command.body)(command.routingKey).map(_ => ())
+        publish(command.body)(ExchangeRoutingKey(command.routingKey, command.exchange)).map(_ => ())
       }
     }
 
-  def publish(message: Payload)(routingKey: RoutingKey, headers: Map[String, AnyRef] = Map.empty[String, AnyRef]): Future[ConsumeAction] = {
-    logger.debug(s"Publish message [${message.unmarshal[String]}] with $routingKey")
-    if (bindings.isDefinedAt(routingKey)) {
-      val queueName = bindings(routingKey)
+  def publish(message: Payload)(exchangeRoutingKey: ExchangeRoutingKey, headers: Map[String, AnyRef] = Map.empty[String, AnyRef]): Future[ConsumeAction] = {
+    logger.debug(s"Publish message [${message.unmarshal[String]}] with $exchangeRoutingKey")
+    if (bindings.isDefinedAt(exchangeRoutingKey)) {
+      val queueName = bindings(exchangeRoutingKey)
       consumers.get(queueName).fold(Future.failed[ConsumeAction](new RuntimeException(s"No consumers found for $queueName!"))) { handler =>
         import scala.collection.convert.wrapAll._
-        handler(Delivery(message, ConsumerTag("ctag"), new Envelope(deliveryTag.getAndIncrement(), false, "", routingKey.value),
+        handler(Delivery(message, ConsumerTag("ctag"), new Envelope(deliveryTag.getAndIncrement(), false, "", exchangeRoutingKey.routingKey.value),
           new BasicProperties.Builder()
             .contentType(MessageProperties.PERSISTENT_BASIC.getContentType)
             .deliveryMode(2)
@@ -74,7 +76,7 @@ class RabbitSimulator(bindings: Bindings = IdentityBindings)(implicit executionC
             .build()))
       }
     } else
-      Future.failed(new RuntimeException("No queue defined for" + routingKey))
+      Future.failed(new RuntimeException("No queue defined for" + exchangeRoutingKey))
   }
 
   def watchQueue(queueName: QueueName): ListBuffer[Delivery] = {

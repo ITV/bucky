@@ -30,7 +30,7 @@ class BasicConsumerTest extends FunSuite with ScalaFutures {
     Lifecycle.using(testLifecycle) { app =>
       app.publisher(MyMessage("Foo")).futureValue
 
-      app.rabbit.publish(Payload.from("Foo"))(RoutingKey("bucky-basicconsumer-example")).futureValue shouldBe Ack
+      app.rabbit.publish(Payload.from("Foo"))(ExchangeRoutingKey(RoutingKey("bucky-basicconsumer-example"))).futureValue shouldBe Ack
 
       app.requeueMessages should have size 0
     }

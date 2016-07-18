@@ -36,7 +36,7 @@ package object bucky {
   type Handler[-T] = T => Future[ConsumeAction]
   type RequeueHandler[-T] = T => Future[RequeueConsumeAction]
 
-  type Bindings = PartialFunction[RoutingKey, QueueName]
+  type Bindings = PartialFunction[ExchangeRoutingKey, QueueName]
 
   def safePerform[T](future : => Future[T])(implicit executionContext: ExecutionContext): Future[T] = Future(future).flatMap(identity)
 
