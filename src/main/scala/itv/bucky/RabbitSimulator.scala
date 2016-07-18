@@ -133,7 +133,7 @@ class RabbitSimulator(bindings: Bindings = IdentityBindings)(implicit executionC
 
       override def queueDeclare(): Queue.DeclareOk = new Queue.DeclareOk.Builder().build()
 
-      override def queueDeclare(queue: String, durable: Boolean, exclusive: Boolean, autoDelete: Boolean, arguments: util.Map[String, AnyRef]): Queue.DeclareOk = new Queue.DeclareOk.Builder().build()
+      override def queueDeclare(queue: String, durable: Boolean, exclusive: Boolean, autoDelete: Boolean, arguments: util.Map[String, AnyRef]): Queue.DeclareOk = new Queue.DeclareOk.Builder().queue(queue).build()
 
       override def clearFlowListeners():Unit = {}
 
@@ -197,9 +197,9 @@ class RabbitSimulator(bindings: Bindings = IdentityBindings)(implicit executionC
 
       override def setDefaultConsumer(consumer: Consumer):Unit = {}
 
-      override def queueBind(queue: String, exchange: String, routingKey: String): Queue.BindOk = ???
+      override def queueBind(queue: String, exchange: String, routingKey: String): Queue.BindOk = new Queue.BindOk.Builder().build()
 
-      override def queueBind(queue: String, exchange: String, routingKey: String, arguments: util.Map[String, AnyRef]): Queue .BindOk = ???
+      override def queueBind(queue: String, exchange: String, routingKey: String, arguments: util.Map[String, AnyRef]): Queue .BindOk =  new Queue.BindOk.Builder().build()
 
       override def txCommit(): Tx .CommitOk = ???
 
