@@ -12,6 +12,7 @@ import scala.collection.concurrent.TrieMap
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.util.Try
 
 case object IdentityBindings extends Bindings {
   def apply(routingQueue: RoutingKey): QueueName = QueueName(routingQueue.value)
@@ -85,13 +86,12 @@ class RabbitSimulator(bindings: Bindings = IdentityBindings)(implicit executionC
     Await.result(Future.sequence(messagesBeingProcessed.values.map(_.consumeActionValue)), timeout)
   }
 
-  //FIXME Define the methods
-  override def withDeclarations[T](thunk: AmqpOps => T)(implicit executionContext: ExecutionContext): T = thunk(new AmqpOps {
-    override def declareExchange(echange: Exchange): Future[Unit] = Future.successful(())
+  override def performOps(thunk: (AmqpOps) => Try[Unit]): Try[Unit] =
+    Try(thunk(new AmqpOps {
+      override def declareExchange(echange: Exchange): Try[Unit] = Try(())
 
-    override def declareQueue(queue: Queue): Future[Unit] = Future.successful(())
+      override def bindQueue(binding: Binding): Try[Unit] = Try(())
 
-    override def bindQueue(binding: Binding): Future[Unit] = Future.successful(())
-  })
-
+      override def declareQueue(queue: Queue): Try[Unit] = Try(())
+    }))
 }

@@ -122,15 +122,11 @@ class RawAmqpClient(channelFactory: Lifecycle[Channel], consumerTag: ConsumerTag
     case infinite => NoOpLifecycle(identity)
   }
 
-  override def withDeclarations[T](thunk: (AmqpOps) => T)(implicit executionContext: ExecutionContext): T =
-    Lifecycle.using(channelFactory)(channel => thunk(ChannelAmqpOps(channel)))
-
-
-  case class ChannelAmqpOps(channel: Channel)(implicit executionContext: ExecutionContext) extends AmqpOps {
+  case class ChannelAmqpOps(channel: Channel) extends AmqpOps {
 
     import scala.collection.JavaConverters._
 
-    override def declareExchange(exchange: Exchange): Future[Unit] = Future {
+    override def declareExchange(exchange: Exchange): Try[Unit] = Try {
       channel.exchangeDeclare(
         exchange.name.value,
         exchange.exchangeType.value,
@@ -140,7 +136,7 @@ class RawAmqpClient(channelFactory: Lifecycle[Channel], consumerTag: ConsumerTag
         exchange.arguments.asJava)
     }
 
-    override def bindQueue(binding: Binding): Future[Unit] = Future {
+    override def bindQueue(binding: Binding): Try[Unit] = Try {
       channel.queueBind(
         binding.queueName.value,
         binding.exchangeName.value,
@@ -148,7 +144,7 @@ class RawAmqpClient(channelFactory: Lifecycle[Channel], consumerTag: ConsumerTag
         binding.arguments.asJava)
     }
 
-    override def declareQueue(queue: Queue): Future[Unit] = Future {
+    override def declareQueue(queue: Queue): Try[Unit] = Try {
       channel.queueDeclare(
         queue.queueName.value,
         queue.isDurable,
@@ -158,5 +154,7 @@ class RawAmqpClient(channelFactory: Lifecycle[Channel], consumerTag: ConsumerTag
     }
   }
 
+  override def performOps(thunk: (AmqpOps) => Try[Unit]): Try[Unit] =
+    Lifecycle.using(channelFactory)(channel => thunk(ChannelAmqpOps(channel)))
 }
 

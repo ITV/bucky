@@ -27,11 +27,12 @@ class DeclarationTest extends FunSuite with ScalaFutures {
     rmqAdminHttp.handle(GET(UriBuilder / "api" / "queues" / "/" / queueName)).statusCode shouldBe 404
 
     Lifecycle.using(amqpConfig) { amqpClient =>
-      Queue(QueueName(queueName),
+      amqpClient.performOps(Queue(QueueName(queueName),
         isDurable = true,
         isExclusive = true,
         shouldAutoDelete = false,
-        Map.empty).applyTo(amqpClient).futureValue
+        Map.empty).run) shouldBe 'successful
+
       rmqAdminHttp.handle(GET(UriBuilder / "api" / "queues" / "/" / queueName)).statusCode shouldBe 200
 
       val handler = new StubConsumeHandler[Delivery]()
@@ -61,11 +62,11 @@ class DeclarationTest extends FunSuite with ScalaFutures {
     rmqAdminHttp.handle(GET(UriBuilder / "api" / "exchanges" / "/" / exchangeName)).statusCode shouldBe 404
 
     Lifecycle.using(amqpConfig) { amqpClient =>
-      Exchange(ExchangeName(exchangeName),
+      amqpClient.performOps(Exchange(ExchangeName(exchangeName),
         isDurable = false,
         shouldAutoDelete = true,
         isInternal = false,
-        arguments = Map.empty).applyTo(amqpClient).futureValue
+        arguments = Map.empty).run) shouldBe 'successful
 
       eventually {
         rmqAdminHttp.handle(GET(UriBuilder / "api" / "exchanges" / "/" / exchangeName)).statusCode shouldBe 200
@@ -81,22 +82,24 @@ class DeclarationTest extends FunSuite with ScalaFutures {
     val (amqpConfig, _, _) = IntegrationUtils.configAndHttp
 
     Lifecycle.using(amqpConfig) { amqpClient =>
-      Exchange(exchangeName,
+      val declarations = List(Exchange(exchangeName,
         isDurable = false,
         shouldAutoDelete = true,
         isInternal = false,
-        arguments = Map.empty).applyTo(amqpClient).futureValue
+        arguments = Map.empty),
 
       Queue(queueName,
         isDurable = false,
         isExclusive = true,
         shouldAutoDelete = false,
-        Map.empty).applyTo(amqpClient).futureValue
+        Map.empty),
 
       Binding(exchangeName,
         queueName,
         routingKey,
-        Map.empty).applyTo(amqpClient).futureValue
+        Map.empty))
+
+      amqpClient.performOps(Declaration.runAll(declarations)) shouldBe 'successful
 
       val handler = new StubConsumeHandler[Delivery]()
       val lifecycle =

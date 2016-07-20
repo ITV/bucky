@@ -2,30 +2,30 @@ package itv.bucky
 
 import com.typesafe.scalalogging.StrictLogging
 
+import scala.collection.generic.CanBuildFrom
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.Try
 
 package object decl {
 
   sealed trait Declaration {
-    def applyTo(client: AmqpClient)(implicit ec: ExecutionContext): Future[Unit]
+    def run: AmqpOps => Try[Unit]
   }
 
   object Declaration {
-    def applyAll(declaration: Iterable[Declaration], client: AmqpClient)(implicit ec: ExecutionContext): Future[Unit] = {
-      val (bindings, rest) = declaration.partition {
-        case binding: Binding => true
-        case _ => false
+    def runAll(declaration: Iterable[Declaration]): AmqpOps => Try[Unit] =
+      ops => {
+        val (bindings, rest) = declaration.partition {
+          case binding: Binding => true
+          case _ => false
+        }
+        for {
+          _ <- TryUtil.sequence(rest.map(_.run(ops)))
+          _ <- TryUtil.sequence(bindings.map(_.run(ops)))
+        } yield ()
       }
-      for {
-        _ <- Future.sequence(rest.map(_.applyTo(client))).map(_ => ())
-        _ <- Future.sequence(bindings.map(_.applyTo(client))).map(_ => ())
-      } yield ()
-    }
   }
-
-  private def declOperation(client: AmqpClient, thunk: AmqpOps => Future[Unit])(implicit ec: ExecutionContext): Future[Unit] =
-    client withDeclarations thunk
 
   sealed trait ExchangeType {
     def value: String
@@ -43,18 +43,6 @@ package object decl {
                       arguments: Map[String, AnyRef] = Map.empty,
                       bindings: List[Binding] = List.empty) extends Declaration with StrictLogging {
 
-    override def applyTo(client: AmqpClient)(implicit ec: ExecutionContext): Future[Unit] = {
-      val createExchange =
-        declOperation(client, {
-          logger.info(s"Declaring Exchange($name, $exchangeType, isDurable=$isDurable, shouldAutoDelete=$shouldAutoDelete, isInternal=$isInternal, arguments=$arguments)")
-          _.declareExchange(this)
-        })
-      val createBindings: List[Future[Unit]] =
-        bindings.map(_.applyTo(client))
-
-      Future.sequence(createBindings :+ createExchange).map(_ => ())
-    }
-
     def notDurable: Exchange = copy(isDurable = false)
 
     def autoDelete: Exchange = copy(shouldAutoDelete = true)
@@ -68,18 +56,28 @@ package object decl {
     def binding(routingKeyToQueue: (RoutingKey, QueueName), arguments: Map[String, AnyRef] = Map.empty): Exchange =
       copy(bindings = this.bindings :+ Binding(name, routingKeyToQueue._2, routingKeyToQueue._1, arguments))
 
+    override def run: (AmqpOps) => Try[Unit] = ops => {
+      logger.info(s"Declaring Exchange($name, $exchangeType, isDurable=$isDurable, shouldAutoDelete=$shouldAutoDelete, isInternal=$isInternal, arguments=$arguments)")
+
+      val createBindings: List[Try[Unit]] =
+        bindings.map(_.run(ops))
+
+      for {
+        _ <- ops.declareExchange(this)
+        _ <- TryUtil.sequence(createBindings)
+      }
+        yield ()
+    }
   }
 
   case class Binding(exchangeName: ExchangeName,
                      queueName: QueueName,
                      routingKey: RoutingKey,
                      arguments: Map[String, AnyRef]) extends Declaration with StrictLogging {
-    override def applyTo(client: AmqpClient)(implicit ec: ExecutionContext): Future[Unit] =
-      declOperation(client, {
-        logger.info(s"Declaring $this")
-        _.bindQueue(this)
-      })
-
+    override def run: (AmqpOps) => Try[Unit] = ops => {
+      logger.info(s"Declaring $this")
+      ops.bindQueue(this)
+    }
   }
 
   case class Queue(queueName: QueueName,
@@ -87,12 +85,6 @@ package object decl {
                    isExclusive: Boolean = false,
                    shouldAutoDelete: Boolean = false,
                    arguments: Map[String, AnyRef] = Map.empty) extends Declaration with StrictLogging {
-
-    override def applyTo(client: AmqpClient)(implicit ec: ExecutionContext): Future[Unit] =
-      declOperation(client, {
-        logger.info(s"Declaring $this")
-        _.declareQueue(this)
-      })
 
     def notDurable: Queue = copy(isDurable = false)
 
@@ -108,6 +100,10 @@ package object decl {
 
     def messageTTL(value: FiniteDuration): Queue = argument("x-message-ttl" -> Long.box(value.toMillis))
 
+    override def run: AmqpOps => Try[Unit] = ops => {
+      logger.info(s"Declaring $this")
+      ops.declareQueue(this)
+    }
   }
 
 }
