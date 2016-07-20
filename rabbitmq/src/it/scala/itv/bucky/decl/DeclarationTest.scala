@@ -31,7 +31,7 @@ class DeclarationTest extends FunSuite with ScalaFutures {
         isDurable = true,
         isExclusive = true,
         shouldAutoDelete = false,
-        Map.empty).run) shouldBe 'successful
+        Map.empty).run) shouldBe 'success
 
       rmqAdminHttp.handle(GET(UriBuilder / "api" / "queues" / "/" / queueName)).statusCode shouldBe 200
 
@@ -66,7 +66,7 @@ class DeclarationTest extends FunSuite with ScalaFutures {
         isDurable = false,
         shouldAutoDelete = true,
         isInternal = false,
-        arguments = Map.empty).run) shouldBe 'successful
+        arguments = Map.empty).run) shouldBe 'success
 
       eventually {
         rmqAdminHttp.handle(GET(UriBuilder / "api" / "exchanges" / "/" / exchangeName)).statusCode shouldBe 200
@@ -99,7 +99,7 @@ class DeclarationTest extends FunSuite with ScalaFutures {
         routingKey,
         Map.empty))
 
-      amqpClient.performOps(Declaration.runAll(declarations)) shouldBe 'successful
+      amqpClient.performOps(Declaration.runAll(declarations)) shouldBe 'success
 
       val handler = new StubConsumeHandler[Delivery]()
       val lifecycle =

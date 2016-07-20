@@ -59,12 +59,9 @@ package object decl {
     override def run: (AmqpOps) => Try[Unit] = ops => {
       logger.info(s"Declaring Exchange($name, $exchangeType, isDurable=$isDurable, shouldAutoDelete=$shouldAutoDelete, isInternal=$isInternal, arguments=$arguments)")
 
-      val createBindings: List[Try[Unit]] =
-        bindings.map(_.run(ops))
-
       for {
         _ <- ops.declareExchange(this)
-        _ <- TryUtil.sequence(createBindings)
+        _ <- TryUtil.sequence(bindings.map(_.run(ops)))
       }
         yield ()
     }
