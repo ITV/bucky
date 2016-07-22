@@ -18,7 +18,7 @@ lazy val kernelSettings = Seq(
   //grab some dependencies from on-premise artifactory for now, until they have been migrated over to artifactory-online
   resolvers += "ITV Libraries" at "http://cpp-artifactory.cpp.o.itv.net.uk:8081/artifactory/libs-release-local/",
   credentials += Credentials(Path.userHome / ".ivy2" / ".credentials"),
-  publishTo := Some("Artifactory Realm" at "https://itvrepos.artifactoryonline.com/itvrepos/cd-scala-libs")
+  publishTo in ThisBuild := Some("Artifactory Realm" at "https://itvrepos.artifactoryonline.com/itvrepos/cd-scala-libs")
 )
 
 lazy val core = project
