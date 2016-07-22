@@ -6,13 +6,18 @@ import org.scalatest.concurrent.ScalaFutures
 
 import scala.concurrent.duration._
 import org.scalatest.Matchers._
-
 import SameThreadExecutionContext.implicitly
 
 class RabbitSimulatorTest extends FunSuite with ScalaFutures {
 
   test("Can publish and consume via simulator") {
     val rabbit = new RabbitSimulator()
+//    rabbit.withChannel { channel =>
+//      channel.queueDeclare("foo", false, false, false, Map.empty[String, AnyRef].asJava)
+//      channel.queueBind("foo", "", "", Map.empty[String, AnyRef].asJava)
+//      channel.exchangeDeclare("", "", false, false, false, Map.empty[String, AnyRef].asJava)
+//
+//    }
     val messages = rabbit.watchQueue(QueueName("my.routing.key"))
 
     rabbit.publish(Payload.from("Hello"))(RoutingKey("my.routing.key")).futureValue shouldBe Ack

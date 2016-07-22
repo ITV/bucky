@@ -3,6 +3,7 @@ package itv.bucky.pattern.requeue
 import com.typesafe.scalalogging.StrictLogging
 import itv.bucky.{Ack, ConsumeAction, DeadLetter, _}
 
+import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
@@ -19,10 +20,12 @@ case class RequeueTransformer(requeuePublisher: Publisher[PublishCommand],
     requeueCount <- Try(requeueCountAnyRef.toString.toInt).toOption
   } yield requeueCount
 
-  private def buildRequeuePublishCommand(delivery: Delivery, remainingAttempts: Int): PublishCommand = {
-    val properties = delivery.properties.withHeader(requeueCountHeaderName -> remainingAttempts.toString)
-    PublishCommand(requeueExchange, delivery.envelope.routingKey, properties, delivery.body)
+  private def buildRequeuePublishCommand(delivery: Delivery, remainingAttempts: Int, requeueAfter: FiniteDuration): PublishCommand = {
+    val properties = delivery.properties
+      .withHeader(requeueCountHeaderName -> remainingAttempts.toString)
+      .copy(expiration = Some(requeueAfter.toMillis.toString))
 
+    PublishCommand(requeueExchange, delivery.envelope.routingKey, properties, delivery.body)
   }
 
   override def apply(delivery: Delivery): Future[ConsumeAction] = {
@@ -30,13 +33,13 @@ case class RequeueTransformer(requeuePublisher: Publisher[PublishCommand],
       action match {
         case itv.bucky.Requeue => remainingAttempts(delivery) match {
           case Some(value) if value < 1 => Future.successful(DeadLetter)
-          case Some(value) => requeuePublisher(buildRequeuePublishCommand(delivery, value - 1)).map(_ => Ack)
+          case Some(value) => requeuePublisher(buildRequeuePublishCommand(delivery, value - 1, requeuePolicy.requeueAfter)).map(_ => Ack)
           case None =>
             if (requeuePolicy.maximumProcessAttempts <= 1)
               Future.successful(DeadLetter)
             else {
               val initialRemainingAttempts = requeuePolicy.maximumProcessAttempts - 2
-              requeuePublisher(buildRequeuePublishCommand(delivery, initialRemainingAttempts)).map(_ => Ack)
+              requeuePublisher(buildRequeuePublishCommand(delivery, initialRemainingAttempts, requeuePolicy.requeueAfter)).map(_ => Ack)
             }
         }
         case other: ConsumeAction => Future.successful(other)

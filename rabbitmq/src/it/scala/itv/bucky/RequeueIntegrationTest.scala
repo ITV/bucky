@@ -28,7 +28,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
 
   val exchange = ExchangeName("")
 
-  val requeuePolicy = RequeuePolicy(3)
+  val requeuePolicy = RequeuePolicy(3, 1.second)
 
   test("Should retain any custom headers when republishing") {
     val handler = new StubRequeueHandler[Delivery]
@@ -144,7 +144,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
 
   test("It should deadletter the message if requeued and maximumProcessAttempts is < 1") {
     val handler = new StubRequeueHandler[Int]
-    val negativeProcessAttemptsRequeuePolicy = RequeuePolicy(Random.nextInt(10) * -1)
+    val negativeProcessAttemptsRequeuePolicy = RequeuePolicy(Random.nextInt(10) * -1, 1.second)
     Lifecycle.using(testLifecycle(handler, negativeProcessAttemptsRequeuePolicy, intMessageDeserializer)) { app =>
 
       handler.nextResponse = Future.successful(Requeue)

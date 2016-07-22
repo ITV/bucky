@@ -47,7 +47,7 @@ object IntegrationUtils {
   def declareRequeueQueues(name: String): Lifecycle[(MessageQueue, MessageQueue, MessageQueue)] = {
     val (amqpClientConfig: AmqpClientConfig, rmqAdminConfig: BrokerConfig, rmqAdminHttp: AuthenticatedHttpClient[Id.Id]) = configAndHttp
 
-    val declarations = requeueDeclarations(QueueName(name), retryAfter = 1.second) collect {
+    val declarations = requeueDeclarations(QueueName(name)) collect {
       case ex: Exchange => ex.autoDelete.expires(1.minute)
       case q: Queue => q.autoDelete.expires(1.minute)
     }

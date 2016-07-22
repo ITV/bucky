@@ -34,6 +34,15 @@ package object decl {
   case object Direct extends ExchangeType {
     override def value: String = "direct"
   }
+  case object Topic extends ExchangeType {
+    override def value: String = "topic"
+  }
+  case object Fanout extends ExchangeType {
+    override def value: String = "fanout"
+  }
+  case object Headers extends ExchangeType {
+    override def value: String = "headers"
+  }
 
   case class Exchange(name: ExchangeName,
                       exchangeType: ExchangeType = Direct,
