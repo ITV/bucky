@@ -22,7 +22,8 @@ lazy val kernelSettings = Seq(
 )
 
 lazy val core = project
-  .settings(moduleName := "bucky-core")
+  .settings(name := "bucky")
+  .settings(moduleName := "core")
   .settings(kernelSettings: _*)
   .settings(
     libraryDependencies ++= Seq(
@@ -37,7 +38,8 @@ lazy val core = project
   .configs(IntegrationTest)
 
 lazy val test = project
-  .settings(moduleName := "bucky-test")
+  .settings(name := "bucky")
+  .settings(moduleName := "test")
   .settings(kernelSettings: _*)
   .aggregate(core)
   .dependsOn(core)
@@ -51,7 +53,8 @@ lazy val test = project
   )
 
 lazy val rabbitmq = project
-  .settings(moduleName := "bucky-rabbitmq")
+  .settings(name := "bucky")
+  .settings(moduleName := "rabbitmq")
   .settings(kernelSettings: _*)
   .aggregate(core, test)
   .dependsOn(core, test % "test,it")
