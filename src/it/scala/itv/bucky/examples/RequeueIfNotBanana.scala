@@ -64,12 +64,12 @@ case class RequeueIfNotBanana(clientLifecycle: Lifecycle[AmqpClient]) {
   val consumerLifecycle =
     for {
       client <- clientLifecycle
-      _ <- DeclarationLifecycle(requeueDeclarations(queueName, retryAfter = 10.seconds), client)
+      _ <- DeclarationLifecycle(requeueDeclarations(queueName), client)
 
       requestDelivery <- client.publisherOf(deliveryRequestPublishCommandBuilder)
 
       handler = RequeueIfNotBananaHandler(requestDelivery)
-      _ <- client.requeueHandlerOf(queueName, handler, RequeuePolicy(maximumProcessAttempts = 3), Fruit.deserializer)
+      _ <- client.requeueHandlerOf(queueName, handler, RequeuePolicy(maximumProcessAttempts = 3, requeueAfter = 10.seconds), Fruit.deserializer)
     }
       yield ()
 

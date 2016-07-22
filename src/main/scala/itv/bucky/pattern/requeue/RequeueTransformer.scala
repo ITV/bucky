@@ -7,6 +7,7 @@ import itv.bucky.{Ack, ConsumeAction, DeadLetter, _}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 import scala.collection.JavaConverters._
+import scala.concurrent.duration.FiniteDuration
 
 case class RequeueTransformer(requeuePublisher: Publisher[PublishCommand],
                               requeueExchange: ExchangeName,
@@ -26,12 +27,13 @@ case class RequeueTransformer(requeuePublisher: Publisher[PublishCommand],
     requeueCount <- Try(requeueCountAnyRef.toString.toInt).toOption
   } yield requeueCount
 
-  private def buildRequeuePublishCommand(delivery: Delivery, remainingAttempts: Int): PublishCommand = {
+  private def buildRequeuePublishCommand(delivery: Delivery, remainingAttempts: Int, requeueAfter: FiniteDuration): PublishCommand = {
     val newHeader: (String, AnyRef) = requeueCountHeaderName -> remainingAttempts.toString
     val headers = (delivery.properties.headersAsMap + newHeader).asJava
-
-    val properties = delivery.properties.builder().headers(headers).build()
-    PublishCommand(requeueExchange, RoutingKey(delivery.envelope.getRoutingKey), properties, delivery.body)
+    val builder = delivery.properties.builder()
+    builder.expiration(requeueAfter.toMillis.toString)
+    builder.headers(headers)
+    PublishCommand(requeueExchange, RoutingKey(delivery.envelope.getRoutingKey), builder.build(), delivery.body)
   }
 
   override def apply(delivery: Delivery): Future[ConsumeAction] = {
@@ -39,13 +41,13 @@ case class RequeueTransformer(requeuePublisher: Publisher[PublishCommand],
       action match {
         case itv.bucky.Requeue => remainingAttempts(delivery) match {
           case Some(value) if value < 1 => Future.successful(DeadLetter)
-          case Some(value) => requeuePublisher(buildRequeuePublishCommand(delivery, value - 1)).map(_ => Ack)
+          case Some(value) => requeuePublisher(buildRequeuePublishCommand(delivery, value - 1, requeuePolicy.requeueAfter)).map(_ => Ack)
           case None =>
             if (requeuePolicy.maximumProcessAttempts <= 1)
               Future.successful(DeadLetter)
             else {
               val initialRemainingAttempts = requeuePolicy.maximumProcessAttempts - 2
-              requeuePublisher(buildRequeuePublishCommand(delivery, initialRemainingAttempts)).map(_ => Ack)
+              requeuePublisher(buildRequeuePublishCommand(delivery, initialRemainingAttempts, requeuePolicy.requeueAfter)).map(_ => Ack)
             }
         }
         case other: ConsumeAction => Future.successful(other)
