@@ -7,6 +7,7 @@ import org.scalatest.concurrent.ScalaFutures
 import scala.concurrent.duration._
 import org.scalatest.Matchers._
 import SameThreadExecutionContext.implicitly
+import itv.contentdelivery.lifecycle.Lifecycle
 
 class RabbitSimulatorTest extends FunSuite with ScalaFutures {
 
@@ -35,6 +36,25 @@ class RabbitSimulatorTest extends FunSuite with ScalaFutures {
     val result = rabbit.publish(Payload.from("Foo"))(RoutingKey("invalid.routing.key")).failed.futureValue
 
     result.getMessage should include("No consumers found")
+  }
+
+  test("It should pass publish headers through to the consumer") {
+    val rabbit = new RabbitSimulator()
+
+    val messages = rabbit.watchQueue(QueueName("queue.name"))
+
+    Lifecycle.using(rabbit.publisher()) { publisher =>
+      val result = publisher(PublishCommand(ExchangeName(""),
+        RoutingKey("queue.name"),
+        MessageProperties.persistentBasic.withHeader("foo" -> "bar"),
+        Payload.from("")))
+
+      result.futureValue shouldBe(())
+
+      messages.size shouldBe 1
+
+      messages.head.properties.headers("foo") shouldBe("bar")
+    }
   }
 
   test("Can publish and consume via simulator with headers") {

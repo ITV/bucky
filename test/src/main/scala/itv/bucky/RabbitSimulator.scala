@@ -54,7 +54,7 @@ class RabbitSimulator(bindings: Bindings = IdentityBindings)(implicit executionC
   def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): Lifecycle[Publisher[PublishCommand]] =
     NoOpLifecycle[Publisher[PublishCommand]] {
       (command: PublishCommand) => {
-        publish(command.body)(command.routingKey).map(_ => ())
+        publish(command.body)(command.routingKey, headers = command.basicProperties.headers).map(_ => ())
       }
     }
 
