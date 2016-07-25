@@ -43,7 +43,11 @@ case class AmqpClientConfig(
     }
   }
 
-  override def shutdown(connection: Connection): Unit = connection.close()
+  override def shutdown(connection: Connection): Unit = {
+    if (connection.isOpen) {
+      connection.close()
+    }
+  }
 }
 
 case class AmqpChannelLifecycle(connection: Connection) extends VanillaLifecycle[Channel] with StrictLogging {
@@ -60,5 +64,9 @@ case class AmqpChannelLifecycle(connection: Connection) extends VanillaLifecycle
         throw exception
     }
 
-  override def shutdown(channel: Channel): Unit = channel.close()
+  override def shutdown(channel: Channel): Unit = {
+    if (connection.isOpen) {
+      channel.close()
+    }
+  }
 }

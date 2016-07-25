@@ -117,6 +117,8 @@ object PayloadMarshaller {
     new PayloadMarshaller[T] {
       override def apply(t: T): Payload = f(t)
     }
+
+  def lift[T](f: T => Payload): PayloadMarshaller[T] = apply(f)
 }
 
 object Unmarshaller {
