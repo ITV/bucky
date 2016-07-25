@@ -8,21 +8,22 @@ import scala.concurrent.duration._
 import org.scalatest.Matchers._
 import SameThreadExecutionContext.implicitly
 import itv.contentdelivery.lifecycle.Lifecycle
+import itv.bucky.PayloadMarshaller.StringPayloadMarshaller
+import itv.bucky.decl._
 
 class RabbitSimulatorTest extends FunSuite with ScalaFutures {
+  import RabbitSimulator._
 
   test("Can publish and consume via simulator") {
     val rabbit = new RabbitSimulator()
-//    rabbit.withChannel { channel =>
-//      channel.queueDeclare("foo", false, false, false, Map.empty[String, AnyRef].asJava)
-//      channel.queueBind("foo", "", "", Map.empty[String, AnyRef].asJava)
-//      channel.exchangeDeclare("", "", false, false, false, Map.empty[String, AnyRef].asJava)
-//
-//    }
+
     val messages = rabbit.watchQueue(QueueName("my.routing.key"))
 
-    rabbit.publish(Payload.from("Hello"))(RoutingKey("my.routing.key")).futureValue shouldBe Ack
-    rabbit.publish(Payload.from("world"))(RoutingKey("my.routing.key")).futureValue shouldBe Ack
+
+    val commandBuilder = defaultPublishCommandBuilder using RoutingKey("my.routing.key")
+
+    rabbit.publish(commandBuilder.toPublishCommand("Hello")).futureValue shouldBe Ack
+    rabbit.publish(commandBuilder.toPublishCommand("world")).futureValue shouldBe Ack
 
     rabbit.waitForMessagesToBeProcessed()(1.second)
     messages should have size 2
@@ -31,11 +32,79 @@ class RabbitSimulatorTest extends FunSuite with ScalaFutures {
     messages.last.body.unmarshal[String] shouldBe "world".unmarshalSuccess
   }
 
+
+  test("Can publish and consume via simulator with an exchange and different queues") {
+    val rabbit = new RabbitSimulator()
+    val exchangeName = ExchangeName("exchange")
+    val firstQueueName = QueueName("a")
+    val firstRoutingQueue = RoutingKey("exchage.a")
+    val secondQueueName = QueueName("b")
+    val secondRoutingQueue = RoutingKey("exchage.b")
+
+    rabbit.performOps { amqpOps =>
+      for {
+        _ <- amqpOps.bindQueue(Binding(exchangeName, firstQueueName, firstRoutingQueue, Map.empty))
+        _ <- amqpOps.bindQueue(Binding(exchangeName, secondQueueName, secondRoutingQueue, Map.empty))
+      } yield()
+    }
+
+    val firstMessages = rabbit.watchQueue(firstQueueName)
+    val secondMessages = rabbit.watchQueue(secondQueueName)
+
+    val commandBuilder = stringPublishCommandBuilder using exchangeName
+
+    rabbit.publish((commandBuilder using firstRoutingQueue).toPublishCommand("Hello")).futureValue shouldBe Ack
+    rabbit.publish((commandBuilder using secondRoutingQueue).toPublishCommand("world")).futureValue shouldBe Ack
+
+    rabbit.waitForMessagesToBeProcessed()(1.second)
+    firstMessages should have size 1
+    secondMessages should have size 1
+
+    firstMessages.head.body.unmarshal[String] shouldBe "Hello".unmarshalSuccess
+    secondMessages.head.body.unmarshal[String] shouldBe "world".unmarshalSuccess
+  }
+
   test("it should not able to ack when the routing key does not found a queue") {
     val rabbit = new RabbitSimulator()
-    val result = rabbit.publish(Payload.from("Foo"))(RoutingKey("invalid.routing.key")).failed.futureValue
+    val commandBuilder = defaultPublishCommandBuilder using RoutingKey("invalid.routing.key")
+    val result = rabbit.publish(commandBuilder.toPublishCommand("Foo")).failed.futureValue
 
     result.getMessage should include("No consumers found")
+  }
+
+
+  test("Can publish and consume via simulator with different exchanges") {
+    val rabbit = new RabbitSimulator()
+    val firstExchangeName = ExchangeName("exchange1")
+    val firstQueueName = QueueName("a")
+    val firstRoutingQueue = RoutingKey("exchage1.a")
+    val secondExchangeName = ExchangeName("exchange2")
+    val secondQueueName = QueueName("b")
+    val secondRoutingQueue = RoutingKey("exchage.b")
+
+    rabbit.performOps { amqpOps =>
+      for {
+        _ <- amqpOps.bindQueue(Binding(firstExchangeName, firstQueueName, firstRoutingQueue, Map.empty))
+        _ <- amqpOps.bindQueue(Binding(secondExchangeName, secondQueueName, secondRoutingQueue, Map.empty))
+      } yield()
+    }
+
+    val firstMessages = rabbit.watchQueue(firstQueueName)
+    val secondMessages = rabbit.watchQueue(secondQueueName)
+
+    val firstCommandBuilder = stringPublishCommandBuilder using firstExchangeName
+    val secondCommandBuilder = stringPublishCommandBuilder using secondExchangeName
+
+    rabbit.publish((firstCommandBuilder using firstRoutingQueue).toPublishCommand("Hello")).futureValue shouldBe Ack
+    rabbit.publish((secondCommandBuilder using secondRoutingQueue).toPublishCommand("world")).futureValue shouldBe Ack
+
+    rabbit.waitForMessagesToBeProcessed()(1.second)
+    firstMessages should have size 1
+    secondMessages should have size 1
+
+    firstMessages.head.body.unmarshal[String] shouldBe "Hello".unmarshalSuccess
+    secondMessages.head.body.unmarshal[String] shouldBe "world".unmarshalSuccess
+
   }
 
   test("It should pass publish headers through to the consumer") {
@@ -49,7 +118,7 @@ class RabbitSimulatorTest extends FunSuite with ScalaFutures {
         MessageProperties.persistentBasic.withHeader("foo" -> "bar"),
         Payload.from("")))
 
-      result.futureValue shouldBe(())
+      result.futureValue shouldBe (())
 
       messages.size shouldBe 1
 
@@ -61,7 +130,9 @@ class RabbitSimulatorTest extends FunSuite with ScalaFutures {
     val rabbit = new RabbitSimulator()
     val messages = rabbit.watchQueue(QueueName("my.routing.key"))
 
-    rabbit.publish(Payload.from("Hello"))(RoutingKey("my.routing.key"), Map("my.header"->"hello")).futureValue shouldBe Ack
+    val commandBuilder = defaultPublishCommandBuilder using RoutingKey("my.routing.key") using MessageProperties.minimalPersistentBasic.withHeader("my.header"->"hello")
+
+    rabbit.publish(commandBuilder.toPublishCommand("Hello")).futureValue shouldBe Ack
 
     rabbit.waitForMessagesToBeProcessed()(1.second)
     messages should have size 1
@@ -75,7 +146,9 @@ class RabbitSimulatorTest extends FunSuite with ScalaFutures {
     val rabbit = new RabbitSimulator()
     val messages = rabbit.watchQueue(QueueName("my.routing.key"))
 
-    rabbit.publish(Payload.from("Hello"))(RoutingKey("my.routing.key")).futureValue shouldBe Ack
+    val commandBuilder = defaultPublishCommandBuilder using RoutingKey("my.routing.key")
+
+    rabbit.publish(commandBuilder.toPublishCommand("Hello")).futureValue shouldBe Ack
 
     rabbit.waitForMessagesToBeProcessed()(1.second)
     messages should have size 1
@@ -91,19 +164,20 @@ class RabbitSimulatorTest extends FunSuite with ScalaFutures {
     val aTobMessages = rabbit.watchQueue(QueueName("b"))
     aTobMessages shouldBe 'empty
 
-    rabbit.publish(Payload.from("a to b"))(RoutingKey("a")).futureValue shouldBe Ack
+    val aCommandBuilder = defaultPublishCommandBuilder using RoutingKey("a")
+
+    rabbit.publish(aCommandBuilder.toPublishCommand("a to b")).futureValue shouldBe Ack
     aTobMessages should have size 1
     aTobMessages.head.body.unmarshal[String] shouldBe "a to b".unmarshalSuccess
 
     val cMessages = rabbit.watchQueue(QueueName("c"))
     cMessages shouldBe 'empty
+    val cCommandBuilder = defaultPublishCommandBuilder using RoutingKey("c")
 
-    rabbit.publish(Payload.from("c to c"))(RoutingKey("c")).futureValue shouldBe Ack
+    rabbit.publish(cCommandBuilder.toPublishCommand("c to c")).futureValue shouldBe Ack
 
     cMessages should have size 1
     cMessages.head.body.unmarshal[String] shouldBe "c to c".unmarshalSuccess
   }
-
-
 
 }

@@ -5,6 +5,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 
 import com.typesafe.scalalogging.StrictLogging
+import itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import itv.bucky.decl.{Binding, Exchange, Queue}
 import itv.contentdelivery.lifecycle.{Lifecycle, NoOpLifecycle}
 
@@ -32,9 +33,12 @@ class RabbitSimulator(bindings: Bindings = IdentityBindings)(implicit executionC
 
   case class Publication(queueName: QueueName, message: Payload, consumeActionValue: Future[ConsumeAction])
 
+  private val declarations = scala.collection.mutable.HashMap.empty[(ExchangeName, RoutingKey), QueueName]
+
   private val consumers = new scala.collection.mutable.HashMap[QueueName, Handler[Delivery]]()
   private val messagesBeingProcessed: TrieMap[UUID, Publication] = TrieMap.empty
   private val deliveryTag = new AtomicLong()
+
 
   def consumer(queueName: QueueName, handler: Handler[Delivery], exceptionalAction: ConsumeAction = DeadLetter)(implicit executionContext: ExecutionContext): Lifecycle[Unit] = NoOpLifecycle {
     val monitorHandler: Handler[Delivery] = delivery => {
@@ -54,23 +58,26 @@ class RabbitSimulator(bindings: Bindings = IdentityBindings)(implicit executionC
   def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): Lifecycle[Publisher[PublishCommand]] =
     NoOpLifecycle[Publisher[PublishCommand]] {
       (command: PublishCommand) => {
-        publish(command.body)(command.routingKey, headers = command.basicProperties.headers).map(_ => ())
+        publish(command).map(_ => ())
       }
     }
 
-  def publish(message: Payload)(routingKey: RoutingKey, headers: Map[String, AnyRef] = Map.empty[String, AnyRef]): Future[ConsumeAction] = {
-    logger.debug(s"Publish message [${message.unmarshal[String]}] with $routingKey")
-    if (bindings.isDefinedAt(routingKey)) {
-      val queueName = bindings(routingKey)
+  def publish(publishCommand: PublishCommand): Future[ConsumeAction] = {
+    logger.debug(s"Publish message [${publishCommand.body.unmarshal[String]}] with ${publishCommand.exchange} ${publishCommand.routingKey}")
+    if (isDefinedAt(publishCommand)) {
+      val queueName = queueNameFor(publishCommand)
       consumers.get(queueName).fold(Future.failed[ConsumeAction](new RuntimeException(s"No consumers found for $queueName!"))) { handler =>
-        handler(Delivery(message, ConsumerTag("ctag"), Envelope(deliveryTag.getAndIncrement(), false, ExchangeName(""), routingKey),
-          MessageProperties.persistentBasic.copy(
-            headers = headers
-          )))
+        handler(Delivery(publishCommand.body, ConsumerTag("ctag"), Envelope(deliveryTag.getAndIncrement(), false, publishCommand.exchange, publishCommand.routingKey), publishCommand.basicProperties))
       }
     } else
-      Future.failed(new RuntimeException("No queue defined for" + routingKey))
+      Future.failed(new RuntimeException(s"No queue defined for ${publishCommand.exchange} ${publishCommand.routingKey}"))
   }
+
+  def queueNameFor(publishCommand: PublishCommand): QueueName =
+    declarations.get(publishCommand.exchange, publishCommand.routingKey).fold(bindings(publishCommand.routingKey))(identity)
+
+  def isDefinedAt(publishCommand: PublishCommand): Boolean =
+    declarations.isDefinedAt(publishCommand.exchange, publishCommand.routingKey) || bindings.isDefinedAt(publishCommand.routingKey)
 
   def watchQueue(queueName: QueueName): ListBuffer[Delivery] = {
     val messages = new ListBuffer[Delivery]()
@@ -90,8 +97,20 @@ class RabbitSimulator(bindings: Bindings = IdentityBindings)(implicit executionC
     Try(thunk(new AmqpOps {
       override def declareExchange(echange: Exchange): Try[Unit] = Try(())
 
-      override def bindQueue(binding: Binding): Try[Unit] = Try(())
+      override def bindQueue(binding: Binding): Try[Unit] = Try {
+        declarations += binding.exchangeName -> binding.routingKey -> binding.queueName
+      }
 
       override def declareQueue(queue: Queue): Try[Unit] = Try(())
     }))
+}
+
+
+object RabbitSimulator {
+
+  import PublishCommandBuilder._
+
+  val stringPublishCommandBuilder = publishCommandBuilder(StringPayloadMarshaller)
+  val defaultPublishCommandBuilder = stringPublishCommandBuilder using ExchangeName("")
+
 }

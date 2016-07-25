@@ -27,10 +27,12 @@ class BasicConsumerTest extends FunSuite with ScalaFutures {
   }
 
   test("it should ack a message") {
+    import RabbitSimulator._
     Lifecycle.using(testLifecycle) { app =>
       app.publisher(MyMessage("Foo")).futureValue
 
-      app.rabbit.publish(Payload.from("Foo"))(RoutingKey("bucky-basicconsumer-example")).futureValue shouldBe Ack
+      val commandBuilder = defaultPublishCommandBuilder using RoutingKey("bucky-basicconsumer-example")
+      app.rabbit.publish(commandBuilder.toPublishCommand("Foo")).futureValue shouldBe Ack
 
       app.requeueMessages should have size 0
     }
