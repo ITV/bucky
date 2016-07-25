@@ -64,7 +64,7 @@ case class RequeueIfNotBanana(clientLifecycle: Lifecycle[AmqpClient]) {
   val consumerLifecycle =
     for {
       client <- clientLifecycle
-      _ <- DeclarationLifecycle(requeueDeclarations(queueName), client)
+      _ <- DeclarationLifecycle(requeueDeclarations(queueName, retryAfter = 1.second), client)
 
       requestDelivery <- client.publisherOf(deliveryRequestPublishCommandBuilder)
 

@@ -5,6 +5,8 @@ import itv.bucky._
 import itv.bucky.decl._
 import itv.contentdelivery.lifecycle.Lifecycle
 
+import scala.concurrent.duration._
+
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
 
@@ -12,7 +14,7 @@ package object requeue {
 
   case class RequeuePolicy(maximumProcessAttempts: Int, requeueAfter: FiniteDuration)
 
-  def requeueDeclarations(queueName: QueueName): Iterable[Declaration] = {
+  def requeueDeclarations(queueName: QueueName, retryAfter: FiniteDuration = 5.minutes): Iterable[Declaration] = {
     val deadLetterQueueName: QueueName = QueueName(s"${queueName.value}.dlq")
     val requeueQueueName: QueueName = QueueName(s"${queueName.value}.requeue")
     val dlxExchangeName: ExchangeName = ExchangeName(s"${queueName.value}.dlx")
@@ -22,7 +24,7 @@ package object requeue {
     List(
       Queue(queueName).deadLetterExchange(dlxExchangeName),
       Queue(deadLetterQueueName),
-      Queue(requeueQueueName).deadLetterExchange(redeliverExchangeName),
+      Queue(requeueQueueName).deadLetterExchange(redeliverExchangeName).messageTTL(retryAfter),
       Exchange(dlxExchangeName).binding(RoutingKey(queueName.value) -> deadLetterQueueName),
       Exchange(requeueExchangeName).binding(RoutingKey(queueName.value) -> requeueQueueName),
       Exchange(redeliverExchangeName).binding(RoutingKey(queueName.value) -> queueName)
