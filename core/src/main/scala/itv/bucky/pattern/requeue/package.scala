@@ -14,20 +14,27 @@ package object requeue {
 
   case class RequeuePolicy(maximumProcessAttempts: Int, requeueAfter: FiniteDuration)
 
-  def requeueDeclarations(queueName: QueueName, retryAfter: FiniteDuration = 5.minutes): Iterable[Declaration] = {
+  def basicRequeueDeclarations(queueName: QueueName, retryAfter: FiniteDuration = 5.minutes): Iterable[Declaration] = {
+    val deadLetterQueueName: QueueName = QueueName(s"${queueName.value}.dlq")
+    val dlxExchangeName: ExchangeName = ExchangeName(s"${queueName.value}.dlx")
+
+    requeueDeclarations(queueName, RoutingKey(queueName.value),
+      Exchange(dlxExchangeName).binding(RoutingKey(queueName.value) -> deadLetterQueueName), retryAfter)
+  }
+
+  def requeueDeclarations(queueName: QueueName, routingKey: RoutingKey, deadletterExchange: Exchange, retryAfter: FiniteDuration = 5.minutes): Iterable[Declaration] = {
     val deadLetterQueueName: QueueName = QueueName(s"${queueName.value}.dlq")
     val requeueQueueName: QueueName = QueueName(s"${queueName.value}.requeue")
-    val dlxExchangeName: ExchangeName = ExchangeName(s"${queueName.value}.dlx")
     val redeliverExchangeName: ExchangeName = ExchangeName(s"${queueName.value}.redeliver")
     val requeueExchangeName: ExchangeName = ExchangeName(s"${queueName.value}.requeue")
 
     List(
-      Queue(queueName).deadLetterExchange(dlxExchangeName),
+      Queue(queueName).deadLetterExchange(deadletterExchange.name),
       Queue(deadLetterQueueName),
       Queue(requeueQueueName).deadLetterExchange(redeliverExchangeName).messageTTL(retryAfter),
-      Exchange(dlxExchangeName).binding(RoutingKey(queueName.value) -> deadLetterQueueName),
-      Exchange(requeueExchangeName).binding(RoutingKey(queueName.value) -> requeueQueueName),
-      Exchange(redeliverExchangeName).binding(RoutingKey(queueName.value) -> queueName)
+      deadletterExchange.binding(routingKey -> deadLetterQueueName),
+      Exchange(requeueExchangeName).binding(routingKey -> requeueQueueName),
+      Exchange(redeliverExchangeName).binding(routingKey -> queueName)
     )
   }
 
@@ -40,16 +47,16 @@ package object requeue {
                             onFailure: RequeueConsumeAction = Requeue,
                             unmarshalFailureAction: RequeueConsumeAction = DeadLetter)
                            (implicit ec: ExecutionContext): Lifecycle[Unit] = {
-     requeueDeliveryHandlerOf(queueName, handler, requeuePolicy, toDeliveryUnmarshaller(unmarshaller), onFailure, unmarshalFailureAction)
+      requeueDeliveryHandlerOf(queueName, handler, requeuePolicy, toDeliveryUnmarshaller(unmarshaller), onFailure, unmarshalFailureAction)
     }
 
     def requeueDeliveryHandlerOf[T](
-                                   queueName: QueueName,
-                                   handler: RequeueHandler[T],
-                                   requeuePolicy: RequeuePolicy,
-                                   unmarshaller: DeliveryUnmarshaller[T],
-                                   onFailure: RequeueConsumeAction = Requeue,
-                                   unmarshalFailureAction: RequeueConsumeAction = DeadLetter)
+                                     queueName: QueueName,
+                                     handler: RequeueHandler[T],
+                                     requeuePolicy: RequeuePolicy,
+                                     unmarshaller: DeliveryUnmarshaller[T],
+                                     onFailure: RequeueConsumeAction = Requeue,
+                                     unmarshalFailureAction: RequeueConsumeAction = DeadLetter)
                                    (implicit ec: ExecutionContext): Lifecycle[Unit] = {
       val deserializeHandler = new DeliveryUnmarshalHandler[T, RequeueConsumeAction](unmarshaller)(handler, unmarshalFailureAction)
       requeueOf(queueName, deserializeHandler, requeuePolicy)
