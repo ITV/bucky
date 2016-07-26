@@ -1,6 +1,5 @@
 package itv.bucky
 
-import argonaut.{CodecJson, DecodeJson, Parse}
 import itv.bucky.Unmarshaller._
 import itv.utils.{Blob, BlobUnmarshaller}
 
@@ -9,7 +8,6 @@ import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 
 import scala.xml.Node
-import scalaz.{-\/, \/-}
 
 class PayloadMarshalTest extends FunSuite {
 
@@ -63,28 +61,5 @@ class PayloadMarshalTest extends FunSuite {
     reason shouldBe "Content is not allowed in prolog."
     throwable shouldBe 'defined
   }
-
-  case class Hello(world: String)
-  object Hello {
-    implicit val helloCodec: CodecJson[Hello] = CodecJson.casecodec1(Hello.apply, Hello.unapply)("hello")
-
-  }
-
-  test("Argonaut unmarshaller") {
-    import UnmarshalResult._
-    val content = """{ "hello": "world" }"""
-
-    val payload = Payload(content.getBytes("UTF-8"))
-
-    implicit def jsonDecoder[T](implicit decodeJson: DecodeJson[T]): PayloadUnmarshaller[T] =
-      StringPayloadUnmarshaller flatMap
-        Unmarshaller.liftResult(s => Parse.decodeEither(s)(decodeJson) match {
-          case -\/(reason) => UnmarshalResult.Failure(reason)
-          case \/-(value) => UnmarshalResult.Success(value)
-        })
-
-    Hello("world").unmarshalSuccess shouldBe payload.unmarshal[Hello]
-  }
-
 
 }

@@ -14,8 +14,6 @@ import itv.bucky.SameThreadExecutionContext.implicitly
 import org.joda.time.DateTime
 
 import scala.concurrent.duration._
-import argonaut._
-import Argonaut._
 import itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 
 case class Fruit(name: String)
@@ -29,10 +27,12 @@ case class DeliveryRequest(fruit: Fruit, timeOfRequest: DateTime)
 object DeliveryRequest {
   val marshaller: PayloadMarshaller[DeliveryRequest] =
     StringPayloadMarshaller contramap { request =>
-      jObjectFields(
-        "name" -> jString(request.fruit.name),
-        "timeOfRequest" -> jString(request.timeOfRequest.toString)
-      ).nospaces
+      s"""
+         |{
+         |"name": "${request.fruit.name}",
+         |"timeOfRequest": "${request.timeOfRequest.toString}"
+         |}
+       """.stripMargin
     }
 }
 

@@ -7,9 +7,6 @@ import itv.contentdelivery.lifecycle.Lifecycle
 import itv.contentdelivery.testutilities.rmq._
 
 import scala.concurrent.duration._
-import scalaz._
-import Scalaz._
-import itv.bucky.SameThreadExecutionContext.implicitly
 
 object IntegrationUtils {
 

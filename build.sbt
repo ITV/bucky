@@ -31,7 +31,6 @@ lazy val core = project
       "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
       "org.scalatest" %% "scalatest" % scalaTestVersion % "test",
       "itv.cps" %% "cps-utils" % commonPlatformServicesSharedVersion % "test",
-      "io.argonaut" %% "argonaut" % "6.1" % "test",
       "org.mockito" % "mockito-core" % mockitoVersion % "test"
     )
   )
