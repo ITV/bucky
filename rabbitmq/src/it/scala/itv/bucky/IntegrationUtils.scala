@@ -5,7 +5,6 @@ import itv.bucky.decl._
 import itv.bucky.pattern.requeue._
 import itv.contentdelivery.lifecycle.Lifecycle
 import itv.contentdelivery.testutilities.rmq._
-import itv.httpyroraptor._
 
 import scala.concurrent.duration._
 import scalaz._
@@ -17,8 +16,8 @@ object IntegrationUtils {
   def defaultDeclaration(queueName: QueueName): List[Queue] =
     List(queueName).map(Queue(_).autoDelete.expires(2.minutes))
 
-  def declareQueues(testQueueNames: QueueName*): (Seq[MessageQueue], AmqpClientConfig, HttpClient[Id]) = {
-    val (amqpClientConfig: AmqpClientConfig, rmqAdminConfig: BrokerConfig, rmqAdminHhttp: AuthenticatedHttpClient[Id.Id]) = configAndHttp
+  def declareQueues(testQueueNames: QueueName*): (Seq[MessageQueue], AmqpClientConfig) = {
+    val (amqpClientConfig: AmqpClientConfig, rmqAdminConfig: BrokerConfig) = configAndHttp
 
     val queues = for {
       client <- amqpClientConfig
@@ -28,11 +27,11 @@ object IntegrationUtils {
       yield testQueueNames.map(qn => MessageQueue(qn.value, rmqAdminConfig))
 
     Lifecycle.using(queues) { queues =>
-      (queues, amqpClientConfig, rmqAdminHhttp)
+      (queues, amqpClientConfig)
     }
   }
 
-  def configAndHttp: (AmqpClientConfig, BrokerConfig, AuthenticatedHttpClient[Id.Id]) = {
+  def configAndHttp: (AmqpClientConfig, BrokerConfig) = {
     val config = ConfigFactory.load("bucky")
     val host = config.getString("rmq.host")
     val clientConfig = config.getConfig("rmq.client")
@@ -40,12 +39,11 @@ object IntegrationUtils {
     val adminConfig = config.getConfig("rmq.admin-api")
     val rmqAdminConfig = BrokerConfig(adminConfig.getString("username"), adminConfig.getString("password"), host, adminConfig.getInt("port"))
 
-    val rmqAdminHhttp = SyncHttpClient.forHost(rmqAdminConfig.hostname, rmqAdminConfig.port).withAuthentication(rmqAdminConfig.username, rmqAdminConfig.password)
-    (amqpClientConfig, rmqAdminConfig, rmqAdminHhttp)
+    (amqpClientConfig, rmqAdminConfig)
   }
 
   def declareRequeueQueues(name: String): Lifecycle[(MessageQueue, MessageQueue, MessageQueue)] = {
-    val (amqpClientConfig: AmqpClientConfig, rmqAdminConfig: BrokerConfig, rmqAdminHttp: AuthenticatedHttpClient[Id.Id]) = configAndHttp
+    val (amqpClientConfig: AmqpClientConfig, rmqAdminConfig: BrokerConfig) = configAndHttp
 
     val declarations = basicRequeueDeclarations(QueueName(name), retryAfter = 1.second) collect {
       case ex: Exchange => ex.autoDelete.expires(1.minute)

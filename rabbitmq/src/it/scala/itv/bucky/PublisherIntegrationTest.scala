@@ -1,16 +1,12 @@
 package itv.bucky
 
 import com.typesafe.scalalogging.StrictLogging
+import itv.bucky.SameThreadExecutionContext.implicitly
 import itv.bucky.TestUtils._
 import itv.contentdelivery.lifecycle.Lifecycle
-import itv.contentdelivery.testutilities.json.JsonResult
-import itv.httpyroraptor._
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.ScalaFutures
-
-import scala.concurrent.duration._
-import itv.bucky.SameThreadExecutionContext.implicitly
 
 class PublisherIntegrationTest extends FunSuite with ScalaFutures with StrictLogging {
 

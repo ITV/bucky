@@ -170,7 +170,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
 
   private def baseTestLifecycle(): Lifecycle[BaseTextFixture] = {
     val testQueueName = "bucky-requeue-consumer-ack" + Random.nextInt()
-    val (amqpClientConfig: AmqpClientConfig, _, _) = IntegrationUtils.configAndHttp
+    val (amqpClientConfig: AmqpClientConfig, _) = IntegrationUtils.configAndHttp
 
     for {
       amqpClient <- amqpClientConfig

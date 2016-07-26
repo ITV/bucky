@@ -71,7 +71,6 @@ lazy val rabbitmq = project
       //      "org.slf4j" % "slf4j-api" % "1.6.1",
       "itv.contentdelivery" %% "contentdelivery-shared-lifecycle" % contentDeliverySharedVersion,
       "org.scalatest" %% "scalatest" % scalaTestVersion % "test, it",
-      "itv.contentdelivery" %% "contentdelivery-shared-httpyroraptor" % contentDeliverySharedVersion % "it",
       "itv.contentdelivery" %% "contentdelivery-shared-test-utilities" % contentDeliverySharedVersion % "test,it" excludeAll ExclusionRule(organization = "com.google.guava")
       //      "io.netty" % "netty-all" % "4.1.2.Final" % "test,it",
       //      "com.google.guava" % "guava" % "18.0" % "it"

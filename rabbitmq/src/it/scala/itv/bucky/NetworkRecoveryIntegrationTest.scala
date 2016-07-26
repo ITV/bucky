@@ -18,7 +18,7 @@ class NetworkRecoveryIntegrationTest extends FunSuite with ScalaFutures {
 
   def testLifecycle: Lifecycle[(Proxy, StubConsumeHandler[Unit], Publisher[Unit])] = {
     val queueName = QueueName("proxy" + Random.nextInt())
-    val (amqpClientConfig: AmqpClientConfig, _, _) = IntegrationUtils.configAndHttp
+    val (amqpClientConfig: AmqpClientConfig, _) = IntegrationUtils.configAndHttp
 
     val marshaller: PayloadMarshaller[Unit] = PayloadMarshaller.lift(_ => Payload.from("hello"))
     val pcb = publishCommandBuilder[Unit](marshaller) using ExchangeName("") using RoutingKey(queueName.value)
