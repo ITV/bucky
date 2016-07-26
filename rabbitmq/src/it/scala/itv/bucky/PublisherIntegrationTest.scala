@@ -30,49 +30,4 @@ class PublisherIntegrationTest extends FunSuite with ScalaFutures with StrictLog
     }
   }
 
-  test("Publisher can recover from connection failure") {
-    import IntegrationUtils._
-    lazy val (testQueue, amqpClientConfig, rmqAdminHhttp) = IntegrationUtils.declareQueues(QueueName(testQueueName))
-    testQueue.head.purge()
-    val config = AmqpClientConfig("33.33.33.11", 5672, "guest", "guest", networkRecoveryInterval = Some(500.millis))
-
-
-
-    Lifecycle.using(base(defaultDeclaration(QueueName(testQueueName)), config)) { case (_, publisher) =>
-      val body = Payload.from("Hello World!")
-      publisher(PublishCommand(ExchangeName(""), routingKey, MessageProperties.persistentBasic, body)).asTry.futureValue shouldBe 'success
-
-      killRabbitConnection(config)
-
-      // Publish fails until connection is re-established
-      publisher(PublishCommand(exchange, routingKey, MessageProperties.persistentBasic, Payload.from("Immediately after"))).asTry.futureValue shouldBe 'failure
-
-      // Publish succeeds once connection is re-established
-      Thread.sleep(600L)
-
-      publisher(PublishCommand(exchange, routingKey, MessageProperties.persistentBasic, Payload.from("A while after"))).asTry.futureValue shouldBe 'success
-      testQueue.head.consumeAllMessages() should have size 2
-
-    }
-
-  }
-
-  private def killRabbitConnection(config: AmqpClientConfig): Unit = {
-    val rmqAdminHhttp = SyncHttpClient.forHost(config.host, 15672).withAuthentication(config.username, config.password)
-    val requestConnections = GET("/api/connections")
-    val response = rmqAdminHhttp.handle(requestConnections)
-
-    logger.debug(s"$requestConnections -> $response")
-
-    val jsonResult = response.body.to[JsonResult]
-    for {
-      connection <- jsonResult.array if connection("user").string == defaultConfig.username
-    } {
-      val connectionName = connection("name").string
-      logger.debug(s"Killing connection $connectionName")
-      rmqAdminHhttp.handle(DELETE(UriBuilder / "api" / "connections" / connectionName)) shouldBe 'successful
-    }
-  }
-
-
 }
