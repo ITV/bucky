@@ -6,7 +6,6 @@ name := "bucky"
 organization := "itv"
 
 val contentDeliverySharedVersion = "1.0-591"
-val commonPlatformServicesSharedVersion = "37.4.0"
 val amqpClientVersion = "3.3.1"
 val scalaLoggingVersion = "3.1.0"
 val scalaTestVersion = "2.2.1"
@@ -30,7 +29,6 @@ lazy val core = project
       "itv.contentdelivery" %% "contentdelivery-shared-lifecycle" % contentDeliverySharedVersion,
       "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
       "org.scalatest" %% "scalatest" % scalaTestVersion % "test",
-      "itv.cps" %% "cps-utils" % commonPlatformServicesSharedVersion % "test",
       "org.mockito" % "mockito-core" % mockitoVersion % "test"
     )
   )

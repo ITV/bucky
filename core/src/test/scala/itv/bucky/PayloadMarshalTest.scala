@@ -1,13 +1,10 @@
 package itv.bucky
 
 import itv.bucky.Unmarshaller._
-import itv.utils.{Blob, BlobUnmarshaller}
 
 import scala.util.{Random, Try}
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
-
-import scala.xml.Node
 
 class PayloadMarshalTest extends FunSuite {
 
@@ -36,30 +33,6 @@ class PayloadMarshalTest extends FunSuite {
     value.unmarshalSuccess shouldBe Payload.from(value).unmarshal[Int]
 
     "'blah' was not a valid integer".unmarshalFailure shouldBe Payload.from("blah").unmarshal[Int]
-  }
-
-  test("Can marshal from/to itv.utils.Blob") {
-    import UnmarshalResult._
-    implicit val blobMarshaller: PayloadMarshaller[Blob] = new PayloadMarshaller[Blob] {
-      override def apply(blob: Blob): Payload = Payload(blob.content)
-    }
-
-    implicit def blobUnmarshaller[T](implicit blobUnmarshaller: BlobUnmarshaller[T]): PayloadUnmarshaller[T] =
-      new PayloadUnmarshaller[T] {
-        override def unmarshal(thing: Payload): UnmarshalResult[T] =
-          try {
-            blobUnmarshaller.fromBlob(Blob(thing.value)).unmarshalSuccess
-          } catch {
-            case t: Throwable => t.unmarshalFailure()
-          }
-      }
-
-    Blob.from("Hello").unmarshalSuccess shouldBe Payload.from("Hello").unmarshal[Blob]
-
-    val Failure(reason, throwable) = Payload.from("Hello").unmarshal[Node]
-
-    reason shouldBe "Content is not allowed in prolog."
-    throwable shouldBe 'defined
   }
 
 }
