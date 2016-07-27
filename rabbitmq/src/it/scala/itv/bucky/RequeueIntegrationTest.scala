@@ -11,10 +11,11 @@ import itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.util.Random
+import scala.util.{Random, Success}
 import itv.contentdelivery.lifecycle.Lifecycle
 import itv.contentdelivery.testutilities.rmq.MessageQueue
 import itv.bucky.Unmarshaller._
+import itv.bucky.decl.{DeclarationLifecycle, Exchange, Queue}
 
 class RequeueIntegrationTest extends FunSuite with ScalaFutures {
 
@@ -70,11 +71,11 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
       app.publish(Payload.from(1)).futureValue shouldBe published
 
       eventually {
-        app.queue.allMessages shouldBe 'empty
+        app.amqpClient.estimatedMessageCount(app.queueName) shouldBe Success(0)
       }
-      app.requeue.allMessages shouldBe 'empty
+      app.amqpClient.estimatedMessageCount(app.requeueQueueName) shouldBe Success(0)
+      app.deadletterQueue.receivedMessages shouldBe 'empty
       handler.receivedMessages.length shouldBe 1
-
     }
   }
 
@@ -134,10 +135,10 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
       app.publish(payload).futureValue shouldBe published
 
       eventually {
-        app.queue.allMessages shouldBe 'empty
-        app.requeue.allMessages shouldBe 'empty
+        app.amqpClient.estimatedMessageCount(app.queueName) shouldBe Success(0)
+        app.amqpClient.estimatedMessageCount(app.requeueQueueName) shouldBe Success(0)
         handler.receivedMessages.size shouldBe requeuePolicy.maximumProcessAttempts
-        app.deadletterQueue.allMessages.map(b => Payload(b.payload.content)) shouldBe List(payload)
+        app.deadletterQueue.receivedMessages.map(_.body) shouldBe List(payload)
       }(requeuePatienceConfig)
     }
   }
@@ -152,44 +153,47 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
       app.publish(payload).futureValue shouldBe published
 
       eventually {
-        app.queue.allMessages shouldBe 'empty
-        app.requeue.allMessages shouldBe 'empty
+        app.amqpClient.estimatedMessageCount(app.queueName) shouldBe Success(0)
+        app.amqpClient.estimatedMessageCount(app.requeueQueueName) shouldBe Success(0)
         handler.receivedMessages.size shouldBe 1
-        app.deadletterQueue.allMessages.map(b => Payload(b.payload.content)) shouldBe List(payload)
+        app.deadletterQueue.receivedMessages.map(_.body) shouldBe List(payload)
       }(requeuePatienceConfig)
     }
   }
 
-  case class TestFixture(queue: MessageQueue, requeue: MessageQueue, deadletterQueue: MessageQueue, publisher: Publisher[PublishCommand]) {
+  case class TestFixture(amqpClient: AmqpClient, queueName: QueueName, requeueQueueName: QueueName, deadletterQueue: QueueWatcher[Delivery], publisher: Publisher[PublishCommand]) {
     def publish(body: Payload, properties: MessageProperties = MessageProperties.persistentBasic): Future[Unit] = publisher(
-      PublishCommand(ExchangeName(""), RoutingKey(queue.name), properties, body))
+      PublishCommand(ExchangeName(""), RoutingKey(queueName.value), properties, body))
   }
 
-
-  case class BaseTextFixture(amqpClient: AmqpClient, queueName: QueueName, testFixture: TestFixture)
-
-  private def baseTestLifecycle(): Lifecycle[BaseTextFixture] = {
+  private def baseTestLifecycle(): Lifecycle[TestFixture] = {
     val testQueueName = "bucky-requeue-consumer-ack" + Random.nextInt()
-    val (amqpClientConfig: AmqpClientConfig, _) = IntegrationUtils.configAndHttp
+
+    val declarations = requeueDeclarations(QueueName(testQueueName), RoutingKey(testQueueName), Exchange(ExchangeName(testQueueName + ".dlx")), retryAfter = 1.second) collect {
+      case ex: Exchange => ex.autoDelete.expires(1.minute)
+      case q: Queue => q.autoDelete.expires(1.minute)
+    }
 
     for {
-      amqpClient <- amqpClientConfig
-      queues <- IntegrationUtils.declareRequeueQueues(testQueueName)
-      (testQueue, testRequeue, testDeadletterQueue) = queues
-      publish <- amqpClient.publisher()
-    } yield BaseTextFixture(amqpClient, QueueName(testQueueName), TestFixture(testQueue, testRequeue, testDeadletterQueue, publish))
+      client <- IntegrationUtils.config
+      _ <- DeclarationLifecycle(declarations, client)
+
+      publish <- client.publisher()
+      deadletterWatcher = new QueueWatcher[Delivery]
+      deadletterQueue <- client.consumer(QueueName(testQueueName + ".dlq"), deadletterWatcher)
+    } yield TestFixture(client, QueueName(testQueueName), QueueName(testQueueName + ".requeue"), deadletterWatcher, publish)
   }
 
   def testLifecycle[T](handler: RequeueHandler[T], requeuePolicy: RequeuePolicy, unmarshaller: PayloadUnmarshaller[T]): Lifecycle[TestFixture] = for {
-    base <- baseTestLifecycle()
-    consumer <- base.amqpClient.requeueHandlerOf(base.queueName, handler, requeuePolicy, unmarshaller)
-  } yield base.testFixture
+    testFixture <- baseTestLifecycle()
+    consumer <- testFixture.amqpClient.requeueHandlerOf(testFixture.queueName, handler, requeuePolicy, unmarshaller)
+  } yield testFixture
 
 
   def testLifecycle(handler: RequeueHandler[Delivery], requeuePolicy: RequeuePolicy): Lifecycle[TestFixture] = for {
-    base <- baseTestLifecycle()
-    consumer <- base.amqpClient.requeueOf(base.queueName, handler, requeuePolicy)
-  } yield base.testFixture
+    testFixture <- baseTestLifecycle()
+    consumer <- testFixture.amqpClient.requeueOf(testFixture.queueName, handler, requeuePolicy)
+  } yield testFixture
 
 
   private def getHeader(header: String, properties: MessageProperties): Option[String] =

@@ -21,9 +21,7 @@ class DeclarationTest extends FunSuite with ScalaFutures {
   test("Should be able to declare a queue") {
     val queueName = "queue.declare" + Random.nextInt()
 
-    val (amqpConfig, _) = IntegrationUtils.configAndHttp
-
-    Lifecycle.using(amqpConfig) { amqpClient =>
+    Lifecycle.using(IntegrationUtils.config) { amqpClient =>
       amqpClient.performOps(Queue(QueueName(queueName),
         isDurable = true,
         isExclusive = true,
@@ -54,9 +52,7 @@ class DeclarationTest extends FunSuite with ScalaFutures {
     val queueName = QueueName("bindingq" + Random.nextInt())
     val routingKey = RoutingKey("bindingr" + Random.nextInt())
 
-    val (amqpConfig, _) = IntegrationUtils.configAndHttp
-
-    Lifecycle.using(amqpConfig) { amqpClient =>
+    Lifecycle.using(IntegrationUtils.config) { amqpClient =>
       val declarations = List(Exchange(exchangeName,
         isDurable = false,
         shouldAutoDelete = true,

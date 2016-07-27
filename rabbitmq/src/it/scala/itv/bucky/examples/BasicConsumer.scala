@@ -53,13 +53,11 @@ object BasicConsumer extends App {
 
       val myMessageSerializer = publishCommandBuilder(messageMarshaller) using RoutingKey(targetQueueName.value) using ExchangeName("")
 
-      lazy val (testQueues, amqpClientConfig) = IntegrationUtils.declareQueues(QueueName(queueName.value), QueueName(targetQueueName.value))
-
-        testQueues.foreach(_.purge())
+      val testQueues = IntegrationUtils.declareQueues(QueueName(queueName.value), QueueName(targetQueueName.value))
 
         import AmqpClient._
         for {
-          amqClient <- buildAmqpClient(amqpClientConfig)
+          amqClient <- buildAmqpClient(IntegrationUtils.config)
           publisher <- amqClient.publisher().map(publisherOf(myMessageSerializer))
           blah <- amqClient.consumer(queueName, handlerOf(PrintlnHandler(publisher), payloadUnmarshaller))
         } yield {

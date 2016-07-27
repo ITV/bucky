@@ -29,12 +29,10 @@ class EstimatedMessageCountTest extends FunSuite {
   }
 
   def estimatedMessageCountTest(messagesToPublish: Int): Unit = {
-    val (amqpClientConfig, _) = IntegrationUtils.configAndHttp
-
     val randomQueueName = QueueName("estimatedmessagecount" + Random.nextInt())
 
     val clientLifecycle = for {
-      client <- amqpClientConfig
+      client <- IntegrationUtils.config
       _ <- DeclarationLifecycle(IntegrationUtils.defaultDeclaration(randomQueueName), client)
       publisher <- client.publisher()
       _ = Future.sequence((1 to messagesToPublish).map(_ => publisher(PublishCommand(ExchangeName(""), RoutingKey(randomQueueName.value), MessageProperties.persistentBasic, Payload.from("hello")))))
