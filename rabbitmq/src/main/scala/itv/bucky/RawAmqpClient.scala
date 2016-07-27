@@ -156,5 +156,10 @@ class RawAmqpClient(channelFactory: Lifecycle[Channel], consumerTag: ConsumerTag
 
   override def performOps(thunk: (AmqpOps) => Try[Unit]): Try[Unit] =
     Lifecycle.using(channelFactory)(channel => thunk(ChannelAmqpOps(channel)))
+
+  override def estimatedMessageCount(queueName: QueueName): Try[Int] =
+    Try(Lifecycle.using(channelFactory) { channel =>
+      Option(channel.basicGet(queueName.value, false)).fold(0)(_.getMessageCount + 1)
+    })
 }
 

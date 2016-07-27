@@ -23,6 +23,8 @@ trait AmqpClient {
 
   def performOps(thunk: AmqpOps => Try[Unit]): Try[Unit]
 
+  def estimatedMessageCount(queueName: QueueName): Try[Int]
+
 }
 
 trait AmqpOps {
