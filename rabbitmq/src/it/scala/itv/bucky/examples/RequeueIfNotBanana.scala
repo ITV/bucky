@@ -1,5 +1,7 @@
 package itv.bucky.examples
 
+import java.time.Instant
+
 import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.StrictLogging
 import itv.bucky._
@@ -11,7 +13,6 @@ import itv.bucky.Unmarshaller._
 
 import scala.concurrent.Future
 import itv.bucky.SameThreadExecutionContext.implicitly
-import org.joda.time.DateTime
 
 import scala.concurrent.duration._
 import itv.bucky.PayloadMarshaller.StringPayloadMarshaller
@@ -22,7 +23,7 @@ object Fruit {
   val deserializer: PayloadUnmarshaller[Fruit] = StringPayloadUnmarshaller.map(Fruit.apply)
 }
 
-case class DeliveryRequest(fruit: Fruit, timeOfRequest: DateTime)
+case class DeliveryRequest(fruit: Fruit, timeOfRequest: Instant)
 
 object DeliveryRequest {
   val marshaller: PayloadMarshaller[DeliveryRequest] =
@@ -43,7 +44,7 @@ case class RequeueIfNotBananaHandler(requestDelivery: Publisher[DeliveryRequest]
       case fruit@Fruit("Banana") => {
         logger.info("Fruit was Banana, cool")
 
-        val deliveryRequest = DeliveryRequest(fruit, DateTime.now())
+        val deliveryRequest = DeliveryRequest(fruit, Instant.now())
         requestDelivery(deliveryRequest).map(_ => Ack)
       }
       case _ => {

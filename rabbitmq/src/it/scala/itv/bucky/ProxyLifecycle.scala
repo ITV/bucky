@@ -162,7 +162,7 @@ case class ProxyLifecycle(local: HostPort, remote: HostPort) extends VanillaLife
     new Proxy {
       override def shutdown(): Unit = {
         logger.info("Shutting down proxy server")
-        clientSocketChannelFactory.shutdown()
+        clientSocketChannelFactory.releaseExternalResources()
       }
 
       override def closeAllOpenConnections: Unit = {

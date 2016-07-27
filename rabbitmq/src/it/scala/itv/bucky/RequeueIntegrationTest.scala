@@ -1,21 +1,20 @@
 package itv.bucky
 
-import itv.bucky.pattern.requeue._
+import itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import itv.bucky.SameThreadExecutionContext.implicitly
+import itv.bucky.Unmarshaller._
+import itv.bucky.decl.{DeclarationLifecycle, Exchange, Queue}
+import itv.bucky.pattern.requeue._
+import itv.contentdelivery.lifecycle.Lifecycle
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.concurrent.Eventually
 import Eventually._
-import itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Random, Success}
-import itv.contentdelivery.lifecycle.Lifecycle
-import itv.contentdelivery.testutilities.rmq.MessageQueue
-import itv.bucky.Unmarshaller._
-import itv.bucky.decl.{DeclarationLifecycle, Exchange, Queue}
 
 class RequeueIntegrationTest extends FunSuite with ScalaFutures {
 
