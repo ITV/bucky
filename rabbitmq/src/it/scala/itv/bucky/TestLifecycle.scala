@@ -16,7 +16,7 @@ object TestLifecycle {
           (implicit executionContext: ExecutionContext): Lifecycle[(AmqpClient, Publisher[PublishCommand])] = {
     for {
       _ <- if (config.host == "localhost") LocalAmqpServer(passwordFile = new File("src/it/resources/qpid-passwd")) else NoOpLifecycle(())
-      amqpClient <- config
+      amqpClient <- AmqpClientLifecycle(config)
       _ <- DeclarationLifecycle(declarations, amqpClient)
       publisher <- amqpClient.publisher()
     } yield (amqpClient, publisher)

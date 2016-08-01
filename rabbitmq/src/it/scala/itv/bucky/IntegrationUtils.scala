@@ -11,21 +11,6 @@ object IntegrationUtils {
   def defaultDeclaration(queueName: QueueName): List[Queue] =
     List(queueName).map(Queue(_).autoDelete.expires(2.minutes))
 
-  def declareQueues(testQueueNames: QueueName*): Unit = {
-    val amqpClientConfig = config
-
-    val queues = for {
-      client <- amqpClientConfig
-      declarations = testQueueNames.map(qn => Queue(qn).autoDelete.expires(2.minutes))
-      _ <- DeclarationLifecycle(declarations, client)
-    }
-      yield ()
-
-    Lifecycle.using(queues) { _ =>
-      ()
-    }
-  }
-
   def config: AmqpClientConfig = {
     val config = ConfigFactory.load("bucky")
     val host = config.getString("rmq.host")

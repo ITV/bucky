@@ -83,5 +83,6 @@ object Main extends App {
     AmqpClientConfig(host, clientConfig.getInt("port"), clientConfig.getString("username"), clientConfig.getString("password"))
   }
 
-  RequeueIfNotBanana(readConfig(ConfigFactory.load("bucky"))).consumerLifecycle.runUntilJvmShutdown()
+  val config = readConfig(ConfigFactory.load("bucky"))
+  RequeueIfNotBanana(AmqpClientLifecycle(config)).consumerLifecycle.runUntilJvmShutdown()
 }

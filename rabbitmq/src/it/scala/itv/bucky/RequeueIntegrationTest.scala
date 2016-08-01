@@ -174,7 +174,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
     }
 
     for {
-      client <- IntegrationUtils.config
+      client <- AmqpClientLifecycle(IntegrationUtils.config)
       _ <- DeclarationLifecycle(declarations, client)
 
       publish <- client.publisher()

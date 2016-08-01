@@ -7,31 +7,20 @@ import itv.contentdelivery.lifecycle.{Lifecycle, VanillaLifecycle}
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
-/**
-  * AmqpClient configuration. Acts as a lifecycle factory for AmqpClient.
-  */
-case class AmqpClientConfig(
-                             host: String,
-                             port: Int,
-                             username: String,
-                             password: String,
-                             networkRecoveryInterval: Option[FiniteDuration] = Some(5.seconds))
-  extends Lifecycle[AmqpClient] with StrictLogging {
+case class AmqpClientLifecycle(config: AmqpClientConfig) extends Lifecycle[AmqpClient] with StrictLogging {
 
   override type ServiceInstance = Connection
-
-  override def unwrap(connection: Connection): AmqpClient = new RawAmqpClient(AmqpChannelLifecycle(connection))
 
   override def start(): Connection = {
     Try {
       logger.info(s"Starting AmqpClient")
       val connectionFactory = new ConnectionFactory()
-      connectionFactory.setHost(host)
-      connectionFactory.setPort(port)
-      connectionFactory.setUsername(username)
-      connectionFactory.setPassword(password)
-      connectionFactory.setAutomaticRecoveryEnabled(networkRecoveryInterval.isDefined)
-      networkRecoveryInterval.map(_.toMillis.toInt).foreach(connectionFactory.setNetworkRecoveryInterval)
+      connectionFactory.setHost(config.host)
+      connectionFactory.setPort(config.port)
+      connectionFactory.setUsername(config.username)
+      connectionFactory.setPassword(config.password)
+      connectionFactory.setAutomaticRecoveryEnabled(config.networkRecoveryInterval.isDefined)
+      config.networkRecoveryInterval.map(_.toMillis.toInt).foreach(connectionFactory.setNetworkRecoveryInterval)
       connectionFactory.newConnection()
     } match {
       case Success(connection) =>
@@ -43,12 +32,23 @@ case class AmqpClientConfig(
     }
   }
 
-  override def shutdown(connection: Connection): Unit = {
-    if (connection.isOpen) {
-      connection.close()
+  override def unwrap(instance: Connection): AmqpClient = new RawAmqpClient(AmqpChannelLifecycle(instance))
+
+  override def shutdown(instance: Connection): Unit =
+    if (instance.isOpen) {
+      instance.close()
     }
-  }
+
 }
+/**
+  * AmqpClient configuration. Acts as a lifecycle factory for AmqpClient.
+  */
+case class AmqpClientConfig(
+                             host: String,
+                             port: Int,
+                             username: String,
+                             password: String,
+                             networkRecoveryInterval: Option[FiniteDuration] = Some(5.seconds))
 
 case class AmqpChannelLifecycle(connection: Connection) extends VanillaLifecycle[Channel] with StrictLogging {
   override def start(): Channel =

@@ -34,9 +34,10 @@ class NetworkRecoveryIntegrationTest extends FunSuite with ScalaFutures {
       }
     }
 
+    val proxyConfig = amqpClientConfig.copy(host = "localhost", port = 9999, networkRecoveryInterval = Some(1.second))
     for {
       proxy <- ProxyLifecycle(local = HostPort("localhost", 9999), remote = HostPort(amqpClientConfig.host, amqpClientConfig.port))
-      client <- amqpClientConfig.copy(host = "localhost", port = 9999, networkRecoveryInterval = Some(1.second))
+      client <- AmqpClientLifecycle(proxyConfig)
       _ <- DeclarationLifecycle(List(Queue(queueA).notDurable.expires(1.minute)), client)
       _ <- DeclarationLifecycle(List(Queue(queueB).notDurable.expires(1.minute)), client)
       publisherA <- client.publisherOf(pcbA)

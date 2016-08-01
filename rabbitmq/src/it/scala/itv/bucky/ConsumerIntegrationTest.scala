@@ -93,8 +93,9 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogg
     val queueName = QueueName("exception-from-handler" + Random.nextInt())
     val handler = new StubConsumeHandler[Delivery]()
     val dlqHandler = new QueueWatcher[Delivery]
+    val config: AmqpClientConfig = AmqpClientConfig("33.33.33.11", 5672, "guest", "guest", None)
     for {
-      amqpClient <- AmqpClientConfig("33.33.33.11", 5672, "guest", "guest", None)
+      amqpClient <- AmqpClientLifecycle(config)
       declarations = basicRequeueDeclarations(queueName, retryAfter = 1.second) collect {
         case ex: Exchange => ex.autoDelete.expires(1.minute)
         case q: Queue => q.autoDelete.expires(1.minute)
