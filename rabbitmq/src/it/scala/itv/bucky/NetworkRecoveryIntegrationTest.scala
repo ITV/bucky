@@ -16,13 +16,16 @@ import scala.util.Random
 class NetworkRecoveryIntegrationTest extends FunSuite with ScalaFutures {
   import TestUtils._
 
-  def testLifecycle: Lifecycle[(Proxy, StubConsumeHandler[Unit], Publisher[Unit])] = {
-    val queueName = QueueName("proxy" + Random.nextInt())
+  def testLifecycle: Lifecycle[(Proxy, StubConsumeHandler[Unit], StubConsumeHandler[Unit], Publisher[Unit], Publisher[Unit])] = {
+    val queueA = QueueName("proxy" + Random.nextInt())
+    val queueB = QueueName("proxy" + Random.nextInt())
     val amqpClientConfig = IntegrationUtils.config
 
     val marshaller: PayloadMarshaller[Unit] = PayloadMarshaller.lift(_ => Payload.from("hello"))
-    val pcb = publishCommandBuilder[Unit](marshaller) using ExchangeName("") using RoutingKey(queueName.value)
-    val handler = new StubConsumeHandler[Unit]
+    val pcbA = publishCommandBuilder[Unit](marshaller) using ExchangeName("") using RoutingKey(queueA.value)
+    val pcbB = publishCommandBuilder[Unit](marshaller) using ExchangeName("") using RoutingKey(queueB.value)
+    val handlerA = new StubConsumeHandler[Unit]
+    val handlerB = new StubConsumeHandler[Unit]
     val unmarshaller = Unmarshaller.liftResult[Payload, Unit] {
       _.unmarshal[String] match {
         case UnmarshalResult.Success(s) if s == "hello" => UnmarshalResult.Success(())
@@ -34,28 +37,36 @@ class NetworkRecoveryIntegrationTest extends FunSuite with ScalaFutures {
     for {
       proxy <- ProxyLifecycle(local = HostPort("localhost", 9999), remote = HostPort(amqpClientConfig.host, amqpClientConfig.port))
       client <- amqpClientConfig.copy(host = "localhost", port = 9999, networkRecoveryInterval = Some(1.second))
-      _ <- DeclarationLifecycle(List(Queue(queueName).notDurable.expires(1.minute)), client)
-      publisher <- client.publisherOf(pcb)
-      _ <- client.consumer(queueName, AmqpClient.handlerOf(handler, unmarshaller))
+      _ <- DeclarationLifecycle(List(Queue(queueA).notDurable.expires(1.minute)), client)
+      _ <- DeclarationLifecycle(List(Queue(queueB).notDurable.expires(1.minute)), client)
+      publisherA <- client.publisherOf(pcbA)
+      publisherB <- client.publisherOf(pcbB)
+      _ <- client.consumer(queueA, AmqpClient.handlerOf(handlerA, unmarshaller))
+      _ <- client.consumer(queueB, AmqpClient.handlerOf(handlerB, unmarshaller))
     }
-      yield (proxy, handler, publisher)
+      yield (proxy, handlerA, handlerB, publisherA, publisherB)
   }
 
   test("can recover publishers and consumers from a network failure") {
-    Lifecycle.using(testLifecycle) { case (proxy, handler, publisher) =>
-      handler.receivedMessages shouldBe 'empty
+    Lifecycle.using(testLifecycle) { case (proxy, handlerA, handlerB, publisherA, publisherB) =>
+      handlerA.receivedMessages shouldBe 'empty
+      handlerB.receivedMessages shouldBe 'empty
 
       withClue("should be able to publish and consume a couple of messages") {
-        publisher.apply(()).asTry.futureValue shouldBe 'success
+        publisherA.apply(()).asTry.futureValue shouldBe 'success
+        publisherB.apply(()).asTry.futureValue shouldBe 'success
 
         eventually {
-          handler.receivedMessages should have size 1
+          handlerA.receivedMessages should have size 1
+          handlerB.receivedMessages should have size 1
         }(Eventually.PatienceConfig(5.seconds, 1.second))
 
-        publisher.apply(()).asTry.futureValue shouldBe 'success
+        publisherA.apply(()).asTry.futureValue shouldBe 'success
+        publisherB.apply(()).asTry.futureValue shouldBe 'success
 
         eventually {
-          handler.receivedMessages should have size 2
+          handlerA.receivedMessages should have size 2
+          handlerB.receivedMessages should have size 2
         }(Eventually.PatienceConfig(5.seconds, 1.second))
       }
 
@@ -63,20 +74,28 @@ class NetworkRecoveryIntegrationTest extends FunSuite with ScalaFutures {
       proxy.closeAllOpenConnections()
 
       withClue("should fail to publish when connection to broker is lost") {
-        publisher.apply(()).asTry.futureValue shouldBe 'failure
+        publisherA.apply(()).asTry.futureValue shouldBe 'failure
+        publisherB.apply(()).asTry.futureValue shouldBe 'failure
       }
 
       proxy.startAcceptingNewConnections()
 
       withClue("should be able to publish after broker allows connections again") {
         eventually {
-          publisher.apply(()).asTry.futureValue shouldBe 'success
+          publisherA.apply(()).asTry.futureValue shouldBe 'success
+          publisherB.apply(()).asTry.futureValue shouldBe 'success
         }(Eventually.PatienceConfig(5.seconds, 1.second))
       }
 
-      withClue("should be able to consume after broker allows connections again") {
+      withClue("should be able to consume from Queue B after broker allows connections again") {
         eventually {
-          handler.receivedMessages should have size 3
+          handlerB.receivedMessages should have size 3
+        }(Eventually.PatienceConfig(5.seconds, 1.second))
+      }
+
+      withClue("should be able to consume from Queue A after broker allows connections again") {
+        eventually {
+          handlerA.receivedMessages should have size 3
         }(Eventually.PatienceConfig(5.seconds, 1.second))
       }
     }

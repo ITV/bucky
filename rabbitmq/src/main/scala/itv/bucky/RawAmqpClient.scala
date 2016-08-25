@@ -14,14 +14,15 @@ import scala.util.{Failure, Success, Try}
 import com.rabbitmq.client.{Envelope => RabbitMQEnvelope}
 import itv.bucky.decl.{Binding, Exchange, Queue}
 
-class RawAmqpClient(channelFactory: Lifecycle[Channel], consumerTag: ConsumerTag = ConsumerTag.pidAndHost) extends AmqpClient with StrictLogging {
+class RawAmqpClient(channelFactory: Lifecycle[Channel]) extends AmqpClient with StrictLogging {
 
   def consumer(queueName: QueueName, handler: Handler[Delivery], actionOnFailure: ConsumeAction = DeadLetter)
               (implicit executionContext: ExecutionContext): Lifecycle[Unit] =
     for {
       channel <- channelFactory
     } yield {
-      logger.info(s"Starting consumer on $queueName")
+      val consumerTag: ConsumerTag = ConsumerTag.create(queueName)
+      logger.info(s"Starting consumer on $queueName with $consumerTag")
       Try {
         channel.basicConsume(queueName.value, false, consumerTag.value, new DefaultConsumer(channel) {
           override def handleDelivery(consumerTag: String, envelope: RabbitMQEnvelope, properties: BasicProperties, body: Array[Byte]): Unit = {

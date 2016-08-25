@@ -146,6 +146,6 @@ class PublisherTest extends FunSuite with ScalaFutures {
   }
 
   private def createClient(channel: StubChannel): RawAmqpClient = {
-    new RawAmqpClient(NoOpLifecycle(channel), ConsumerTag("consumer-tag"))
+    new RawAmqpClient(NoOpLifecycle(channel))
   }
 }

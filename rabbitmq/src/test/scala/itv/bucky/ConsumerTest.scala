@@ -57,6 +57,6 @@ class ConsumerTest extends FunSuite {
   }
 
   private def createClient(channel: StubChannel): RawAmqpClient = {
-    new RawAmqpClient(NoOpLifecycle(channel), ConsumerTag("foo"))
+    new RawAmqpClient(NoOpLifecycle(channel))
   }
 }

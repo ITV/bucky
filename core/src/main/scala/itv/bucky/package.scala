@@ -40,7 +40,7 @@ package object bucky {
   case class ConsumerTag(value: String)
 
   object ConsumerTag {
-    val pidAndHost: ConsumerTag = ConsumerTag(ManagementFactory.getRuntimeMXBean.getName)
+    def create(queueName: QueueName): ConsumerTag = ConsumerTag(s"${ManagementFactory.getRuntimeMXBean.getName}-${queueName.value}")
   }
 
   case class Envelope(deliveryTag: Long, redeliver: Boolean, exchangeName: ExchangeName, routingKey: RoutingKey)

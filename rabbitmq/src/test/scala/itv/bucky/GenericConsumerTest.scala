@@ -76,7 +76,7 @@ class GenericConsumerTest extends FunSuite with ScalaFutures {
   }
 
   private def createClient(channel: StubChannel): RawAmqpClient = {
-    new RawAmqpClient(NoOpLifecycle(channel), ConsumerTag("foo"))
+    new RawAmqpClient(NoOpLifecycle(channel))
   }
 
 
