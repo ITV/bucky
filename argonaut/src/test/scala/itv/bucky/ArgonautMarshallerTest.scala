@@ -12,7 +12,7 @@ class ArgonautMarshallerTest extends FunSuite {
 
   test("Can marshall a foo") {
     import Foo._
-    val marshaller: PayloadMarshaller[Foo] = toMarshaller
+    val marshaller: PayloadMarshaller[Foo] = marshallerFromEncodeJson
 
     val foo = Foo("bar")
     marshaller(foo) shouldBe Payload.from(foo.asJson)
