@@ -8,7 +8,7 @@ import org.scalatest.Assertions._
 object UnmarshalResultOps {
 
   implicit class UnmarshalResultOps[T](result: UnmarshalResult[T]) {
-    def get: T = result match {
+    def success: T = result match {
       case Success(actualElem) => actualElem
       case Failure(reason, cause) =>
         val message = s"Unmarshal result ops for $reason"
