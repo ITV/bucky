@@ -49,6 +49,27 @@ lazy val test = project
     )
   )
 
+
+lazy val argonaut = project
+  .settings(name := "itv")
+  .settings(moduleName := "bucky-argonaut")
+  .settings(kernelSettings: _*)
+  .aggregate(core, test)
+  .dependsOn(core, test % "test,it")
+  .configs(IntegrationTest)
+  .settings(Defaults.itSettings)
+  .settings(
+    internalDependencyClasspath in IntegrationTest += Attributed.blank((classDirectory in Test).value),
+    parallelExecution in IntegrationTest := false
+  )
+  .settings(
+    libraryDependencies ++= Seq(
+      "io.argonaut" %% "argonaut" % "6.1",
+      "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
+      "org.scalatest" %% "scalatest" % scalaTestVersion % "test, it"
+    )
+  )
+
 lazy val rabbitmq = project
   .settings(name := "itv")
   .settings(moduleName := "bucky-rabbitmq")
