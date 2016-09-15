@@ -86,7 +86,7 @@ lazy val rabbitmq = project
     libraryDependencies ++= Seq(
       "com.rabbitmq" % "amqp-client" % amqpClientVersion,
       "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
-      "itv.contentdelivery" %% "contentdelivery-shared-lifecycle" % contentDeliverySharedVersion,
+      "com.itv" %% "lifecycle" % "0.3",
       "org.scalatest" %% "scalatest" % scalaTestVersion % "test, it",
       "io.netty" % "netty" % "3.4.2.Final" % "test,it",
       "com.typesafe" % "config" % "1.2.1" % "it"
