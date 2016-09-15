@@ -8,8 +8,7 @@ import scala.xml.{Elem, XML}
 
 object XmlSupport {
 
-  def unmarshallerToElem: PayloadUnmarshaller[Elem] =
-    StringPayloadUnmarshaller.flatMap {
+  def unmarshallerToElem: PayloadUnmarshaller[Elem] = StringPayloadUnmarshaller.flatMap {
       Unmarshaller.liftResult { value =>
           Try(XML.loadString(value)) match {
             case Success(elem) => UnmarshalResult.Success.apply(elem)
