@@ -4,7 +4,7 @@ import java.util.concurrent.TimeUnit
 
 import com.typesafe.scalalogging.StrictLogging
 import itv.bucky.decl.{Binding, Exchange, Queue}
-import itv.contentdelivery.lifecycle.Lifecycle
+import com.itv.lifecycle.Lifecycle
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.{Duration, FiniteDuration}

@@ -3,7 +3,7 @@ package itv.bucky
 import java.io.File
 
 import itv.bucky.decl.{Declaration, DeclarationLifecycle, Queue}
-import itv.contentdelivery.lifecycle.{Lifecycle, NoOpLifecycle}
+import com.itv.lifecycle.{Lifecycle, NoOpLifecycle}
 
 import scala.concurrent.ExecutionContext
 

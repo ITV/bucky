@@ -4,7 +4,7 @@ import itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import itv.bucky.PublishCommandBuilder._
 import itv.bucky.SameThreadExecutionContext.implicitly
 import itv.bucky._
-import itv.contentdelivery.lifecycle.Lifecycle
+import com.itv.lifecycle.Lifecycle
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.ScalaFutures

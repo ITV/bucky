@@ -6,7 +6,7 @@ import java.util.concurrent.TimeoutException
 import com.rabbitmq.client._
 import com.rabbitmq.client.impl.AMQImpl
 import itv.bucky.TestUtils._
-import itv.contentdelivery.lifecycle.{Lifecycle, NoOpLifecycle}
+import com.itv.lifecycle.{Lifecycle, NoOpLifecycle}
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.ScalaFutures

@@ -3,7 +3,7 @@ package itv.bucky
 import itv.bucky.PublishCommandBuilder._
 import itv.bucky.SameThreadExecutionContext.implicitly
 import itv.bucky.decl.{DeclarationLifecycle, Queue}
-import itv.contentdelivery.lifecycle.Lifecycle
+import com.itv.lifecycle.Lifecycle
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.Eventually._

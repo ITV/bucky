@@ -3,7 +3,7 @@ package itv.bucky
 import com.typesafe.scalalogging.StrictLogging
 import itv.bucky.SameThreadExecutionContext.implicitly
 import itv.bucky.TestUtils._
-import itv.contentdelivery.lifecycle.Lifecycle
+import com.itv.lifecycle.Lifecycle
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.ScalaFutures

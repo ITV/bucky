@@ -1,7 +1,7 @@
 package itv.bucky
 
 import com.rabbitmq.client.impl.AMQImpl.Basic
-import itv.contentdelivery.lifecycle.{Lifecycle, NoOpLifecycle}
+import com.itv.lifecycle.{Lifecycle, NoOpLifecycle}
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.ScalaFutures

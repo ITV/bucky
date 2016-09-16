@@ -5,7 +5,7 @@ name := "bucky"
 
 organization := "itv"
 
-val contentDeliverySharedVersion = "1.0-591"
+val itvLifecycleVersion = "0.3"
 val amqpClientVersion = "3.3.1"
 val scalaLoggingVersion = "3.1.0"
 val scalaTestVersion = "2.2.1"
@@ -14,8 +14,6 @@ val mockitoVersion = "1.9.0"
 lazy val kernelSettings = Seq(
   scalaVersion := "2.11.8",
   scalacOptions ++= Seq("-feature", "-deprecation", "-Xfatal-warnings"),
-  //grab some dependencies from on-premise artifactory for now, until they have been migrated over to artifactory-online
-  resolvers += "ITV Libraries" at "http://cpp-artifactory.cpp.o.itv.net.uk:8081/artifactory/libs-release-local/",
   credentials += Credentials(Path.userHome / ".ivy2" / ".credentials"),
   publishTo in ThisBuild := Some("Artifactory Realm" at "https://itvrepos.artifactoryonline.com/itvrepos/cd-scala-libs")
 )
@@ -26,7 +24,7 @@ lazy val core = project
   .settings(kernelSettings: _*)
   .settings(
     libraryDependencies ++= Seq(
-      "itv.contentdelivery" %% "contentdelivery-shared-lifecycle" % contentDeliverySharedVersion,
+      "com.itv" %% "lifecycle" % itvLifecycleVersion,
       "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
       "org.scalatest" %% "scalatest" % scalaTestVersion % "test",
       "org.mockito" % "mockito-core" % mockitoVersion % "test"
@@ -42,7 +40,7 @@ lazy val test = project
   .dependsOn(core)
   .settings(
     libraryDependencies ++= Seq(
-      "itv.contentdelivery" %% "contentdelivery-shared-lifecycle" % contentDeliverySharedVersion,
+      "com.itv" %% "lifecycle" % itvLifecycleVersion,
       "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
       "org.apache.qpid" % "qpid-broker" % "6.0.4",
       "org.scalatest" %% "scalatest" % scalaTestVersion
@@ -106,9 +104,9 @@ lazy val rabbitmq = project
   )
   .settings(
     libraryDependencies ++= Seq(
+      "com.itv" %% "lifecycle" % itvLifecycleVersion,
       "com.rabbitmq" % "amqp-client" % amqpClientVersion,
       "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
-      "com.itv" %% "lifecycle" % "0.3",
       "org.scalatest" %% "scalatest" % scalaTestVersion % "test, it",
       "io.netty" % "netty" % "3.4.2.Final" % "test,it",
       "com.typesafe" % "config" % "1.2.1" % "it"

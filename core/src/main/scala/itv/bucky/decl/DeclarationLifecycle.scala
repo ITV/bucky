@@ -3,7 +3,7 @@ package itv.bucky.decl
 import com.typesafe.scalalogging.StrictLogging
 import itv.bucky.AmqpClient
 
-import itv.contentdelivery.lifecycle.VanillaLifecycle
+import com.itv.lifecycle.VanillaLifecycle
 
 import scala.concurrent.{Await, ExecutionContext}
 import scala.concurrent.duration.FiniteDuration

@@ -7,7 +7,7 @@ import java.util.concurrent.atomic.AtomicLong
 import com.typesafe.scalalogging.StrictLogging
 import itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import itv.bucky.decl.{Binding, Exchange, Queue}
-import itv.contentdelivery.lifecycle.{Lifecycle, NoOpLifecycle}
+import com.itv.lifecycle.{Lifecycle, NoOpLifecycle}
 
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable.ListBuffer

@@ -3,7 +3,7 @@ package itv.bucky
 import java.io.File
 
 import com.google.common.io.Files
-import itv.contentdelivery.lifecycle.Lifecycle
+import com.itv.lifecycle.Lifecycle
 import org.apache.qpid.server.logging.QpidLoggerTurboFilter
 import org.apache.qpid.server.store.MemoryMessageStore
 import org.apache.qpid.server.{Broker, BrokerOptions}

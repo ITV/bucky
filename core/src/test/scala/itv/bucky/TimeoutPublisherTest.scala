@@ -2,7 +2,7 @@ package itv.bucky
 
 import java.util.concurrent.{ScheduledExecutorService, TimeoutException}
 
-import itv.contentdelivery.lifecycle.{ExecutorLifecycles, Lifecycle}
+import com.itv.lifecycle.{ExecutorLifecycles, Lifecycle}
 import org.mockito.Matchers.any
 import org.mockito.Mockito.when
 import org.mockito.invocation.InvocationOnMock

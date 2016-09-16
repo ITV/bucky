@@ -2,7 +2,7 @@ package itv.bucky
 
 import com.typesafe.config.ConfigFactory
 import itv.bucky.decl._
-import itv.contentdelivery.lifecycle.Lifecycle
+import com.itv.lifecycle.Lifecycle
 
 import scala.concurrent.duration._
 

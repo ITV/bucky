@@ -5,7 +5,7 @@ import itv.bucky.SameThreadExecutionContext.implicitly
 import itv.bucky.Unmarshaller._
 import itv.bucky.decl.{DeclarationLifecycle, Exchange, Queue}
 import itv.bucky.pattern.requeue._
-import itv.contentdelivery.lifecycle.Lifecycle
+import com.itv.lifecycle.Lifecycle
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.ScalaFutures

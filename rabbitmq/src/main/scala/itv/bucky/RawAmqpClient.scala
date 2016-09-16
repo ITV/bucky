@@ -5,7 +5,7 @@ import java.util.concurrent.TimeUnit
 import com.rabbitmq.client.AMQP.BasicProperties
 import com.rabbitmq.client._
 import com.typesafe.scalalogging.StrictLogging
-import itv.contentdelivery.lifecycle.{ExecutorLifecycles, Lifecycle, NoOpLifecycle}
+import com.itv.lifecycle._
 
 import scala.collection.convert.wrapAsScala.collectionAsScalaIterable
 import scala.concurrent.duration.{Duration, FiniteDuration}

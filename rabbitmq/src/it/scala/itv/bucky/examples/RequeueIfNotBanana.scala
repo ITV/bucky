@@ -7,7 +7,7 @@ import com.typesafe.scalalogging.StrictLogging
 import itv.bucky._
 import itv.bucky.pattern.requeue._
 import itv.bucky.decl.DeclarationLifecycle
-import itv.contentdelivery.lifecycle.Lifecycle
+import com.itv.lifecycle.Lifecycle
 import itv.bucky.PublishCommandBuilder._
 import itv.bucky.Unmarshaller._
 

@@ -7,7 +7,7 @@ import org.scalatest.concurrent.ScalaFutures
 import scala.concurrent.duration._
 import org.scalatest.Matchers._
 import SameThreadExecutionContext.implicitly
-import itv.contentdelivery.lifecycle.Lifecycle
+import com.itv.lifecycle.Lifecycle
 import itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import itv.bucky.decl._
 

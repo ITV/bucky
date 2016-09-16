@@ -3,7 +3,7 @@ package itv.bucky.pattern
 import itv.bucky.Unmarshaller._
 import itv.bucky._
 import itv.bucky.decl._
-import itv.contentdelivery.lifecycle.Lifecycle
+import com.itv.lifecycle.Lifecycle
 
 import scala.concurrent.duration._
 

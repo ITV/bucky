@@ -2,7 +2,7 @@ package itv.bucky
 
 import com.rabbitmq.client.{Channel, Connection, ConnectionFactory}
 import com.typesafe.scalalogging.StrictLogging
-import itv.contentdelivery.lifecycle.{Lifecycle, VanillaLifecycle}
+import com.itv.lifecycle.{Lifecycle, VanillaLifecycle}
 
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}

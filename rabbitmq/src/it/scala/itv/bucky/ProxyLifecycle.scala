@@ -4,7 +4,7 @@ import java.net.InetSocketAddress
 import java.util.concurrent.Executors
 
 import com.typesafe.scalalogging.StrictLogging
-import itv.contentdelivery.lifecycle.VanillaLifecycle
+import com.itv.lifecycle.VanillaLifecycle
 import org.jboss.netty.bootstrap.{ClientBootstrap, ServerBootstrap}
 import org.jboss.netty.buffer.ChannelBuffers
 import org.jboss.netty.channel.group.{ChannelGroup, DefaultChannelGroup}
