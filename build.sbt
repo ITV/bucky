@@ -10,6 +10,7 @@ val amqpClientVersion = "3.3.1"
 val scalaLoggingVersion = "3.1.0"
 val scalaTestVersion = "2.2.1"
 val mockitoVersion = "1.9.0"
+val argonautVersion = "6.1"
 
 lazy val kernelSettings = Seq(
   scalaVersion := "2.11.8",
@@ -47,6 +48,21 @@ lazy val test = project
     )
   )
 
+lazy val example = project
+  .settings(name := "itv")
+  .settings(moduleName := "bucky-example")
+  .settings(kernelSettings: _*)
+  .aggregate(core, rabbitmq, argonaut)
+  .dependsOn(core, rabbitmq, argonaut)
+  .settings(
+    libraryDependencies ++= Seq(
+      "io.argonaut" %% "argonaut" % argonautVersion,
+      "com.itv" %% "lifecycle" % itvLifecycleVersion,
+      "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
+      "org.apache.qpid" % "qpid-broker" % "6.0.4",
+      "org.scalatest" %% "scalatest" % scalaTestVersion
+    )
+  )
 
 lazy val argonaut = project
   .settings(name := "itv")
@@ -62,7 +78,7 @@ lazy val argonaut = project
   )
   .settings(
     libraryDependencies ++= Seq(
-      "io.argonaut" %% "argonaut" % "6.1",
+      "io.argonaut" %% "argonaut" % argonautVersion,
       "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
       "org.scalatest" %% "scalatest" % scalaTestVersion % "test, it"
     )
