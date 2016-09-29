@@ -21,6 +21,7 @@ case class AmqpClientLifecycle(config: AmqpClientConfig) extends Lifecycle[AmqpC
       connectionFactory.setPassword(config.password)
       connectionFactory.setAutomaticRecoveryEnabled(config.networkRecoveryInterval.isDefined)
       config.networkRecoveryInterval.map(_.toMillis.toInt).foreach(connectionFactory.setNetworkRecoveryInterval)
+      config.virtualHost.foreach(connectionFactory.setVirtualHost)
       connectionFactory.newConnection()
     } match {
       case Success(connection) =>
@@ -48,7 +49,8 @@ case class AmqpClientConfig(
                              port: Int,
                              username: String,
                              password: String,
-                             networkRecoveryInterval: Option[FiniteDuration] = Some(5.seconds))
+                             networkRecoveryInterval: Option[FiniteDuration] = Some(5.seconds),
+                             virtualHost: Option[String] = None)
 
 case class AmqpChannelLifecycle(connection: Connection) extends VanillaLifecycle[Channel] with StrictLogging {
   override def start(): Channel =
