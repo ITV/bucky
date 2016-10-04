@@ -153,6 +153,10 @@ class RawAmqpClient(channelFactory: Lifecycle[Channel]) extends AmqpClient with 
         queue.shouldAutoDelete,
         queue.arguments.asJava)
     }
+
+    override def definePrefetchCount(prefetchCount: Int): Try[Unit] = Try {
+      channel.basicQos(prefetchCount)
+    }
   }
 
   override def performOps(thunk: (AmqpOps) => Try[Unit]): Try[Unit] =

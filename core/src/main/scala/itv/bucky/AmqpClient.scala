@@ -28,6 +28,7 @@ trait AmqpClient {
 }
 
 trait AmqpOps {
+  def definePrefetchCount(prefetchCount: Int): Try[Unit]
   def declareQueue(queue: Queue): Try[Unit]
   def declareExchange(echange: Exchange): Try[Unit]
   def bindQueue(binding: Binding): Try[Unit]
