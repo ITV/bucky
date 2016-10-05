@@ -45,9 +45,10 @@ package object requeue {
                             requeuePolicy: RequeuePolicy,
                             unmarshaller: PayloadUnmarshaller[T],
                             onFailure: RequeueConsumeAction = Requeue,
-                            unmarshalFailureAction: RequeueConsumeAction = DeadLetter)
+                            unmarshalFailureAction: RequeueConsumeAction = DeadLetter,
+                            prefetchCount: Int = 0)
                            (implicit ec: ExecutionContext): Lifecycle[Unit] = {
-      requeueDeliveryHandlerOf(queueName, handler, requeuePolicy, toDeliveryUnmarshaller(unmarshaller), onFailure, unmarshalFailureAction)
+      requeueDeliveryHandlerOf(queueName, handler, requeuePolicy, toDeliveryUnmarshaller(unmarshaller), onFailure, unmarshalFailureAction, prefetchCount)
     }
 
     def requeueDeliveryHandlerOf[T](
@@ -56,21 +57,23 @@ package object requeue {
                                      requeuePolicy: RequeuePolicy,
                                      unmarshaller: DeliveryUnmarshaller[T],
                                      onFailure: RequeueConsumeAction = Requeue,
-                                     unmarshalFailureAction: RequeueConsumeAction = DeadLetter)
+                                     unmarshalFailureAction: RequeueConsumeAction = DeadLetter,
+                                     prefetchCount: Int = 0)
                                    (implicit ec: ExecutionContext): Lifecycle[Unit] = {
       val deserializeHandler = new DeliveryUnmarshalHandler[T, RequeueConsumeAction](unmarshaller)(handler, unmarshalFailureAction)
-      requeueOf(queueName, deserializeHandler, requeuePolicy)
+      requeueOf(queueName, deserializeHandler, requeuePolicy, prefetchCount = prefetchCount)
     }
 
     def requeueOf(queueName: QueueName,
                   handler: RequeueHandler[Delivery],
                   requeuePolicy: RequeuePolicy,
-                  onFailure: RequeueConsumeAction = Requeue)
+                  onFailure: RequeueConsumeAction = Requeue,
+                  prefetchCount: Int = 0)
                  (implicit ec: ExecutionContext): Lifecycle[Unit] = {
       val requeueExchange = ExchangeName(s"${queueName.value}.requeue")
       for {
         requeuePublish <- amqpClient.publisher()
-        consumer <- amqpClient.consumer(queueName, RequeueTransformer(requeuePublish, requeueExchange, requeuePolicy, onFailure)(handler))
+        consumer <- amqpClient.consumer(queueName, RequeueTransformer(requeuePublish, requeueExchange, requeuePolicy, onFailure)(handler), prefetchCount = prefetchCount)
       } yield consumer
     }
 
