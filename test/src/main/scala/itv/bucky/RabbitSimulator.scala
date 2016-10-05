@@ -40,7 +40,7 @@ class RabbitSimulator(bindings: Bindings = IdentityBindings)(implicit executionC
   private val deliveryTag = new AtomicLong()
 
 
-  def consumer(queueName: QueueName, handler: Handler[Delivery], exceptionalAction: ConsumeAction = DeadLetter)(implicit executionContext: ExecutionContext): Lifecycle[Unit] = NoOpLifecycle {
+  def consumer(queueName: QueueName, handler: Handler[Delivery], exceptionalAction: ConsumeAction = DeadLetter, prefetchCount: Int = 0)(implicit executionContext: ExecutionContext): Lifecycle[Unit] = NoOpLifecycle {
     val monitorHandler: Handler[Delivery] = delivery => {
       val key = UUID.randomUUID()
       val consumeActionValue = handler(delivery)
@@ -103,7 +103,6 @@ class RabbitSimulator(bindings: Bindings = IdentityBindings)(implicit executionC
 
       override def declareQueue(queue: Queue): Try[Unit] = Try(())
 
-      override def definePrefetchCount(prefetchCount: Int): Try[Unit] = ???
     }))
 
   override def estimatedMessageCount(queueName: QueueName): Try[Int] = {

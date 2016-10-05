@@ -16,8 +16,10 @@ class ConsumerTest extends FunSuite {
 
     val handler = new StubConsumeHandler[Delivery]()
 
-    Lifecycle.using(client.consumer(QueueName("blah"), handler)) { _ =>
+    Lifecycle.using(client.consumer(QueueName("blah"), handler, prefetchCount = 12)) { _ =>
       channel.consumers should have size 1
+      channel.setPrefetchCount shouldBe 12
+
       val msg = Payload.from("Hello World!")
 
       handler.nextResponse = Future.successful(Ack)

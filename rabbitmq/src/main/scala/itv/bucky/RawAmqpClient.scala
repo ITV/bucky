@@ -16,14 +16,15 @@ import itv.bucky.decl.{Binding, Exchange, Queue}
 
 class RawAmqpClient(channelFactory: Lifecycle[Channel]) extends AmqpClient with StrictLogging {
 
-  def consumer(queueName: QueueName, handler: Handler[Delivery], actionOnFailure: ConsumeAction = DeadLetter)
+  def consumer(queueName: QueueName, handler: Handler[Delivery], actionOnFailure: ConsumeAction = DeadLetter, prefetchCount: Int = 0)
               (implicit executionContext: ExecutionContext): Lifecycle[Unit] =
     for {
       channel <- channelFactory
     } yield {
       val consumerTag: ConsumerTag = ConsumerTag.create(queueName)
-      logger.info(s"Starting consumer on $queueName with $consumerTag")
+      logger.info(s"Starting consumer on $queueName with $consumerTag and a prefetchCount of ")
       Try {
+        channel.basicQos(prefetchCount)
         channel.basicConsume(queueName.value, false, consumerTag.value, new DefaultConsumer(channel) {
           override def handleDelivery(consumerTag: String, envelope: RabbitMQEnvelope, properties: BasicProperties, body: Array[Byte]): Unit = {
             val delivery = Delivery(Payload(body), ConsumerTag(consumerTag), MessagePropertiesConverters(envelope), MessagePropertiesConverters(properties))
@@ -154,9 +155,6 @@ class RawAmqpClient(channelFactory: Lifecycle[Channel]) extends AmqpClient with 
         queue.arguments.asJava)
     }
 
-    override def definePrefetchCount(prefetchCount: Int): Try[Unit] = Try {
-      channel.basicQos(prefetchCount)
-    }
   }
 
   override def performOps(thunk: (AmqpOps) => Try[Unit]): Try[Unit] =

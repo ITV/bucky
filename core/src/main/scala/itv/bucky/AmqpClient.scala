@@ -18,7 +18,7 @@ trait AmqpClient {
 
   def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): Lifecycle[Publisher[PublishCommand]]
 
-  def consumer(queueName: QueueName, handler: Handler[Delivery], exceptionalAction: ConsumeAction = DeadLetter)
+  def consumer(queueName: QueueName, handler: Handler[Delivery], exceptionalAction: ConsumeAction = DeadLetter, prefetchCount: Int = 0)
               (implicit executionContext: ExecutionContext): Lifecycle[Unit]
 
   def performOps(thunk: AmqpOps => Try[Unit]): Try[Unit]
@@ -28,7 +28,6 @@ trait AmqpClient {
 }
 
 trait AmqpOps {
-  def definePrefetchCount(prefetchCount: Int): Try[Unit]
   def declareQueue(queue: Queue): Try[Unit]
   def declareExchange(echange: Exchange): Try[Unit]
   def bindQueue(binding: Binding): Try[Unit]
