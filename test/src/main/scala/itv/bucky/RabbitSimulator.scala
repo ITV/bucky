@@ -35,7 +35,7 @@ class RabbitSimulator(bindings: Bindings = IdentityBindings)(implicit executionC
 
   private val declarations = scala.collection.mutable.HashMap.empty[(ExchangeName, RoutingKey), QueueName]
 
-  private val consumers = new scala.collection.mutable.HashMap[QueueName, Handler[Delivery]]()
+  private val consumers = new scala.collection.mutable.HashMap[QueueName, List[Handler[Delivery]]]()
   private val messagesBeingProcessed: TrieMap[UUID, Publication] = TrieMap.empty
   private val deliveryTag = new AtomicLong()
 
@@ -52,7 +52,8 @@ class RabbitSimulator(bindings: Bindings = IdentityBindings)(implicit executionC
       }
       consumeActionValue
     }
-    consumers += (queueName -> monitorHandler)
+    val handlers = monitorHandler :: consumers.getOrElse(queueName, List.empty)
+    consumers += (queueName -> handlers)
   }
 
   def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): Lifecycle[Publisher[PublishCommand]] =
@@ -66,8 +67,9 @@ class RabbitSimulator(bindings: Bindings = IdentityBindings)(implicit executionC
     logger.debug(s"Publish message [${publishCommand.body.unmarshal[String]}] with ${publishCommand.exchange} ${publishCommand.routingKey}")
     if (isDefinedAt(publishCommand)) {
       val queueName = queueNameFor(publishCommand)
-      consumers.get(queueName).fold(Future.failed[ConsumeAction](new RuntimeException(s"No consumers found for $queueName!"))) { handler =>
-        handler(Delivery(publishCommand.body, ConsumerTag("ctag"), Envelope(deliveryTag.getAndIncrement(), false, publishCommand.exchange, publishCommand.routingKey), publishCommand.basicProperties))
+      consumers.get(queueName).fold(Future.failed[ConsumeAction](new RuntimeException(s"No consumers found for $queueName!"))) { handlers =>
+        val responses = handlers.map (h => h(Delivery(publishCommand.body, ConsumerTag("ctag"), Envelope(deliveryTag.getAndIncrement(), false, publishCommand.exchange, publishCommand.routingKey), publishCommand.basicProperties)))
+        Future.sequence(responses).map(actions => actions.find(_ != Ack).getOrElse(Ack))
       }
     } else
       Future.failed(new RuntimeException(s"No queue defined for ${publishCommand.exchange} ${publishCommand.routingKey}"))

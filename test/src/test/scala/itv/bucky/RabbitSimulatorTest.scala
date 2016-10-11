@@ -32,6 +32,28 @@ class RabbitSimulatorTest extends FunSuite with ScalaFutures {
     messages.last.body.unmarshal[String] shouldBe "world".unmarshalSuccess
   }
 
+  test("Can publish and consume in multiple queues via simulator") {
+    val rabbit = new RabbitSimulator()
+
+    val messages = rabbit.watchQueue(QueueName("my.routing.key"))
+    val messages2 = rabbit.watchQueue(QueueName("my.routing.key"))
+
+
+    val commandBuilder = defaultPublishCommandBuilder using RoutingKey("my.routing.key")
+
+    rabbit.publish(commandBuilder.toPublishCommand("Hello")).futureValue shouldBe Ack
+    rabbit.publish(commandBuilder.toPublishCommand("world")).futureValue shouldBe Ack
+
+    rabbit.waitForMessagesToBeProcessed()(1.second)
+    messages should have size 2
+    messages2 should have size 2
+
+    messages.head.body.unmarshal[String] shouldBe "Hello".unmarshalSuccess
+    messages.last.body.unmarshal[String] shouldBe "world".unmarshalSuccess
+    messages2.head.body.unmarshal[String] shouldBe "Hello".unmarshalSuccess
+    messages2.last.body.unmarshal[String] shouldBe "world".unmarshalSuccess
+  }
+
 
   test("Can publish and consume via simulator with an exchange and different queues") {
     val rabbit = new RabbitSimulator()
