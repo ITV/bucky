@@ -10,6 +10,22 @@ package object bucky {
   type Handler[-T] = T => Future[ConsumeAction]
   type RequeueHandler[-T] = T => Future[RequeueConsumeAction]
 
+  object Handler {
+    def apply[T](f: T => Future[ConsumeAction]): Handler[T] =
+      new Handler[T] {
+        override def apply(message: T): Future[ConsumeAction] =
+          f(message)
+      }
+  }
+
+  object RequeueHandler {
+    def apply[T](f: T => Future[RequeueConsumeAction]): RequeueHandler[T] =
+      new RequeueHandler[T] {
+        override def apply(message: T): Future[RequeueConsumeAction] =
+          f(message)
+      }
+  }
+
   type Bindings = PartialFunction[RoutingKey, QueueName]
 
   type PayloadUnmarshaller[T] = Unmarshaller[Payload, T]
