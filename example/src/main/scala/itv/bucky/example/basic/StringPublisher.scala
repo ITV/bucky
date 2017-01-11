@@ -1,4 +1,4 @@
-package itv.bucky.example.publisher.basic
+package itv.bucky.example.basic
 
 import com.itv.lifecycle.Lifecycle
 import itv.bucky.PayloadMarshaller.StringPayloadMarshaller

@@ -1,33 +1,31 @@
-package itv.bucky.example.publisher.basic
+package itv.bucky.example.argonaut
 
 import com.itv.lifecycle.Lifecycle
-import itv.bucky.Unmarshaller.StringPayloadUnmarshaller
+import com.typesafe.scalalogging.StrictLogging
 import itv.bucky._
 import itv.bucky.decl.{DeclarationLifecycle, Queue}
-
+import itv.bucky.example.argonaut.Shared.Person
 import scala.concurrent.ExecutionContext.Implicits.global
+
 import scala.concurrent.Future
 
 /*
-This example aims to give a minimal structure to:
-* Declare a queue
-* Print any Strings to a stdout
-It is not very useful by itself, but hopefully reveals the structure of how Bucky components fit together
+  The only difference between this and itv.bucky.example.marshalling.UnmarshalledConsumer
+  is the way the PayloadUnmarshaller is defined in itv.bucky.example.argonaut.Shared!
  */
-
-object StringConsumer extends App {
+object ArgonautUnmarshalledConsumer extends App with StrictLogging {
 
   object Declarations {
-    val queue = Queue(QueueName("queue.string"))
+    val queue = Queue(QueueName("queue.people.argonaut"))
     val all = List(queue)
   }
 
   val amqpClientConfig: AmqpClientConfig = AmqpClientConfig("33.33.33.11", 5672, "guest", "guest")
 
-  val stringToStdoutHandler =
-    Handler { message: String =>
-      Future.successful {
-        println(message)
+  val personHandler =
+    Handler { message: Person =>
+      Future {
+        logger.info(s"${message.name} is ${message.age} years old")
         Ack
       }
     }
@@ -40,7 +38,7 @@ object StringConsumer extends App {
     for {
       amqpClient <- AmqpClientLifecycle(amqpClientConfig)
       _ <- DeclarationLifecycle(Declarations.all, amqpClient)
-      _ <- amqpClient.consumer(Declarations.queue.queueName, AmqpClient.handlerOf(stringToStdoutHandler, StringPayloadUnmarshaller))
+      _ <- amqpClient.consumer(Declarations.queue.queueName, AmqpClient.handlerOf(personHandler, Shared.personUnmarshaller))
     }
       yield ()
 
