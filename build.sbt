@@ -5,7 +5,7 @@ name := "bucky"
 
 organization := "itv"
 
-val itvLifecycleVersion = "0.3"
+val itvLifecycleVersion = "0.5"
 val amqpClientVersion = "3.3.1"
 val scalaLoggingVersion = "3.1.0"
 val scalaTestVersion = "2.2.1"
