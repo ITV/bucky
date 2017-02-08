@@ -10,12 +10,12 @@ import itv.bucky.example.marshalling.Shared.Person
 import scala.concurrent.duration._
 import scala.concurrent._
 
-object MarshalledPublisher extends App {
+object MarshallingPublisher extends App {
 
   object Declarations {
     val queue = Queue(QueueName("queue.people"))
     val routingKey = RoutingKey("personPublisherRoutingKey")
-    val exchange = Exchange(ExchangeName("exchange.person-publisher")).binding(routingKey -> queue.queueName)
+    val exchange = Exchange(ExchangeName("exchange.person-publisher")).binding(routingKey -> queue.name)
 
     val all = List(queue, exchange)
   }
@@ -24,7 +24,7 @@ object MarshalledPublisher extends App {
 
   /**
     * A publisher delivers a message of a fixed type to an exchange.
-    * The routing key (along with exchange configuration) determine where the message will reach.
+    * The routing key, along with exchange name, determine where the message will reach.
     */
   val publisherConfig =
     publishCommandBuilder(Shared.personMarshaller) using Declarations.routingKey using Declarations.exchange.name

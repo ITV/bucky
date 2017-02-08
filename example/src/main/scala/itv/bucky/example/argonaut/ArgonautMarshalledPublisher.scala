@@ -20,7 +20,7 @@ object ArgonautMarshalledPublisher extends App {
   object Declarations {
     val queue = Queue(QueueName("queue.people.argonaut"))
     val routingKey = RoutingKey("personArgonautPublisherRoutingKey")
-    val exchange = Exchange(ExchangeName("exchange.person-publisher")).binding(routingKey -> queue.queueName)
+    val exchange = Exchange(ExchangeName("exchange.person-publisher")).binding(routingKey -> queue.name)
 
     val all = List(queue, exchange)
   }

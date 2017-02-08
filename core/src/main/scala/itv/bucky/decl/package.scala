@@ -86,7 +86,7 @@ package object decl {
     }
   }
 
-  case class Queue(queueName: QueueName,
+  case class Queue(name: QueueName,
                    isDurable: Boolean = true,
                    isExclusive: Boolean = false,
                    shouldAutoDelete: Boolean = false,

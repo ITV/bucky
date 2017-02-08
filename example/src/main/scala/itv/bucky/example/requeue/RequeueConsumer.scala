@@ -15,7 +15,7 @@ object RequeueConsumer extends App with StrictLogging {
 
   object Declarations {
     val queue = Queue(QueueName("requeue.string"))
-    val all = List(queue) ++ basicRequeueDeclarations(queue.queueName)
+    val all = List(queue) ++ basicRequeueDeclarations(queue.name)
   }
 
   val amqpClientConfig: AmqpClientConfig = AmqpClientConfig("33.33.33.11", 5672, "guest", "guest")
@@ -43,7 +43,7 @@ object RequeueConsumer extends App with StrictLogging {
     for {
       amqpClient <- AmqpClientLifecycle(amqpClientConfig)
       _ <- DeclarationLifecycle(Declarations.all, amqpClient)
-      _ <- amqpClient.requeueHandlerOf(Declarations.queue.queueName, stringToLogRequeueHandler, requeuePolicy, StringPayloadUnmarshaller)
+      _ <- amqpClient.requeueHandlerOf(Declarations.queue.name, stringToLogRequeueHandler, requeuePolicy, StringPayloadUnmarshaller)
     }
       yield ()
 

@@ -41,7 +41,7 @@ object StringConsumer extends App with StrictLogging {
     for {
       amqpClient <- AmqpClientLifecycle(amqpClientConfig)
       _ <- DeclarationLifecycle(Declarations.all, amqpClient)
-      _ <- amqpClient.consumer(Declarations.queue.queueName, AmqpClient.handlerOf(stringToLogHandler, StringPayloadUnmarshaller))
+      _ <- amqpClient.consumer(Declarations.queue.name, AmqpClient.handlerOf(stringToLogHandler, StringPayloadUnmarshaller))
     }
       yield ()
 

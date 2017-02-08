@@ -9,7 +9,7 @@ import itv.bucky.example.marshalling.Shared.Person
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-object UnmarshalledConsumer extends App with StrictLogging {
+object UnmarshallingConsumer extends App with StrictLogging {
 
   object Declarations {
     val queue = Queue(QueueName("queue.people"))
@@ -34,7 +34,7 @@ object UnmarshalledConsumer extends App with StrictLogging {
     for {
       amqpClient <- AmqpClientLifecycle(amqpClientConfig)
       _ <- DeclarationLifecycle(Declarations.all, amqpClient)
-      _ <- amqpClient.consumer(Declarations.queue.queueName, AmqpClient.handlerOf(personHandler, Shared.personUnmarshaller))
+      _ <- amqpClient.consumer(Declarations.queue.name, AmqpClient.handlerOf(personHandler, Shared.personUnmarshaller))
     }
       yield ()
 

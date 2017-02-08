@@ -38,7 +38,7 @@ object ArgonautUnmarshalledConsumer extends App with StrictLogging {
     for {
       amqpClient <- AmqpClientLifecycle(amqpClientConfig)
       _ <- DeclarationLifecycle(Declarations.all, amqpClient)
-      _ <- amqpClient.consumer(Declarations.queue.queueName, AmqpClient.handlerOf(personHandler, Shared.personUnmarshaller))
+      _ <- amqpClient.consumer(Declarations.queue.name, AmqpClient.handlerOf(personHandler, Shared.personUnmarshaller))
     }
       yield ()
 

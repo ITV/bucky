@@ -22,6 +22,10 @@ package object requeue {
       Exchange(dlxExchangeName).binding(RoutingKey(queueName.value) -> deadLetterQueueName), retryAfter)
   }
 
+  def requeueDeclarations(queueName: QueueName, routingKey: RoutingKey): Iterable[Declaration] = {
+    requeueDeclarations(queueName, routingKey, Exchange(ExchangeName(s"${queueName.value}.dlx")))
+  }
+
   def requeueDeclarations(queueName: QueueName, routingKey: RoutingKey, deadletterExchange: Exchange, retryAfter: FiniteDuration = 5.minutes): Iterable[Declaration] = {
     val deadLetterQueueName: QueueName = QueueName(s"${queueName.value}.dlq")
     val requeueQueueName: QueueName = QueueName(s"${queueName.value}.requeue")

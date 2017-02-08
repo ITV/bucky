@@ -22,7 +22,7 @@ object StringPublisher extends App {
   object Declarations {
     val queue = Queue(QueueName("queue.string"))
     val routingKey = RoutingKey("stringPublisherRoutingKey")
-    val exchange = Exchange(ExchangeName("exchange.string-publisher")).binding(routingKey -> queue.queueName)
+    val exchange = Exchange(ExchangeName("exchange.string-publisher")).binding(routingKey -> queue.name)
 
     val all = List(queue, exchange)
   }

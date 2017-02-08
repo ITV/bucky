@@ -148,7 +148,7 @@ class RawAmqpClient(channelFactory: Lifecycle[Channel]) extends AmqpClient with 
 
     override def declareQueue(queue: Queue): Try[Unit] = Try {
       channel.queueDeclare(
-        queue.queueName.value,
+        queue.name.value,
         queue.isDurable,
         queue.isExclusive,
         queue.shouldAutoDelete,
