@@ -4,16 +4,17 @@ import sbt.Keys._
 name := "bucky"
 
 organization := "itv"
+crossScalaVersions := Seq("2.11.8", "2.12.1")
 
-val itvLifecycleVersion = "0.5"
-val amqpClientVersion = "3.3.1"
-val scalaLoggingVersion = "3.1.0"
+val itvLifecycleVersion = "0.13"
+val amqpClientVersion = "4.0.2"
+val scalaLoggingVersion = "3.5.0"
 val scalaTestVersion = "3.0.1"
 val mockitoVersion = "1.9.0"
-val argonautVersion = "6.1"
+val argonautVersion = "6.2-RC2"
 
 lazy val kernelSettings = Seq(
-  scalaVersion := "2.11.8",
+  scalaVersion := "2.12.1",
   scalacOptions ++= Seq("-feature", "-deprecation", "-Xfatal-warnings"),
   credentials += Credentials(Path.userHome / ".ivy2" / ".credentials"),
   publishTo in ThisBuild := Some("Artifactory Realm" at "https://itvrepos.artifactoryonline.com/itvrepos/cd-scala-libs")

@@ -1,7 +1,5 @@
 package itv.bucky
 
-import java.io.IOException
-
 import com.google.common.util.concurrent.MoreExecutors
 import com.rabbitmq.client.impl.AMQImpl.Basic.ConsumeOk
 import com.rabbitmq.client.impl.AMQImpl.Confirm.SelectOk
@@ -10,7 +8,7 @@ import com.rabbitmq.client.{AMQP, Method, MessageProperties => RMessagePropertie
 
 import scala.collection.mutable.ListBuffer
 
-class StubChannel extends ChannelN(null, 0, new ConsumerWorkService(MoreExecutors.newDirectExecutorService(), null)) {
+class StubChannel extends ChannelN(null, 0, new ConsumerWorkService(MoreExecutors.newDirectExecutorService(), null, 1)) {
 
   val transmittedCommands: ListBuffer[Method] = ListBuffer.empty
   val consumers: ListBuffer[AMQP.Basic.Consume] = ListBuffer.empty

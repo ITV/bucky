@@ -7,9 +7,10 @@ import com.rabbitmq.client._
 import com.typesafe.scalalogging.StrictLogging
 import com.itv.lifecycle._
 
-import scala.collection.convert.wrapAsScala.collectionAsScalaIterable
+import scala.collection.JavaConverters
+
 import scala.concurrent.duration.{Duration, FiniteDuration}
-import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.concurrent.{ExecutionContext, Promise}
 import scala.util.{Failure, Success, Try}
 import com.rabbitmq.client.{Envelope => RabbitMQEnvelope}
 import itv.bucky.decl.{Binding, Exchange, Queue}
@@ -77,7 +78,7 @@ class RawAmqpClient(channelFactory: Lifecycle[Channel]) extends AmqpClient with 
           private def removePromises(deliveryTag: Long, multiple: Boolean): List[Promise[Unit]] = channel.synchronized {
             if (multiple) {
               val entries = unconfirmedPublications.headMap(deliveryTag + 1L)
-              val removedValues = collectionAsScalaIterable(entries.values()).toList
+              val removedValues = JavaConverters.collectionAsScalaIterable(entries.values()).toList
               entries.clear()
               removedValues
             } else {
@@ -121,7 +122,7 @@ class RawAmqpClient(channelFactory: Lifecycle[Channel]) extends AmqpClient with 
   private def publisherWrapperLifecycle(timeout: Duration): Lifecycle[Publisher[PublishCommand] => Publisher[PublishCommand]] = timeout match {
     case finiteTimeout: FiniteDuration =>
       ExecutorLifecycles.singleThreadScheduledExecutor.map(ec => new TimeoutPublisher(_, finiteTimeout)(ec))
-    case infinite => NoOpLifecycle(identity)
+    case _ => NoOpLifecycle(identity)
   }
 
   case class ChannelAmqpOps(channel: Channel) extends AmqpOps {

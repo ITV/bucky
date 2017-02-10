@@ -8,7 +8,7 @@ import itv.bucky.Unmarshaller.StringPayloadUnmarshaller
 object ArgonautSupport {
 
   def unmarshallerFromDecodeJson[T](implicit decode: DecodeJson[T]): PayloadUnmarshaller[T] =
-    StringPayloadUnmarshaller.map(Parse.decodeValidation[T]).flatMap(Unmarshaller.liftResult(res =>
+    StringPayloadUnmarshaller.map(Parse.decodeEither[T]).flatMap(Unmarshaller.liftResult(res =>
       res.fold(UnmarshalResult.Failure(_, None), UnmarshalResult.Success.apply)
     ))
 

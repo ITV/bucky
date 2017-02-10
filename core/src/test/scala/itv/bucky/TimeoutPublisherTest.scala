@@ -27,6 +27,7 @@ class TimeoutPublisherTest extends FunSuite with ScalaFutures {
     val delegate: Publisher[PublishCommand] = {
       case `command1` => Future.fromTry(expectedOutcome1)
       case `command2` => Future.fromTry(expectedOutcome2)
+      case PublishCommand(_, _, _, _) => fail("Unexpected outcome")
     }
     val service = mock[ScheduledExecutorService]
     when(service.execute(any[Runnable]())).thenAnswer(new Answer[Unit] {
