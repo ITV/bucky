@@ -10,7 +10,6 @@ import scala.util.Success
 import scala.util.Random
 import SameThreadExecutionContext._
 import org.scalatest.concurrent.Eventually
-import Eventually._
 
 import scala.concurrent.duration._
 
@@ -28,6 +27,8 @@ class EstimatedMessageCountTest extends FunSuite {
     estimatedMessageCountTest(Random.nextInt(10))
   }
 
+  implicit val patianceConfig: Eventually.PatienceConfig = Eventually.PatienceConfig(timeout = 5.seconds, 1.second)
+
   def estimatedMessageCountTest(messagesToPublish: Int): Unit = {
     val randomQueueName = QueueName("estimatedmessagecount" + Random.nextInt())
 
@@ -40,9 +41,9 @@ class EstimatedMessageCountTest extends FunSuite {
       yield client
 
     Lifecycle.using(clientLifecycle) { client =>
-      eventually {
+      Eventually.eventually {
         client.estimatedMessageCount(randomQueueName) shouldBe Success(messagesToPublish)
-      }(PatienceConfig(timeout = 5.seconds, 1.second))
+      }
     }
   }
 }

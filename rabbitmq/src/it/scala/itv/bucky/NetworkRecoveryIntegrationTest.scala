@@ -6,8 +6,8 @@ import itv.bucky.decl.{DeclarationLifecycle, Queue}
 import com.itv.lifecycle.Lifecycle
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
-import org.scalatest.concurrent.Eventually._
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
+import Eventually.eventually
 
 import scala.concurrent.duration._
 import scala.util.Random
@@ -48,6 +48,8 @@ class NetworkRecoveryIntegrationTest extends FunSuite with ScalaFutures {
       yield (proxy, handlerA, handlerB, publisherA, publisherB)
   }
 
+  implicit val eventuallyPatienceConfig = Eventually.PatienceConfig(5.seconds, 1.second)
+
   test("can recover publishers and consumers from a network failure") {
     Lifecycle.using(testLifecycle) { case (proxy, handlerA, handlerB, publisherA, publisherB) =>
       handlerA.receivedMessages shouldBe 'empty
@@ -60,7 +62,7 @@ class NetworkRecoveryIntegrationTest extends FunSuite with ScalaFutures {
         eventually {
           handlerA.receivedMessages should have size 1
           handlerB.receivedMessages should have size 1
-        }(Eventually.PatienceConfig(5.seconds, 1.second))
+        }
 
         publisherA.apply(()).asTry.futureValue shouldBe 'success
         publisherB.apply(()).asTry.futureValue shouldBe 'success
@@ -68,7 +70,7 @@ class NetworkRecoveryIntegrationTest extends FunSuite with ScalaFutures {
         eventually {
           handlerA.receivedMessages should have size 2
           handlerB.receivedMessages should have size 2
-        }(Eventually.PatienceConfig(5.seconds, 1.second))
+        }
       }
 
       proxy.stopAcceptingNewConnections()
@@ -85,19 +87,19 @@ class NetworkRecoveryIntegrationTest extends FunSuite with ScalaFutures {
         eventually {
           publisherA.apply(()).asTry.futureValue shouldBe 'success
           publisherB.apply(()).asTry.futureValue shouldBe 'success
-        }(Eventually.PatienceConfig(5.seconds, 1.second))
+        }
       }
 
       withClue("should be able to consume from Queue B after broker allows connections again") {
         eventually {
           handlerB.receivedMessages should have size 3
-        }(Eventually.PatienceConfig(5.seconds, 1.second))
+        }
       }
 
       withClue("should be able to consume from Queue A after broker allows connections again") {
         eventually {
           handlerA.receivedMessages should have size 3
-        }(Eventually.PatienceConfig(5.seconds, 1.second))
+        }
       }
     }
   }

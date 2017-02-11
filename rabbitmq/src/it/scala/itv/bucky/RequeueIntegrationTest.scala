@@ -10,7 +10,7 @@ import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.concurrent.Eventually
-import Eventually._
+import Eventually.eventually
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -24,7 +24,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
 
   implicit val intMarshaller: PayloadMarshaller[Int] = StringPayloadMarshaller.contramap(_.toString)
 
-  val requeuePatienceConfig: Eventually.PatienceConfig = Eventually.PatienceConfig(timeout = 60.second, interval = 100.millis)
+  implicit val requeuePatienceConfig: Eventually.PatienceConfig = Eventually.PatienceConfig(timeout = 60.second, interval = 100.millis)
 
   val exchange = ExchangeName("")
 
@@ -42,7 +42,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
       eventually {
         val headersOfReceived = handler.receivedMessages.map(d => getHeader("foo", d.properties))
         headersOfReceived.flatten.toList.length should be > 1
-      }(requeuePatienceConfig)
+      }
     }
   }
 
@@ -57,7 +57,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
 
       eventually {
         handler.receivedMessages.count(_.properties.correlationId == expectedCorrelationId) should be > 1
-      }(requeuePatienceConfig)
+      }
 
     }
   }
@@ -86,7 +86,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
 
       eventually {
         handler.receivedMessages.length should be >= requeuePolicy.maximumProcessAttempts
-      }(requeuePatienceConfig)
+      }
     }
   }
 
@@ -98,7 +98,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
 
       eventually {
         handler.receivedMessages.length should be >= requeuePolicy.maximumProcessAttempts
-      }(requeuePatienceConfig)
+      }
     }
   }
 
@@ -110,7 +110,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
 
       eventually {
         handler.receivedMessages.length should be >= requeuePolicy.maximumProcessAttempts
-      }(requeuePatienceConfig)
+      }
     }
   }
 
@@ -122,7 +122,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
 
       eventually {
         handler.receivedMessages.length should be >= requeuePolicy.maximumProcessAttempts
-      }(requeuePatienceConfig)
+      }
     }
   }
 
@@ -138,7 +138,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
         app.amqpClient.estimatedMessageCount(app.requeueQueueName) shouldBe Success(0)
         handler.receivedMessages.size shouldBe requeuePolicy.maximumProcessAttempts
         app.deadletterQueue.receivedMessages.map(_.body) shouldBe List(payload)
-      }(requeuePatienceConfig)
+      }
     }
   }
 
@@ -156,7 +156,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
         app.amqpClient.estimatedMessageCount(app.requeueQueueName) shouldBe Success(0)
         handler.receivedMessages.size shouldBe 1
         app.deadletterQueue.receivedMessages.map(_.body) shouldBe List(payload)
-      }(requeuePatienceConfig)
+      }
     }
   }
 

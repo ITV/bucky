@@ -8,7 +8,7 @@ organization := "itv"
 val itvLifecycleVersion = "0.5"
 val amqpClientVersion = "3.3.1"
 val scalaLoggingVersion = "3.1.0"
-val scalaTestVersion = "2.2.1"
+val scalaTestVersion = "3.0.1"
 val mockitoVersion = "1.9.0"
 val argonautVersion = "6.1"
 

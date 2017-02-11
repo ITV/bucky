@@ -18,7 +18,6 @@ class StubChannel extends ChannelN(null, 0, new ConsumerWorkService(MoreExecutor
 
   override def quiescingTransmit(c: AMQCommand): Unit = {
     val method = c.getMethod
-    transmittedCommands += method
     method match {
       case _: AMQP.Confirm.Select =>
         replyWith(new SelectOk())
@@ -27,7 +26,14 @@ class StubChannel extends ChannelN(null, 0, new ConsumerWorkService(MoreExecutor
         replyWith(new ConsumeOk(c.getConsumerTag))
       case _: AMQP.Basic.Publish =>
         ()
+      case _: AMQP.Basic.Ack =>
+        ()
+      case _: AMQP.Basic.Nack =>
+        ()
+      case other =>
+        throw new IllegalStateException("StubChannel does not know how to handle " + other)
     }
+    transmittedCommands += method
   }
 
   override def basicQos(prefetchCount: Int): Unit = {

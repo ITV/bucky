@@ -42,7 +42,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogg
         handler.receivedMessages should have size 1
 
         handler.receivedMessages.head shouldBe Message(expectedMessage)
-      }(consumerPatienceConfig)
+      }
     }
   }
 
@@ -85,7 +85,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogg
       eventually {
         handler.receivedMessages should have size 1
         handler.receivedMessages.head shouldBe expected
-      }(consumerPatienceConfig)
+      }
     }
   }
 
@@ -117,7 +117,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogg
       eventually {
         handler.receivedMessages should have size 1
         dlqHandler.receivedMessages should have size 1
-      }(consumerPatienceConfig)
+      }
     }
   }
 
@@ -136,7 +136,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogg
           inside(handler.receivedMessages.head) {
             case Delivery(body, _, _, _) => Payload(body.value).unmarshal[String] shouldBe Success(expectedMessage)
           }
-        }(consumerPatienceConfig)
+        }
     }
   }
 
@@ -158,7 +158,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogg
           inside(handler.receivedMessages.head) {
             case Delivery(body, _, _, properties) => properties.headers.get("hello").map(_.toString) shouldBe Some("world")
           }
-        }(consumerPatienceConfig)
+        }
     }
   }
 

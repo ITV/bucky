@@ -9,14 +9,15 @@ import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.concurrent.Eventually
-import Eventually._
+import Eventually.eventually
 
 import scala.concurrent.duration._
 import scala.util.Random
 
 class DeclarationTest extends FunSuite with ScalaFutures {
 
-  val declarationPatienceConfig: Eventually.PatienceConfig = Eventually.PatienceConfig(timeout = 5.second, interval = 100.millis)
+  implicit val declarationPatienceConfig: Eventually.PatienceConfig =
+    Eventually.PatienceConfig(timeout = 5.second, interval = 100.millis)
 
   test("Should be able to declare a queue") {
     val queueName = "queue.declare" + Random.nextInt()
@@ -42,7 +43,7 @@ class DeclarationTest extends FunSuite with ScalaFutures {
         publisher("Hello")
         eventually {
           handler.receivedMessages.size shouldBe 1
-        }(declarationPatienceConfig)
+        }
       }
     }
   }
@@ -86,7 +87,7 @@ class DeclarationTest extends FunSuite with ScalaFutures {
         publisher("Hello")
         eventually {
           handler.receivedMessages.size shouldBe 1
-        }(declarationPatienceConfig)
+        }
       }
     }
 

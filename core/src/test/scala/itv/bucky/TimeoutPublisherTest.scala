@@ -10,7 +10,7 @@ import org.mockito.stubbing.Answer
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.mock.MockitoSugar._
+import org.scalatest.mockito.MockitoSugar._
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, Promise}
