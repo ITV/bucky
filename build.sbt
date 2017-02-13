@@ -60,8 +60,7 @@ lazy val example = project
       "com.itv" %% "lifecycle" % itvLifecycleVersion,
       "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
       "org.apache.qpid" % "qpid-broker" % "6.0.4",
-      "org.scalatest" %% "scalatest" % scalaTestVersion,
-      "itv.contentdelivery" %% "contentdelivery-shared-httpyroraptor" % "1.0-588"
+      "org.scalatest" %% "scalatest" % scalaTestVersion
     )
   )
 
