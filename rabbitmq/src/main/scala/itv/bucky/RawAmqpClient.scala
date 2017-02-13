@@ -7,7 +7,7 @@ import com.rabbitmq.client._
 import com.typesafe.scalalogging.StrictLogging
 import com.itv.lifecycle._
 
-import scala.collection.JavaConverters
+import scala.collection.JavaConverters._
 
 import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.concurrent.{ExecutionContext, Promise}
@@ -78,7 +78,7 @@ class RawAmqpClient(channelFactory: Lifecycle[Channel]) extends AmqpClient with 
           private def removePromises(deliveryTag: Long, multiple: Boolean): List[Promise[Unit]] = channel.synchronized {
             if (multiple) {
               val entries = unconfirmedPublications.headMap(deliveryTag + 1L)
-              val removedValues = JavaConverters.collectionAsScalaIterable(entries.values()).toList
+              val removedValues = entries.values().asScala.toList
               entries.clear()
               removedValues
             } else {

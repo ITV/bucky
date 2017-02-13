@@ -6,7 +6,7 @@ name := "bucky"
 organization := "itv"
 crossScalaVersions := Seq("2.11.8", "2.12.1")
 
-val itvLifecycleVersion = "0.13"
+val itvLifecycleVersion = "0.16"
 val amqpClientVersion = "4.0.2"
 val scalaLoggingVersion = "3.5.0"
 val scalaTestVersion = "3.0.1"
