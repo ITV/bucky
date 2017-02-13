@@ -12,6 +12,7 @@ val scalaLoggingVersion = "3.5.0"
 val scalaTestVersion = "3.0.1"
 val mockitoVersion = "1.9.0"
 val argonautVersion = "6.2-RC2"
+val circeVersion = "0.7.0"
 
 lazy val kernelSettings = Seq(
   scalaVersion := "2.12.1",
@@ -53,8 +54,8 @@ lazy val example = project
   .settings(name := "itv")
   .settings(moduleName := "bucky-example")
   .settings(kernelSettings: _*)
-  .aggregate(core, rabbitmq, argonaut)
-  .dependsOn(core, rabbitmq, argonaut)
+  .aggregate(core, rabbitmq, argonaut, circe)
+  .dependsOn(core, rabbitmq, argonaut, circe)
   .settings(
     libraryDependencies ++= Seq(
       "io.argonaut" %% "argonaut" % argonautVersion,
@@ -80,6 +81,29 @@ lazy val argonaut = project
   .settings(
     libraryDependencies ++= Seq(
       "io.argonaut" %% "argonaut" % argonautVersion,
+      "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
+      "org.scalatest" %% "scalatest" % scalaTestVersion % "test, it"
+    )
+  )
+
+
+lazy val circe = project
+  .settings(name := "itv")
+  .settings(moduleName := "bucky-circe")
+  .settings(kernelSettings: _*)
+  .aggregate(core, test)
+  .dependsOn(core, test % "test,it")
+  .configs(IntegrationTest)
+  .settings(Defaults.itSettings)
+  .settings(
+    internalDependencyClasspath in IntegrationTest += Attributed.blank((classDirectory in Test).value),
+    parallelExecution in IntegrationTest := false
+  )
+  .settings(
+    libraryDependencies ++= Seq(
+      "io.circe" %% "circe-core" % circeVersion,
+      "io.circe" %% "circe-generic" % circeVersion,
+      "io.circe" %% "circe-parser" % circeVersion,
       "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
       "org.scalatest" %% "scalatest" % scalaTestVersion % "test, it"
     )

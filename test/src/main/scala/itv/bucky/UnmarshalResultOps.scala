@@ -11,7 +11,7 @@ object UnmarshalResultOps {
     def success: T = result match {
       case Success(actualElem) => actualElem
       case Failure(reason, cause) =>
-        val message = s"Unmarshal result ops for $reason"
+        val message = s"Unmarshal result ops for '$reason'"
         cause.fold(fail(message))(exception => fail(message, exception))
     }
     def failure: String = result match {
