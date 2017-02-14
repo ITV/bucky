@@ -11,6 +11,7 @@ import org.scalatest.Matchers._
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.concurrent.Eventually
 import Eventually.eventually
+import com.itv.bucky.{QueueWatcher, StubRequeueHandler}
 
 import scala.concurrent.Future
 import scala.concurrent.duration._

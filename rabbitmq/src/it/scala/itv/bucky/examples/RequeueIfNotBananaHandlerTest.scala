@@ -1,6 +1,7 @@
 package itv.bucky.examples
 
-import itv.bucky.{Ack, Requeue, StubPublisher}
+import com.itv.bucky.StubPublisher
+import itv.bucky.{Ack, Requeue}
 import org.scalatest.FunSuite
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.Matchers._

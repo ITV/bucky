@@ -12,7 +12,7 @@ import scala.util.Random
 
 class ArgonautPayloadUnmarshallersTest  extends FunSuite {
 
-  import itv.bucky.UnmarshalResultOps._
+  import UnmarshalResultOps._
   import com.itv.bucky.ArgonautSupport._
 
   case class Some(foo: String)

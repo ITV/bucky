@@ -8,7 +8,7 @@ import scala.util.Random
 import scala.xml.Elem
 
 class XmlPayloadUnmarshallersTest extends FunSuite {
-  import itv.bucky.UnmarshalResultOps._
+  import UnmarshalResultOps._
   import com.itv.bucky.XmlSupport._
 
 

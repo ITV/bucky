@@ -1,5 +1,6 @@
 package itv.bucky
 
+import com.itv.bucky.StubConsumeHandler
 import com.rabbitmq.client.impl.AMQImpl.Basic
 import com.itv.lifecycle.{Lifecycle, NoOpLifecycle}
 import itv.bucky.SameThreadExecutionContext.implicitly

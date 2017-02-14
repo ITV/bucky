@@ -6,6 +6,7 @@ import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.ScalaFutures
 import UnmarshalResult._
+import com.itv.bucky.StubConsumeHandler
 
 class GenericConsumerTest extends FunSuite with ScalaFutures {
 

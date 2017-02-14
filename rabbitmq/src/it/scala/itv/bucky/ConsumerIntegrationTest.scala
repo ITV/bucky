@@ -1,5 +1,6 @@
 package itv.bucky
 
+import com.itv.bucky.{QueueWatcher, StubConsumeHandler}
 import com.typesafe.scalalogging.StrictLogging
 import itv.bucky.UnmarshalResult.Success
 import itv.bucky.Unmarshaller._

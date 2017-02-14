@@ -1,13 +1,14 @@
-package itv.bucky
+package com.itv.bucky
 
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 
+import com.itv.lifecycle.{Lifecycle, NoOpLifecycle}
 import com.typesafe.scalalogging.StrictLogging
 import itv.bucky.PayloadMarshaller.StringPayloadMarshaller
+import itv.bucky._
 import itv.bucky.decl.{Binding, Exchange, Queue}
-import com.itv.lifecycle.{Lifecycle, NoOpLifecycle}
 
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable.ListBuffer

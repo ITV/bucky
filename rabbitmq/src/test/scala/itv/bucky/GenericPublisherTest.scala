@@ -1,5 +1,6 @@
 package itv.bucky
 
+import com.itv.bucky.StubPublisher
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.ScalaFutures

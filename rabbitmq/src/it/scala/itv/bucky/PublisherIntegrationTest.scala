@@ -1,5 +1,6 @@
 package itv.bucky
 
+import com.itv.bucky.QueueWatcher
 import com.typesafe.scalalogging.StrictLogging
 import itv.bucky.SameThreadExecutionContext.implicitly
 import itv.bucky.TestUtils._

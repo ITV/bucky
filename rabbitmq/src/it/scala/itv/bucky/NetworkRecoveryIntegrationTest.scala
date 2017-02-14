@@ -8,6 +8,7 @@ import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import Eventually.eventually
+import com.itv.bucky.StubConsumeHandler
 
 import scala.concurrent.duration._
 import scala.util.Random

@@ -1,15 +1,16 @@
-package itv.bucky
+package com.itv.bucky
 
-import itv.bucky.UnmarshalResult._
-import org.scalatest.FunSuite
-import org.scalatest.concurrent.ScalaFutures
-
-import scala.concurrent.duration._
-import org.scalatest.Matchers._
-import SameThreadExecutionContext.implicitly
 import com.itv.lifecycle.Lifecycle
 import itv.bucky.PayloadMarshaller.StringPayloadMarshaller
+import itv.bucky.UnmarshalResult._
+import itv.bucky._
 import itv.bucky.decl._
+import org.scalatest.FunSuite
+import org.scalatest.Matchers._
+import org.scalatest.concurrent.ScalaFutures
+import SameThreadExecutionContext.implicitly
+
+import scala.concurrent.duration._
 
 class RabbitSimulatorTest extends FunSuite with ScalaFutures {
   import RabbitSimulator._

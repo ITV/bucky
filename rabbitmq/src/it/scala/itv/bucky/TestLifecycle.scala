@@ -2,6 +2,7 @@ package itv.bucky
 
 import java.io.File
 
+import com.itv.bucky.LocalAmqpServer
 import itv.bucky.decl.{Declaration, DeclarationLifecycle, Queue}
 import com.itv.lifecycle.{Lifecycle, NoOpLifecycle}
 

@@ -10,6 +10,7 @@ import org.scalatest.Matchers._
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.concurrent.Eventually
 import Eventually.eventually
+import com.itv.bucky.StubConsumeHandler
 
 import scala.concurrent.duration._
 import scala.util.Random

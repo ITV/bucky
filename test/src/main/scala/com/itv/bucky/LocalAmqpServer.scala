@@ -1,4 +1,4 @@
-package itv.bucky
+package com.itv.bucky
 
 import java.io.File
 

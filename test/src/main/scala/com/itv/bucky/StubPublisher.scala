@@ -1,4 +1,6 @@
-package itv.bucky
+package com.itv.bucky
+
+import itv.bucky.Publisher
 
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.Future

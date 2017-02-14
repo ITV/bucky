@@ -13,7 +13,7 @@ import scala.util.Random
 
 class CircePayloadUnmarshallersTest  extends FunSuite {
 
-  import itv.bucky.UnmarshalResultOps._
+  import UnmarshalResultOps._
   import com.itv.bucky.CirceSupport._
 
   case class Some(foo: String)
