@@ -1,9 +1,10 @@
-package itv.bucky
+package com.itv.bucky
 
-import org.scalatest.FunSuite
+import argonaut.Argonaut._
 import argonaut._
-import Argonaut._
-import ArgonautSupport._
+import com.itv.bucky.ArgonautSupport._
+import itv.bucky.{Payload, PayloadMarshaller}
+import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 
 class ArgonautMarshallerTest extends FunSuite {

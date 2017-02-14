@@ -2,7 +2,7 @@ package itv.bucky.example.argonaut
 
 import argonaut._
 import Argonaut._
-import itv.bucky.ArgonautSupport._
+import com.itv.bucky.ArgonautSupport._
 import itv.bucky.{PayloadMarshaller, PayloadUnmarshaller}
 
 object Shared {

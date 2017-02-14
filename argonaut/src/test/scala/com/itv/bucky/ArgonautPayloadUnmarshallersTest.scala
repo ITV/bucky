@@ -1,9 +1,10 @@
-package itv.bucky
+package com.itv.bucky
 
 import argonaut._
 import Argonaut._
 import itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import itv.bucky.Unmarshaller.StringPayloadUnmarshaller
+import itv.bucky._
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 
@@ -11,8 +12,8 @@ import scala.util.Random
 
 class ArgonautPayloadUnmarshallersTest  extends FunSuite {
 
-  import UnmarshalResultOps._
-  import ArgonautSupport._
+  import itv.bucky.UnmarshalResultOps._
+  import com.itv.bucky.ArgonautSupport._
 
   case class Some(foo: String)
   implicit val someCodec: CodecJson[Some] = casecodec1(Some.apply, Some.unapply)("foo")
@@ -20,7 +21,7 @@ class ArgonautPayloadUnmarshallersTest  extends FunSuite {
   test("it should parse a json object") {
     val expectedValue = s"bar ${new Random().nextInt(10)}"
     val payload: Payload = validJson(expectedValue)
-    val jsonResult: Json = unmarshallerFromDecodeJson[Json].unmarshal(payload).success
+    val jsonResult: Json = new UnmarshalResultOps(unmarshallerFromDecodeJson[Json].unmarshal(payload)).success
 
     jsonResult.fieldOr("foo", fail).stringOr(fail) shouldBe expectedValue
   }
