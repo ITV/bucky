@@ -1,10 +1,11 @@
-package itv.bucky
+package com.itv.bucky
 
 import io.circe._
-import io.circe.syntax._
 import io.circe.generic.auto._
+import io.circe.syntax._
 import itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import itv.bucky.Unmarshaller.StringPayloadUnmarshaller
+import itv.bucky._
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 
@@ -12,8 +13,8 @@ import scala.util.Random
 
 class CircePayloadUnmarshallersTest  extends FunSuite {
 
-  import UnmarshalResultOps._
-  import CirceSupport._
+  import itv.bucky.UnmarshalResultOps._
+  import com.itv.bucky.CirceSupport._
 
   case class Some(foo: String)
 

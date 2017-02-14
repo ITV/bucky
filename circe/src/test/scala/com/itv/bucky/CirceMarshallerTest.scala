@@ -1,10 +1,11 @@
-package itv.bucky
+package com.itv.bucky
 
-import org.scalatest.FunSuite
+import com.itv.bucky.CirceSupport._
 import io.circe._
-import io.circe.syntax._
 import io.circe.generic.auto._
-import CirceSupport._
+import io.circe.syntax._
+import itv.bucky.{Payload, PayloadMarshaller}
+import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 
 class CirceMarshallerTest extends FunSuite {
@@ -12,7 +13,6 @@ class CirceMarshallerTest extends FunSuite {
   case class Foo(bar: String)
 
   test("Can marshall a foo") {
-    import Foo._
     val marshaller: PayloadMarshaller[Foo] = marshallerFromEncodeJson
 
     val foo = Foo("bar")
