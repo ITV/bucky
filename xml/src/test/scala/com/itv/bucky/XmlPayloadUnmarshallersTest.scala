@@ -1,5 +1,6 @@
-package itv.bucky
+package com.itv.bucky
 
+import itv.bucky.Payload
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 
@@ -7,8 +8,8 @@ import scala.util.Random
 import scala.xml.Elem
 
 class XmlPayloadUnmarshallersTest extends FunSuite {
-  import XmlSupport._
-  import UnmarshalResultOps._
+  import itv.bucky.UnmarshalResultOps._
+  import com.itv.bucky.XmlSupport._
 
 
   test("it should parse a xml object") {
