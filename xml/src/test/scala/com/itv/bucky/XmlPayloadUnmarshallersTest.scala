@@ -1,6 +1,5 @@
 package com.itv.bucky
 
-import itv.bucky.Payload
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 

@@ -4,7 +4,6 @@ import com.itv.bucky.CirceSupport._
 import io.circe._
 import io.circe.generic.auto._
 import io.circe.syntax._
-import itv.bucky.{Payload, PayloadMarshaller}
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 

@@ -3,7 +3,6 @@ package com.itv.bucky
 import argonaut.Argonaut._
 import argonaut._
 import com.itv.bucky.ArgonautSupport._
-import itv.bucky.{Payload, PayloadMarshaller}
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 

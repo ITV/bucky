@@ -1,10 +1,7 @@
 package com.itv.bucky
 
-import itv.bucky.UnmarshalResult
-import itv.bucky.UnmarshalResult.{Failure, Success}
+import UnmarshalResult.{Failure, Success}
 import org.scalatest.Assertions._
-
-
 
 object UnmarshalResultOps {
 

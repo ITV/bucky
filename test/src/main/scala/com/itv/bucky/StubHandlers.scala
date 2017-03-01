@@ -1,7 +1,5 @@
 package com.itv.bucky
 
-import itv.bucky.{Ack, ConsumeAction, RequeueConsumeAction}
-
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.Future
 

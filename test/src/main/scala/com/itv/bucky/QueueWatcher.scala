@@ -1,7 +1,5 @@
 package com.itv.bucky
 
-import itv.bucky.{Ack, ConsumeAction, Handler}
-
 import scala.concurrent.{Future, Promise}
 
 class QueueWatcher[T] extends Handler[T] {

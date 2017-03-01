@@ -2,10 +2,8 @@ package com.itv.bucky
 
 import io.circe._
 import io.circe.parser.decode
-import itv.bucky.PayloadMarshaller.StringPayloadMarshaller
-import itv.bucky.Unmarshaller.StringPayloadUnmarshaller
-import itv.bucky._
-
+import PayloadMarshaller.StringPayloadMarshaller
+import Unmarshaller.StringPayloadUnmarshaller
 
 object CirceSupport {
 

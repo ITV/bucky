@@ -1,10 +1,9 @@
 package com.itv.bucky
 
 import com.itv.lifecycle.Lifecycle
-import itv.bucky.PayloadMarshaller.StringPayloadMarshaller
-import itv.bucky.UnmarshalResult._
-import itv.bucky._
-import itv.bucky.decl._
+import PayloadMarshaller.StringPayloadMarshaller
+import UnmarshalResult._
+import com.itv.bucky.decl._
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.ScalaFutures

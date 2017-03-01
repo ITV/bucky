@@ -3,9 +3,8 @@ package com.itv.bucky
 import io.circe._
 import io.circe.generic.auto._
 import io.circe.syntax._
-import itv.bucky.PayloadMarshaller.StringPayloadMarshaller
-import itv.bucky.Unmarshaller.StringPayloadUnmarshaller
-import itv.bucky._
+import PayloadMarshaller.StringPayloadMarshaller
+import Unmarshaller.StringPayloadUnmarshaller
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 
