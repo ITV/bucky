@@ -14,11 +14,9 @@ package object requeue {
   case class RequeuePolicy(maximumProcessAttempts: Int, requeueAfter: FiniteDuration)
 
   def basicRequeueDeclarations(queueName: QueueName, retryAfter: FiniteDuration = 5.minutes): Iterable[Declaration] = {
-    val deadLetterQueueName: QueueName = QueueName(s"${queueName.value}.dlq")
     val dlxExchangeName: ExchangeName = ExchangeName(s"${queueName.value}.dlx")
 
-    requeueDeclarations(queueName, RoutingKey(queueName.value),
-      Exchange(dlxExchangeName).binding(RoutingKey(queueName.value) -> deadLetterQueueName), retryAfter)
+    requeueDeclarations(queueName, RoutingKey(queueName.value), Exchange(dlxExchangeName), retryAfter)
   }
 
   def requeueDeclarations(queueName: QueueName, routingKey: RoutingKey): Iterable[Declaration] = {

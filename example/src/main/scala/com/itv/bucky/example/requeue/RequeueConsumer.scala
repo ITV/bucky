@@ -15,7 +15,7 @@ object RequeueConsumer extends App with StrictLogging {
 
   object Declarations {
     val queue = Queue(QueueName("requeue.string"))
-    val all = List(queue) ++ basicRequeueDeclarations(queue.name)
+    val all = basicRequeueDeclarations(queue.name)
   }
 
   val amqpClientConfig: AmqpClientConfig = AmqpClientConfig("33.33.33.11", 5672, "guest", "guest")
