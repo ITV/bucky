@@ -3,7 +3,7 @@ import sbt.Keys._
 
 name := "bucky"
 
-organization := "itv"
+organization := "com.itv"
 crossScalaVersions := Seq("2.11.8", "2.12.1")
 
 val itvLifecycleVersion = "0.16"
