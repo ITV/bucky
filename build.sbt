@@ -23,73 +23,6 @@ pomIncludeRepository := { _ => false }
 
 releasePublishArtifactsAction := PgpKeys.publishSigned.value
 
-pomExtra := (
-  <url>https://github.com/ITV/bucky</url>
-    <licenses>
-      <license>
-        <name>ITV-OSS</name>
-        <url>http://itv.com/itv-oss-licence-v1.0</url>
-        <distribution>repo</distribution>
-      </license>
-    </licenses>
-    <scm>
-      <url>git@github.com:ITV/bucky.git</url>
-      <connection>scm:git@github.com:ITV/bucky.git</connection>
-    </scm>
-    <developers>
-      <developer>
-        <id>jfwilson</id>
-        <name>Jamie Wilson</name>
-        <url>https://github.com/jfwilson</url>
-      </developer>
-      <developer>
-        <id>BeniVF</id>
-        <name>Beni Villa Fernandez</name>
-        <url>https://github.com/BeniVF</url>
-      </developer>
-      <developer>
-        <id>leneghan</id>
-        <name>Stuart Leneghan</name>
-        <url>https://github.com/leneghan</url>
-      </developer>
-      <developer>
-        <id>caoilte</id>
-        <name>Caoilte O'Connor</name>
-        <url>https://github.com/caoilte</url>
-      </developer>
-      <developer>
-        <id>andrewgee</id>
-        <name>Andrew Gee</name>
-        <url>https://github.com/andrewgee</url>
-      </developer>
-      <developer>
-        <id>smithleej</id>
-        <name>Lee Smith</name>
-        <url>https://github.com/smithleej</url>
-      </developer>
-      <developer>
-        <id>sofiaaacole</id>
-        <name>Sofia Cole</name>
-        <url>https://github.com/sofiaaacole</url>
-      </developer>
-      <developer>
-        <id>mcarolan</id>
-        <name>Martin Carolan</name>
-        <url>https://mcarolan.net/</url>
-        <organization>ITV</organization>
-        <organizationUrl>http://www.itv.com</organizationUrl>
-      </developer>
-    </developers>
-  )
-
-publishTo := {
-  val nexus = "https://oss.sonatype.org/"
-  if (isSnapshot.value)
-    Some("snapshots" at nexus + "content/repositories/snapshots")
-  else
-    Some("releases"  at nexus + "service/local/staging/deploy/maven2")
-}
-
 releaseProcess := Seq[ReleaseStep](
   checkSnapshotDependencies,
   inquireVersions,
@@ -109,7 +42,72 @@ releaseCrossBuild := true
 
 lazy val kernelSettings = Seq(
   scalaVersion := "2.12.1",
-  scalacOptions ++= Seq("-feature", "-deprecation", "-Xfatal-warnings")
+  scalacOptions ++= Seq("-feature", "-deprecation", "-Xfatal-warnings"),
+  publishTo := {
+    val nexus = "https://oss.sonatype.org/"
+    if (isSnapshot.value)
+      Some("snapshots" at nexus + "content/repositories/snapshots")
+    else
+      Some("releases"  at nexus + "service/local/staging/deploy/maven2")
+  },
+  pomExtra := (
+    <url>https://github.com/ITV/bucky</url>
+      <licenses>
+        <license>
+          <name>ITV-OSS</name>
+          <url>http://itv.com/itv-oss-licence-v1.0</url>
+          <distribution>repo</distribution>
+        </license>
+      </licenses>
+      <scm>
+        <url>git@github.com:ITV/bucky.git</url>
+        <connection>scm:git@github.com:ITV/bucky.git</connection>
+      </scm>
+      <developers>
+        <developer>
+          <id>jfwilson</id>
+          <name>Jamie Wilson</name>
+          <url>https://github.com/jfwilson</url>
+        </developer>
+        <developer>
+          <id>BeniVF</id>
+          <name>Beni Villa Fernandez</name>
+          <url>https://github.com/BeniVF</url>
+        </developer>
+        <developer>
+          <id>leneghan</id>
+          <name>Stuart Leneghan</name>
+          <url>https://github.com/leneghan</url>
+        </developer>
+        <developer>
+          <id>caoilte</id>
+          <name>Caoilte O'Connor</name>
+          <url>https://github.com/caoilte</url>
+        </developer>
+        <developer>
+          <id>andrewgee</id>
+          <name>Andrew Gee</name>
+          <url>https://github.com/andrewgee</url>
+        </developer>
+        <developer>
+          <id>smithleej</id>
+          <name>Lee Smith</name>
+          <url>https://github.com/smithleej</url>
+        </developer>
+        <developer>
+          <id>sofiaaacole</id>
+          <name>Sofia Cole</name>
+          <url>https://github.com/sofiaaacole</url>
+        </developer>
+        <developer>
+          <id>mcarolan</id>
+          <name>Martin Carolan</name>
+          <url>https://mcarolan.net/</url>
+          <organization>ITV</organization>
+          <organizationUrl>http://www.itv.com</organizationUrl>
+        </developer>
+      </developers>
+    )
 )
 
 lazy val core = project
