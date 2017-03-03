@@ -4,7 +4,6 @@ import ReleaseTransformations._
 
 name := "bucky"
 
-organization := "com.itv"
 crossScalaVersions := Seq("2.11.8", "2.12.1")
 
 val itvLifecycleVersion = "0.16"
@@ -37,6 +36,7 @@ pomIncludeRepository := { _ => false }
 releasePublishArtifactsAction := PgpKeys.publishSigned.value
 
 lazy val kernelSettings = Seq(
+  organization := "com.itv",
   scalaVersion := "2.12.1",
   scalacOptions ++= Seq("-feature", "-deprecation", "-Xfatal-warnings"),
   publishTo := {
@@ -173,7 +173,7 @@ lazy val argonaut = project
 
 
 lazy val circe = project
-  .settings(name := "itv")
+  .settings(name := "com.itv")
   .settings(moduleName := "bucky-circe")
   .settings(kernelSettings: _*)
   .aggregate(core, test)
