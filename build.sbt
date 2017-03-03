@@ -109,9 +109,7 @@ releaseCrossBuild := true
 
 lazy val kernelSettings = Seq(
   scalaVersion := "2.12.1",
-  scalacOptions ++= Seq("-feature", "-deprecation", "-Xfatal-warnings"),
-  credentials += Credentials(Path.userHome / ".ivy2" / ".credentials"),
-  publishTo in ThisBuild := Some("Artifactory Realm" at "https://itvrepos.artifactoryonline.com/itvrepos/cd-scala-libs")
+  scalacOptions ++= Seq("-feature", "-deprecation", "-Xfatal-warnings")
 )
 
 lazy val core = project
