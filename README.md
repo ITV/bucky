@@ -9,11 +9,27 @@ Provides constructs for:
 * Declaring AMQP resources
 * Applying common patterns 
 
+#Getting Started
+Bucky is cross built for Scala 2.11 and Scala 2.12
+
+```scala
+val buckyVersion = "0.10"
+libraryDependencies ++= Seq(
+  "com.itv" %% "bucky-rabbitmq" % buckyVersion,
+  
+  "com.itv" %% "bucky-argonaut" % buckyVersion, // optional argonaut marshalling support
+  "com.itv" %% "bucky-circe" % buckyVersion, // optional circe marshalling support
+  "com.itv" %% "bucky-xml" % buckyVersion // optional xml marshalling support
+)
+```
+
+
+
 #Example projects
 
 Basic Consumer
 ---
-[source code here](https://github.com/ITV/bucky/blob/master/example/src/main/scala/itv/bucky/example/basic/StringConsumer.scala)
+[source code here](https://github.com/ITV/bucky/blob/master/example/src/main/scala/com/itv/bucky/example/basic/StringConsumer.scala)
 
 A very simple project that:
 * Declares an AMQP queue
@@ -23,7 +39,7 @@ A very simple project that:
     
 Basic Publisher
 ---
-[source code here](https://github.com/ITV/bucky/blob/master/example/src/main/scala/itv/bucky/example/basic/StringPublisher.scala)
+[source code here](https://github.com/ITV/bucky/blob/master/example/src/main/scala/com/itv/bucky/example/basic/StringPublisher.scala)
 
 A very simple project that:
 * Declares an exchange
@@ -33,7 +49,7 @@ A very simple project that:
 Unmarshalling Consumer
 ----
 
-[source code here](https://github.com/ITV/bucky/blob/master/example/src/main/scala/itv/bucky/example/marshalling/UnmarshallingConsumer.scala)
+[source code here](https://github.com/ITV/bucky/blob/master/example/src/main/scala/com/itv/bucky/example/marshalling/UnmarshallingConsumer.scala)
 
 In this project we aim to consume higher level message payloads as opposed to `String`
 
@@ -71,7 +87,7 @@ The behaviour of the project is not very dissimilar to the "Basic Consumer" proj
 Unmarshalling Publisher
 ----
 
-[source code here](https://github.com/ITV/bucky/blob/master/example/src/main/scala/itv/bucky/example/marshalling/MarshallingPublisher.scala)
+[source code here](https://github.com/ITV/bucky/blob/master/example/src/main/scala/com/itv/bucky/example/marshalling/MarshallingPublisher.scala)
 
 In this project we aim to publish higher level message payloads as opposed to `String`
 
