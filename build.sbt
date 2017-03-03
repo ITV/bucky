@@ -30,7 +30,6 @@ releaseProcess := Seq[ReleaseStep](
   pushChanges
 )
 
-releaseCrossBuild := true
 
 lazy val kernelSettings = Seq(
   scalaVersion := "2.12.1",
@@ -42,6 +41,7 @@ lazy val kernelSettings = Seq(
     else
       Some("releases"  at nexus + "service/local/staging/deploy/maven2")
   },
+  releaseCrossBuild := true,
   publishMavenStyle := true,
   publishArtifact in Test := false,
   pomIncludeRepository := { _ => false },
@@ -238,3 +238,7 @@ lazy val rabbitmq = project
       "com.typesafe" % "config" % "1.2.1" % "it"
     )
   )
+
+lazy val root = (project in file("."))
+  .aggregate(rabbitmq, xml, circe, argonaut, example, test, core)
+  .settings(kernelSettings: _*)
