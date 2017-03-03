@@ -1,5 +1,5 @@
 import sbt.Attributed
-import sbt.Keys._
+import sbt.Keys.{publishArtifact, _}
 import ReleaseTransformations._
 
 name := "bucky"
@@ -14,14 +14,6 @@ val scalaTestVersion = "3.0.1"
 val mockitoVersion = "1.9.0"
 val argonautVersion = "6.2-RC2"
 val circeVersion = "0.7.0"
-
-publishMavenStyle := true
-
-publishArtifact in Test := false
-
-pomIncludeRepository := { _ => false }
-
-releasePublishArtifactsAction := PgpKeys.publishSigned.value
 
 releaseProcess := Seq[ReleaseStep](
   checkSnapshotDependencies,
@@ -50,6 +42,10 @@ lazy val kernelSettings = Seq(
     else
       Some("releases"  at nexus + "service/local/staging/deploy/maven2")
   },
+  publishMavenStyle := true,
+  publishArtifact in Test := false,
+  pomIncludeRepository := { _ => false },
+  releasePublishArtifactsAction := PgpKeys.publishSigned.value,
   pomExtra := (
     <url>https://github.com/ITV/bucky</url>
       <licenses>
