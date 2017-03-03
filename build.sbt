@@ -241,4 +241,4 @@ lazy val rabbitmq = project
 
 lazy val root = (project in file("."))
   .aggregate(rabbitmq, xml, circe, argonaut, example, test, core)
-  .settings(kernelSettings: _*)
+  .settings(publishArtifact := false)
