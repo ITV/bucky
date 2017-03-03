@@ -30,6 +30,11 @@ releaseProcess := Seq[ReleaseStep](
   pushChanges
 )
 
+releaseCrossBuild := true
+publishMavenStyle := true
+publishArtifact in Test := false
+pomIncludeRepository := { _ => false }
+releasePublishArtifactsAction := PgpKeys.publishSigned.value
 
 lazy val kernelSettings = Seq(
   scalaVersion := "2.12.1",
@@ -41,11 +46,6 @@ lazy val kernelSettings = Seq(
     else
       Some("releases"  at nexus + "service/local/staging/deploy/maven2")
   },
-  releaseCrossBuild := true,
-  publishMavenStyle := true,
-  publishArtifact in Test := false,
-  pomIncludeRepository := { _ => false },
-  releasePublishArtifactsAction := PgpKeys.publishSigned.value,
   pomExtra := (
     <url>https://github.com/ITV/bucky</url>
       <licenses>
