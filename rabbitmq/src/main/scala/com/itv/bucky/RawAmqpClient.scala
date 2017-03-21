@@ -154,6 +154,9 @@ class RawAmqpClient(channelFactory: Lifecycle[Channel]) extends AmqpClient with 
         queue.arguments.asJava)
     }
 
+    override def purgeQueue(name: QueueName): Try[Unit] = Try {
+      channel.queuePurge(name.value)
+    }
   }
 
   override def performOps(thunk: (AmqpOps) => Try[Unit]): Try[Unit] =
@@ -164,4 +167,3 @@ class RawAmqpClient(channelFactory: Lifecycle[Channel]) extends AmqpClient with 
       Option(channel.basicGet(queueName.value, false)).fold(0)(_.getMessageCount + 1)
     })
 }
-
