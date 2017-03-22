@@ -31,6 +31,7 @@ trait AmqpOps {
   def declareQueue(queue: Queue): Try[Unit]
   def declareExchange(echange: Exchange): Try[Unit]
   def bindQueue(binding: Binding): Try[Unit]
+  def purgeQueue(name: QueueName): Try[Unit]
 }
 
 
@@ -55,4 +56,3 @@ object AmqpClient extends StrictLogging {
     deliveryHandlerOf(handler, Unmarshaller.toDeliveryUnmarshaller(unmarshaller), unmarshalFailureAction)
 
 }
-

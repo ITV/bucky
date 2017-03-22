@@ -105,6 +105,7 @@ class RabbitSimulator(bindings: Bindings = IdentityBindings)(implicit executionC
 
       override def declareQueue(queue: Queue): Try[Unit] = Try(())
 
+      override def purgeQueue(name: QueueName): Try[Unit] = Try(())
     }))
 
   override def estimatedMessageCount(queueName: QueueName): Try[Int] = {
