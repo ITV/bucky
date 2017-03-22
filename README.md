@@ -13,7 +13,7 @@ Provides constructs for:
 Bucky is cross built for Scala 2.11 and Scala 2.12
 
 ```scala
-val buckyVersion = "0.10"
+val buckyVersion = "0.11"
 libraryDependencies ++= Seq(
   "com.itv" %% "bucky-rabbitmq" % buckyVersion,
   
