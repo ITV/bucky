@@ -3,6 +3,7 @@ package com.itv.bucky
 import java.io.File
 
 import com.itv.bucky.decl.Declaration
+import com.itv.bucky.lifecycle._
 import com.itv.lifecycle.{Lifecycle, NoOpLifecycle}
 
 import scala.concurrent.ExecutionContext

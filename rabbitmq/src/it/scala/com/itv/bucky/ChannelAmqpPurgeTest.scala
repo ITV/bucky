@@ -1,5 +1,6 @@
 package com.itv.bucky
 
+import com.itv.bucky.lifecycle._
 import com.itv.lifecycle.Lifecycle
 import com.typesafe.scalalogging.StrictLogging
 import org.scalatest.FunSuite

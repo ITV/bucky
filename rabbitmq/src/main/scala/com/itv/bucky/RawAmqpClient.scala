@@ -2,13 +2,12 @@ package com.itv.bucky
 
 import java.util.concurrent.TimeUnit
 
-import com.itv.bucky.decl.{Declaration, DeclarationExecutor}
 import com.itv.lifecycle._
 import com.rabbitmq.client.Channel
 import com.typesafe.scalalogging.StrictLogging
 
-import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.concurrent.ExecutionContext
+import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.util.Try
 
 class RawAmqpClient(channelFactory: Lifecycle[Channel]) extends AmqpClient[Lifecycle] with StrictLogging {
@@ -47,14 +46,3 @@ class RawAmqpClient(channelFactory: Lifecycle[Channel]) extends AmqpClient[Lifec
     })
 }
 
-import scala.concurrent.duration._
-import scala.language.higherKinds
-case class DeclarationLifecycle[M[_]](declarations: Iterable[Declaration], client: AmqpClient[M], timeout: FiniteDuration = 5.seconds) extends VanillaLifecycle[Unit]{
-
-
-
-  def start(): Unit = DeclarationExecutor(declarations, client, timeout)
-
-  override def shutdown(instance: Unit): Unit = ()
-
-}

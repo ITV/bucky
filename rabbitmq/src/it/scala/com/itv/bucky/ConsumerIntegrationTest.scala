@@ -4,6 +4,7 @@ import com.itv.bucky.SameThreadExecutionContext.implicitly
 import com.itv.bucky.UnmarshalResult.Success
 import com.itv.bucky.Unmarshaller._
 import com.itv.bucky.decl._
+import com.itv.bucky.lifecycle._
 import com.itv.bucky.pattern.requeue._
 import com.itv.lifecycle.Lifecycle
 import com.typesafe.scalalogging.StrictLogging
