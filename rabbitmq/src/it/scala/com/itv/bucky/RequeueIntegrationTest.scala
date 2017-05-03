@@ -159,7 +159,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
     }
   }
 
-  case class TestFixture(amqpClient: AmqpClient, queueName: QueueName, requeueQueueName: QueueName, deadletterQueue: QueueWatcher[Delivery], publisher: Publisher[PublishCommand]) {
+  case class TestFixture(amqpClient: AmqpClient[Lifecycle], queueName: QueueName, requeueQueueName: QueueName, deadletterQueue: QueueWatcher[Delivery], publisher: Publisher[PublishCommand]) {
     def publish(body: Payload, properties: MessageProperties = MessageProperties.persistentBasic): Future[Unit] = publisher(
       PublishCommand(ExchangeName(""), RoutingKey(queueName.value), properties, body))
   }

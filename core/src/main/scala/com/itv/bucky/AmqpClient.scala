@@ -2,24 +2,24 @@ package com.itv.bucky
 
 import java.util.concurrent.TimeUnit
 
-import com.itv.lifecycle.Lifecycle
 import com.itv.bucky.decl._
 import com.typesafe.scalalogging.StrictLogging
 
 import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
+import scala.language.higherKinds
 
-trait AmqpClient {
+trait AmqpClient[M[_]] {
 
   def publisherOf[T](builder: PublishCommandBuilder[T], timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS))
-                    (implicit executionContext: ExecutionContext): Lifecycle[Publisher[T]] =
-    publisher(timeout).map(AmqpClient.publisherOf(builder))
+                    (implicit M:Monad[M], executionContext: ExecutionContext): M[Publisher[T]] =
+    M.map(publisher(timeout))(AmqpClient.publisherOf(builder))
 
-  def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): Lifecycle[Publisher[PublishCommand]]
+  def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): M[Publisher[PublishCommand]]
 
   def consumer(queueName: QueueName, handler: Handler[Delivery], exceptionalAction: ConsumeAction = DeadLetter, prefetchCount: Int = 0)
-              (implicit executionContext: ExecutionContext): Lifecycle[Unit]
+              (implicit executionContext: ExecutionContext): M[Unit]
 
   def performOps(thunk: AmqpOps => Try[Unit]): Try[Unit]
 

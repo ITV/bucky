@@ -13,7 +13,7 @@ object TestLifecycle {
   val defaultConfig = AmqpClientConfig("localhost", 5672, "guest", "guest", networkRecoveryInterval = None)
 
   def base(declarations: List[Declaration], config: AmqpClientConfig = defaultConfig)
-          (implicit executionContext: ExecutionContext): Lifecycle[(AmqpClient, Publisher[PublishCommand])] = {
+          (implicit executionContext: ExecutionContext): Lifecycle[(AmqpClient[Lifecycle], Publisher[PublishCommand])] = {
     for {
       _ <- if (config.host == "localhost") LocalAmqpServer(passwordFile = new File("src/it/resources/qpid-passwd")) else NoOpLifecycle(())
       amqpClient <- AmqpClientLifecycle(config)

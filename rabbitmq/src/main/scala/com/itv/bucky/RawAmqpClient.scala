@@ -10,7 +10,7 @@ import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.concurrent.ExecutionContext
 import scala.util.Try
 
-class RawAmqpClient(channelFactory: Lifecycle[Channel]) extends AmqpClient with StrictLogging {
+class RawAmqpClient(channelFactory: Lifecycle[Channel]) extends AmqpClient[Lifecycle] with StrictLogging {
 
   def consumer(queueName: QueueName, handler: Handler[Delivery], actionOnFailure: ConsumeAction = DeadLetter, prefetchCount: Int = 0)
               (implicit executionContext: ExecutionContext): Lifecycle[Unit] =

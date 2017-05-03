@@ -6,10 +6,11 @@ import com.typesafe.scalalogging.StrictLogging
 
 import scala.concurrent.duration.{FiniteDuration, _}
 import scala.util.{Failure, Success}
+import scala.language.higherKinds
 
-case class DeclarationLifecycle(declarations: Iterable[Declaration], client: AmqpClient, timeout: FiniteDuration = 5.seconds) extends VanillaLifecycle[Unit] with StrictLogging {
+case class DeclarationLifecycle[M[_]](declarations: Iterable[Declaration], client: AmqpClient[M], timeout: FiniteDuration = 5.seconds) extends VanillaLifecycle[Unit] with StrictLogging {
 
-  override def start(): Unit = {
+  def start(): Unit = {
     logger.info(s"Applying the following declarations: $declarations")
 
     client.performOps(Declaration.runAll(declarations)) match {
@@ -19,5 +20,4 @@ case class DeclarationLifecycle(declarations: Iterable[Declaration], client: Amq
   }
 
   override def shutdown(instance: Unit): Unit = ()
-
 }

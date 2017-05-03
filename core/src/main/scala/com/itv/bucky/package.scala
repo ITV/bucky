@@ -3,6 +3,8 @@ package com.itv
 import java.lang.management.ManagementFactory
 import java.util.Date
 
+import com.itv.lifecycle.{Lifecycle, NoOpLifecycle}
+
 import scala.concurrent.{ExecutionContext, Future}
 
 package object bucky {
@@ -134,5 +136,36 @@ package object bucky {
   }
 
   def safePerform[T](future: => Future[T])(implicit executionContext: ExecutionContext): Future[T] = Future(future).flatMap(identity)
+
+
+  import scala.language.higherKinds
+
+  trait Monad[M[_]] {
+    def apply[A](a: => A): M[A]
+    def map[A, B](m: M[A])(f: A => B): M[B]
+    def flatMap[A, B](m: M[A])(f: A => M[B]): M[B]
+  }
+
+  object Monad {
+
+    type Id[A] = A
+
+    implicit val idMonad = new Monad[Id] {
+      override def apply[A](a: => A): Id[A] = a
+
+      override def map[A, B](m: Id[A])(f: (A) => B): Id[B] = f(m)
+
+      override def flatMap[A, B](m: Id[A])(f: (A) => Id[B]): Id[B] = f(m)
+    }
+  }
+
+
+  implicit val lifecycleMonad = new Monad[Lifecycle] {
+    override def apply[A](a: => A): Lifecycle[A] = NoOpLifecycle(a)
+
+    override def map[A, B](m: Lifecycle[A])(f: (A) => B): Lifecycle[B] = m.map(f)
+
+    override def flatMap[A, B](m: Lifecycle[A])(f: (A) => Lifecycle[B]): Lifecycle[B] = m.flatMap(f)
+  }
 
 }

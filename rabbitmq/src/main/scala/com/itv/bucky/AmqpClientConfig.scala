@@ -6,7 +6,7 @@ import com.typesafe.scalalogging.StrictLogging
 
 import scala.concurrent.duration._
 
-case class AmqpClientLifecycle(config: AmqpClientConfig) extends Lifecycle[AmqpClient] with StrictLogging {
+case class AmqpClientLifecycle(config: AmqpClientConfig) extends Lifecycle[AmqpClient[Lifecycle]] with StrictLogging {
 
   override type ServiceInstance = Connection
 
@@ -14,7 +14,7 @@ case class AmqpClientLifecycle(config: AmqpClientConfig) extends Lifecycle[AmqpC
     RabbitConnection(config)
   }
 
-  override def unwrap(instance: Connection): AmqpClient = new RawAmqpClient(AmqpChannelLifecycle(instance))
+  override def unwrap(instance: Connection): AmqpClient[Lifecycle] = new RawAmqpClient(AmqpChannelLifecycle(instance))
 
   override def shutdown(instance: Connection): Unit =
     if (instance.isOpen) {
