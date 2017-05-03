@@ -1,7 +1,7 @@
 package com.itv.bucky.example.marshalling
 
 import com.itv.bucky.PublishCommandBuilder.publishCommandBuilder
-import com.itv.bucky.decl.DeclarationLifecycle
+import com.itv.bucky.lifecycle._
 import com.itv.lifecycle.Lifecycle
 import com.itv.bucky._
 import com.itv.bucky.decl._
@@ -10,6 +10,7 @@ import com.itv.bucky.example.marshalling.Shared.Person
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent._
 import scala.concurrent.duration._
+
 
 object MarshallingPublisher extends App {
 

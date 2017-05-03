@@ -112,10 +112,8 @@ lazy val core = project
   .settings(kernelSettings: _*)
   .settings(
     libraryDependencies ++= Seq(
-      "com.itv" %% "lifecycle" % itvLifecycleVersion,
       "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
-      "org.scalatest" %% "scalatest" % scalaTestVersion % "test",
-      "org.mockito" % "mockito-core" % mockitoVersion % "test"
+      "org.scalatest" %% "scalatest" % scalaTestVersion % "test"
     )
   )
   .configs(IntegrationTest)
@@ -235,7 +233,8 @@ lazy val rabbitmq = project
       "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
       "org.scalatest" %% "scalatest" % scalaTestVersion % "test, it",
       "io.netty" % "netty" % "3.4.2.Final" % "test,it",
-      "com.typesafe" % "config" % "1.2.1" % "it"
+      "com.typesafe" % "config" % "1.2.1" % "it",
+      "org.mockito" % "mockito-core" % mockitoVersion % "test"
     )
   )
 

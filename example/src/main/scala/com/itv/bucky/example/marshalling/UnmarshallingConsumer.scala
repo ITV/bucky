@@ -1,7 +1,8 @@
 package com.itv.bucky.example.marshalling
 
 import com.itv.bucky._
-import com.itv.bucky.decl.{DeclarationLifecycle, Queue}
+import com.itv.bucky.decl._
+import com.itv.bucky.lifecycle._
 import com.itv.bucky.example.marshalling.Shared.Person
 import com.itv.lifecycle.Lifecycle
 import com.typesafe.scalalogging.StrictLogging

@@ -3,7 +3,6 @@ package com.itv
 import java.lang.management.ManagementFactory
 import java.util.Date
 
-import com.itv.lifecycle.{Lifecycle, NoOpLifecycle}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -157,15 +156,6 @@ package object bucky {
 
       override def flatMap[A, B](m: Id[A])(f: (A) => Id[B]): Id[B] = f(m)
     }
-  }
-
-
-  implicit val lifecycleMonad = new Monad[Lifecycle] {
-    override def apply[A](a: => A): Lifecycle[A] = NoOpLifecycle(a)
-
-    override def map[A, B](m: Lifecycle[A])(f: (A) => B): Lifecycle[B] = m.map(f)
-
-    override def flatMap[A, B](m: Lifecycle[A])(f: (A) => Lifecycle[B]): Lifecycle[B] = m.flatMap(f)
   }
 
 }

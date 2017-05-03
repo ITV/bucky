@@ -2,7 +2,7 @@ package com.itv.bucky.example.basic
 
 import com.itv.bucky.AmqpClient
 import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
-import com.itv.bucky.decl.DeclarationLifecycle
+import com.itv.bucky.lifecycle._
 import com.itv.lifecycle.Lifecycle
 import com.typesafe.scalalogging.StrictLogging
 import com.itv.bucky._

@@ -3,7 +3,7 @@ package com.itv.bucky
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.SameThreadExecutionContext.implicitly
 import com.itv.bucky.Unmarshaller._
-import com.itv.bucky.decl.{DeclarationLifecycle, Exchange, Queue}
+import com.itv.bucky.decl.{Exchange, Queue}
 import com.itv.bucky.pattern.requeue._
 import com.itv.lifecycle.Lifecycle
 import org.scalatest.FunSuite
@@ -14,6 +14,7 @@ import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Random, Success}
+import com.itv.bucky.lifecycle._
 
 class RequeueIntegrationTest extends FunSuite with ScalaFutures {
 

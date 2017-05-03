@@ -3,6 +3,7 @@ package com.itv.bucky.example.requeue
 import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
 import com.itv.bucky.decl._
 import com.itv.bucky._
+import com.itv.bucky.lifecycle._
 import com.itv.bucky.pattern.requeue._
 import com.itv.lifecycle.Lifecycle
 import com.typesafe.scalalogging.StrictLogging
@@ -10,6 +11,7 @@ import com.typesafe.scalalogging.StrictLogging
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration._
+
 
 object RequeueConsumer extends App with StrictLogging {
 

@@ -1,7 +1,7 @@
 package com.itv.bucky.example.argonaut
 
 import com.itv.bucky.AmqpClient
-import com.itv.bucky.decl.DeclarationLifecycle
+import com.itv.bucky.lifecycle._
 import com.itv.lifecycle.Lifecycle
 import com.typesafe.scalalogging.StrictLogging
 import com.itv.bucky._

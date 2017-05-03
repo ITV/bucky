@@ -3,6 +3,7 @@ package com.itv.bucky.example.argonaut
 import com.itv.bucky.PublishCommandBuilder.publishCommandBuilder
 import com.itv.bucky._
 import com.itv.bucky.decl._
+import com.itv.bucky.lifecycle._
 import com.itv.bucky.example.argonaut.Shared.Person
 import com.itv.lifecycle.Lifecycle
 

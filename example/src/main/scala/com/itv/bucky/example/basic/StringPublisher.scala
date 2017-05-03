@@ -5,6 +5,7 @@ import com.itv.bucky.PublishCommandBuilder._
 import com.itv.bucky.decl._
 import com.itv.lifecycle.Lifecycle
 import com.itv.bucky._
+import com.itv.bucky.lifecycle._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
