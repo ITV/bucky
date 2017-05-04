@@ -1,48 +1,33 @@
 package com.itv.bucky
 
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.{Executors, TimeUnit}
 
-import com.itv.lifecycle._
 import com.rabbitmq.client.Channel
 import com.typesafe.scalalogging.StrictLogging
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.{Duration, FiniteDuration}
-import scala.util.Try
+import scala.language.higherKinds
 
-class RawAmqpClient(channelFactory: Lifecycle[Channel]) extends AmqpClient[Lifecycle] with StrictLogging {
+abstract class RawAmqpClient[M[_]](channelFactory: M[Channel])(implicit M: Monad[M]) extends AmqpClient[M] with StrictLogging {
 
   def consumer(queueName: QueueName, handler: Handler[Delivery], actionOnFailure: ConsumeAction = DeadLetter, prefetchCount: Int = 0)
-              (implicit executionContext: ExecutionContext): Lifecycle[Unit] =
-    for {
-      channel <- channelFactory
-    } yield
-      RabbitConsumer(queueName, handler, actionOnFailure, prefetchCount, channel)
+              (implicit executionContext: ExecutionContext): M[Unit] =
+    M.flatMap(channelFactory) { (channel: Channel) =>
+      M.apply(IdConsumer(queueName, handler, actionOnFailure, prefetchCount, channel))
+    }
 
 
+  def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): M[Publisher[PublishCommand]] =
+    M.flatMap(channelFactory) { channel: Channel =>
+      M.apply(
+        IdPublisher(channel,publisherWrapperLifecycle(timeout))
+      )
+    }
 
-  def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): Lifecycle[Publisher[PublishCommand]] =
-    for {
-      channel <- channelFactory
-      publisherWrapper <- publisherWrapperLifecycle(timeout)
-    } yield
-      RabbitPublisher(channel, publisherWrapper)
-
-
-
-  private def publisherWrapperLifecycle(timeout: Duration): Lifecycle[Publisher[PublishCommand] => Publisher[PublishCommand]] = timeout match {
-    case finiteTimeout: FiniteDuration =>
-      ExecutorLifecycles.singleThreadScheduledExecutor.map(ec => new TimeoutPublisher(_, finiteTimeout)(ec))
-    case _ => NoOpLifecycle(identity)
-  }
-
-
-  override def performOps(thunk: (AmqpOps) => Try[Unit]): Try[Unit] =
-    Lifecycle.using(channelFactory)(channel => thunk(ChannelAmqpOps(channel)))
-
-  override def estimatedMessageCount(queueName: QueueName): Try[Int] =
-    Try(Lifecycle.using(channelFactory) { channel =>
-      Option(channel.basicGet(queueName.value, false)).fold(0)(_.getMessageCount + 1)
-    })
+  private def publisherWrapperLifecycle(timeout: Duration): Publisher[PublishCommand] => Publisher[PublishCommand] = timeout match {
+      case finiteTimeout: FiniteDuration =>
+        new TimeoutPublisher(_, finiteTimeout)(Executors.newSingleThreadScheduledExecutor())
+      case _ => identity
+    }
 }
-

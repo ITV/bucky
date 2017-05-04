@@ -1,7 +1,6 @@
 package com.itv.bucky.example.circe
 
 import com.itv.bucky.AmqpClient
-
 import com.itv.lifecycle.Lifecycle
 import com.typesafe.scalalogging.StrictLogging
 import com.itv.bucky._

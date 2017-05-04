@@ -5,6 +5,7 @@ import com.rabbitmq.client.impl.AMQImpl.Basic
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.ScalaFutures
+import com.itv.bucky.lifecycle._
 
 class GenericConsumerTest extends FunSuite with ScalaFutures {
 
@@ -73,8 +74,8 @@ class GenericConsumerTest extends FunSuite with ScalaFutures {
     client.consumer(QueueName("blah"), AmqpClient.handlerOf(handler, unmarshaller, unmarshalFailureAction), actionOnFailure).map(_ => TestFixture(channel, handler))
   }
 
-  private def createClient(channel: StubChannel): RawAmqpClient = {
-    new RawAmqpClient(NoOpLifecycle(channel))
+  private def createClient(channel: StubChannel): RawAmqpClient[Lifecycle] = {
+    new LifecycleRawAmqpClient(NoOpLifecycle(channel))
   }
 
 

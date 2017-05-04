@@ -1,6 +1,7 @@
 package com.itv.bucky
 
 import com.itv.bucky.SameThreadExecutionContext.implicitly
+import com.itv.bucky.lifecycle._
 import com.itv.lifecycle.{Lifecycle, NoOpLifecycle}
 import com.rabbitmq.client.impl.AMQImpl.Basic
 import org.scalatest.FunSuite
@@ -60,7 +61,7 @@ class ConsumerTest extends FunSuite {
     }
   }
 
-  private def createClient(channel: StubChannel): RawAmqpClient = {
-    new RawAmqpClient(NoOpLifecycle(channel))
-  }
+  private def createClient(channel: StubChannel): RawAmqpClient[Lifecycle] =
+    new LifecycleRawAmqpClient(NoOpLifecycle(channel))
+
 }

@@ -4,6 +4,7 @@ import java.io.IOException
 import java.util.concurrent.TimeoutException
 
 import com.itv.lifecycle.{Lifecycle, NoOpLifecycle}
+import com.itv.bucky.lifecycle._
 import com.rabbitmq.client._
 import com.rabbitmq.client.impl.AMQImpl
 import org.scalatest.FunSuite
@@ -128,7 +129,7 @@ class PublisherTest extends FunSuite with ScalaFutures {
 
       val result = publish(anyPublishCommand()).failed
 
-      whenReady(result) { case exception =>
+      whenReady(result) { exception =>
         exception.getMessage shouldBe expectedMsg
       }
     }
@@ -146,7 +147,7 @@ class PublisherTest extends FunSuite with ScalaFutures {
     }
   }
 
-  private def createClient(channel: StubChannel): RawAmqpClient = {
-    new RawAmqpClient(NoOpLifecycle(channel))
+  private def createClient(channel: StubChannel): RawAmqpClient[Lifecycle] = {
+    new LifecycleRawAmqpClient(NoOpLifecycle(channel))
   }
 }
