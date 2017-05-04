@@ -17,6 +17,28 @@ class PublisherTest extends FunSuite with ScalaFutures {
 
   import TestUtils._
 
+  test("Publishing only returns success once publication is acknowledged with Id") {
+    val channel = new StubChannel()
+    val client = new IdAmqpClient(channel)
+
+    val publish = client.publisher(timeout = Duration.Inf)
+
+    channel.transmittedCommands should have size 1
+    channel.transmittedCommands.last shouldBe an[AMQP.Confirm.Select]
+
+    val result = publish(anyPublishCommand())
+
+    channel.transmittedCommands should have size 2
+    channel.transmittedCommands.last shouldBe an[AMQP.Basic.Publish]
+
+    result should not be 'completed
+
+    channel.replyWith(new AMQImpl.Basic.Ack(1L, false))
+
+    result shouldBe 'completed
+    result.futureValue.shouldBe(())
+  }
+
   test("Publishing only returns success once publication is acknowledged") {
     val channel = new StubChannel()
     val client = createClient(channel)

@@ -156,6 +156,15 @@ package object bucky {
 
       override def flatMap[A, B](m: Id[A])(f: (A) => Id[B]): Id[B] = f(m)
     }
+
+
+    import scala.language.implicitConversions
+    implicit def toIdOps[A](id: Id[A]): IdOps[A] = new IdOps(id)
+
+    class IdOps[A](id: Id[A]) {
+      def map[B](f: A => B): Id[B] = idMonad.map(id)(f)
+      def flatMap[B](f: A => Id[B]): Id[B] = idMonad.flatMap(id)(f)
+    }
   }
 
 }

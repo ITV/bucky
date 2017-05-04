@@ -37,7 +37,6 @@ class GenericPublisherTest extends FunSuite with ScalaFutures {
     message.routingKey shouldBe expectedRoutingKey
     message.basicProperties shouldBe expectedProperties
     message.body shouldBe expectedBody
-
   }
 
   test("publishing with a broken publish command serializer should fail the publish future") {
