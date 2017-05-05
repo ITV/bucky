@@ -14,22 +14,14 @@ case class AmqpClientLifecycle(config: AmqpClientConfig) extends Lifecycle[AmqpC
 
   override def unwrap(instance: Connection): AmqpClient[Lifecycle] = new LifecycleRawAmqpClient(AmqpChannelLifecycle(instance))
 
-  override def shutdown(instance: Connection): Unit =
-    if (instance.isOpen) {
-      instance.close()
-    }
-
+  override def shutdown(instance: Connection): Unit = IdConnection.close(instance)
 }
 
 
 case class AmqpChannelLifecycle(connection: Connection) extends VanillaLifecycle[Channel] with StrictLogging {
   override def start(): Channel = IdChannel(connection)
 
-  override def shutdown(channel: Channel): Unit = {
-    if (connection.isOpen) {
-      channel.close()
-    }
-  }
+  override def shutdown(channel: Channel): Unit = IdChannel.close(channel)
 }
 
 

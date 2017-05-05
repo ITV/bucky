@@ -9,12 +9,35 @@ import com.typesafe.scalalogging.StrictLogging
 import scala.concurrent.{ExecutionContext, Promise}
 import scala.util.{Failure, Success, Try}
 
-class IdAmqpClient(channel: Id[Channel]) extends RawAmqpClient[Id](channel) {
+case class IdAmqpClient(channel: Id[Channel]) extends RawAmqpClient[Id](channel) {
   override def performOps(thunk: (AmqpOps) => Try[Unit]): Try[Unit] = thunk(ChannelAmqpOps(channel))
 
   override def estimatedMessageCount(queueName: QueueName): Try[Int] =
     Try(Option(channel.basicGet(queueName.value, false)).fold(0)(_.getMessageCount + 1))
+}
 
+object IdAmqpClient {
+
+  import Monad.toIdOps
+
+  def apply(config: AmqpClientConfig): IdAmqpClient = for {
+    connection <- IdConnection(config)
+    channel <- IdChannel(connection)
+    amqpClient <- IdAmqpClient(channel)
+  } yield amqpClient
+
+  /**
+    * Close channel and connection associated with the IdAmqpClient
+    *
+    * Note: This should not be used if you share the connection
+    *
+    * @param client the IdAmqpClient
+    */
+  def closeAll(client: IdAmqpClient): Unit = {
+    val connection = client.channel.getConnection
+    IdChannel.close(client.channel)
+    IdConnection.close(connection)
+  }
 }
 
 object IdPublisher extends StrictLogging {
@@ -141,9 +164,20 @@ object IdConnection extends StrictLogging {
         throw exception
     }
   }
+
+  def close(connection: Connection): Unit =
+    if (connection.isOpen) {
+      connection.close()
+    }
 }
 
 object IdChannel extends StrictLogging {
+
+  def close(channel: Channel): Unit =
+    if (channel.getConnection.isOpen) {
+      channel.close()
+    }
+
   def apply(connection: Connection): Id[Channel] = {
     Try {
       logger.info(s"Starting Channel")

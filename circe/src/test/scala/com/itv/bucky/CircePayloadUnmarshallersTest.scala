@@ -10,7 +10,7 @@ import org.scalatest.Matchers._
 
 import scala.util.Random
 
-class CircePayloadUnmarshallersTest  extends FunSuite {
+class CircePayloadUnmarshallersTest extends FunSuite {
 
   import UnmarshalResultOps._
   import com.itv.bucky.CirceSupport._
@@ -32,13 +32,14 @@ class CircePayloadUnmarshallersTest  extends FunSuite {
     failure should include("< (line 1, column 1)")
   }
 
-  test("it should convert to a type") {
-    val expectedValue = new Random().nextString(100)
+  test(s"it should convert to a type") {
+    val expectedValue = s"Random-${new Random().nextInt(100)}"
     val payload = validJson(expectedValue)
 
     val someResult = unmarshallerFromDecodeJson[Some].unmarshal(payload).success
     someResult.foo shouldBe expectedValue
   }
+
 
   test("it should not parse to a type with an invalid json") {
     val payload = invalidJson()
@@ -63,7 +64,8 @@ class CircePayloadUnmarshallersTest  extends FunSuite {
     result shouldBe expected
   }
 
-  def validJson(value: String): Payload =  Payload.from(s"""{"foo":"$value"}""")(StringPayloadMarshaller)
+  def validJson(value: String): Payload = Payload.from(s"""{"foo":"$value"}""")(StringPayloadMarshaller)
+
   def invalidJson() = Payload.from(s"<[Bar: ${new Random().nextInt()}}]")
 
 }

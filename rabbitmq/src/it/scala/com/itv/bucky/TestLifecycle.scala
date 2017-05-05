@@ -35,7 +35,6 @@ object TestLifecycle {
     result <- base(defaultDeclaration(queueName), config)
     (amqClient, publisher) = result
     consumer <- amqClient.consumer(queueName, handler)
-
   } yield publisher
 
 }
