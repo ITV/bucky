@@ -1,6 +1,7 @@
 package com.itv.bucky
 
 import com.itv.bucky.SameThreadExecutionContext.implicitly
+import com.itv.bucky.future.{FutureAmqpClient, FutureIdAmqpClient}
 import com.itv.bucky.lifecycle._
 import com.itv.lifecycle.{Lifecycle, NoOpLifecycle}
 import com.rabbitmq.client.impl.AMQImpl.Basic
@@ -13,7 +14,7 @@ class ConsumerTest extends FunSuite {
 
   test("Runs callback with delivered messages with Id") {
     val channel = new StubChannel()
-    val client = new IdAmqpClient(channel)
+    val client = new FutureIdAmqpClient(channel)
 
     val handler = new StubConsumeHandler[Delivery]()
 
@@ -96,7 +97,7 @@ class ConsumerTest extends FunSuite {
   }
 
 
-  private def createClient(channel: StubChannel): RawAmqpClient[Lifecycle] =
+  private def createClient(channel: StubChannel): FutureAmqpClient[Lifecycle] =
     new LifecycleRawAmqpClient(NoOpLifecycle(channel))
 
 }

@@ -4,7 +4,8 @@ import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.PublishCommandBuilder._
 import com.itv.bucky.SameThreadExecutionContext.implicitly
 import com.itv.bucky._
-import com.itv.bucky.lifecycle.AmqpClientLifecycle
+import com.itv.bucky.lifecycle._
+import com.itv.bucky.future._
 import com.itv.lifecycle.Lifecycle
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._

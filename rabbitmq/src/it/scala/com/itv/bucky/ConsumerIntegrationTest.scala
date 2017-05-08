@@ -5,6 +5,7 @@ import com.itv.bucky.UnmarshalResult.Success
 import com.itv.bucky.Unmarshaller._
 import com.itv.bucky.decl._
 import com.itv.bucky.lifecycle._
+import com.itv.bucky.future._
 import com.itv.bucky.pattern.requeue._
 import com.itv.lifecycle.Lifecycle
 import com.typesafe.scalalogging.StrictLogging
@@ -14,6 +15,7 @@ import org.scalatest.Matchers._
 import org.scalatest.concurrent.Eventually.eventually
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 
+import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.Random
 
@@ -163,7 +165,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogg
     }
   }
 
-  def messageConsumer[T](queueName: QueueName, handler: Handler[T], unmarshaller: DeliveryUnmarshaller[T]) = for {
+  def messageConsumer[T](queueName: QueueName, handler: Handler[Future, T], unmarshaller: DeliveryUnmarshaller[T]) = for {
     result <- base(defaultDeclaration(queueName))
     (amqClient, publisher) = result
     consumer <- amqClient.consumer(queueName, AmqpClient.deliveryHandlerOf(handler, unmarshaller))

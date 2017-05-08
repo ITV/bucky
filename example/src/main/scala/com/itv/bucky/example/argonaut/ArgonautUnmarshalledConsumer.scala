@@ -1,11 +1,11 @@
 package com.itv.bucky.example.argonaut
 
-import com.itv.bucky.AmqpClient
-import com.itv.bucky.lifecycle._
 import com.itv.lifecycle.Lifecycle
 import com.typesafe.scalalogging.StrictLogging
 import com.itv.bucky._
 import com.itv.bucky.decl._
+import com.itv.bucky.lifecycle._
+import com.itv.bucky.future._
 import com.itv.bucky.example.argonaut.Shared.Person
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -25,7 +25,7 @@ object ArgonautUnmarshalledConsumer extends App with StrictLogging {
   val amqpClientConfig: AmqpClientConfig = AmqpClientConfig("33.33.33.11", 5672, "guest", "guest")
 
   val personHandler =
-    Handler { message: Person =>
+    Handler[Future, Person] { message: Person =>
       Future {
         logger.info(s"${message.name} is ${message.age} years old")
         Ack

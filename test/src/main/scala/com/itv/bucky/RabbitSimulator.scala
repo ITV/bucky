@@ -22,7 +22,6 @@ case object IdentityBindings extends Bindings {
 }
 
 
-
 /**
   * Provides an AmqpClient implementation that simulates RabbitMQ server with one main difference:
   * Messages are sent directly to the consumer when published, there is no intermediate queue.
@@ -32,20 +31,19 @@ case object IdentityBindings extends Bindings {
   * @param bindings A mapping from routing key to queue name, defaults to identity.
   */
 class RabbitSimulator[M[_]](bindings: Bindings = IdentityBindings)(implicit M: Monad[M],
-                                                                                           executionContext: ExecutionContext) extends AmqpClient[M] with StrictLogging {
+                                                                   executionContext: ExecutionContext) extends AmqpClient[M, Future, Throwable] with StrictLogging {
 
   case class Publication(queueName: QueueName, message: Payload, consumeActionValue: Future[ConsumeAction])
 
   private val declarations = scala.collection.mutable.HashMap.empty[(ExchangeName, RoutingKey), QueueName]
 
-  private val consumers = new scala.collection.mutable.HashMap[QueueName, List[Handler[Delivery]]]()
+  private val consumers = new scala.collection.mutable.HashMap[QueueName, List[Handler[Future, Delivery]]]()
   private val messagesBeingProcessed: TrieMap[UUID, Publication] = TrieMap.empty
   private val deliveryTag = new AtomicLong()
 
 
-  def consumer(queueName: QueueName, handler: Handler[Delivery], exceptionalAction: ConsumeAction = DeadLetter, prefetchCount: Int = 0)
-              (implicit executionContext: ExecutionContext): M[Unit] = M.apply {
-    val monitorHandler: Handler[Delivery] = delivery => {
+  def consumer(queueName: QueueName, handler: Handler[Future, Delivery], exceptionalAction: ConsumeAction = DeadLetter, prefetchCount: Int = 0): M[Unit] = M.apply {
+    val monitorHandler: Handler[Future, Delivery] = delivery => {
       val key = UUID.randomUUID()
       val consumeActionValue = handler(delivery)
       messagesBeingProcessed += key -> Publication(queueName, delivery.body, consumeActionValue)
@@ -60,7 +58,7 @@ class RabbitSimulator[M[_]](bindings: Bindings = IdentityBindings)(implicit M: M
     consumers += (queueName -> handlers)
   }
 
-  def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): M[Publisher[PublishCommand]] =
+  def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): M[Publisher[Future, PublishCommand]] =
     M.apply {
       (command: PublishCommand) => {
         publish(command).map(_ => ())
@@ -72,7 +70,7 @@ class RabbitSimulator[M[_]](bindings: Bindings = IdentityBindings)(implicit M: M
     if (isDefinedAt(publishCommand)) {
       val queueName = queueNameFor(publishCommand)
       consumers.get(queueName).fold(Future.failed[ConsumeAction](new RuntimeException(s"No consumers found for $queueName!"))) { handlers =>
-        val responses = handlers.map (h => h(Delivery(publishCommand.body, ConsumerTag("ctag"), Envelope(deliveryTag.getAndIncrement(), false, publishCommand.exchange, publishCommand.routingKey), publishCommand.basicProperties)))
+        val responses = handlers.map(h => h(Delivery(publishCommand.body, ConsumerTag("ctag"), Envelope(deliveryTag.getAndIncrement(), false, publishCommand.exchange, publishCommand.routingKey), publishCommand.basicProperties)))
         Future.sequence(responses).map(actions => actions.find(_ != Ack).getOrElse(Ack))
       }
     } else

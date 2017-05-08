@@ -3,10 +3,13 @@ package com.itv.bucky
 import com.itv.bucky.IntegrationUtils.defaultDeclaration
 import com.itv.bucky.SameThreadExecutionContext.implicitly
 import com.itv.bucky.decl.DeclarationExecutor
+import com.itv.bucky.future.FutureIdAmqpClient
+import com.itv.bucky.future._
 import com.itv.lifecycle.Lifecycle
 import com.typesafe.scalalogging.StrictLogging
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
+
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 
 import scala.concurrent.duration._
@@ -32,13 +35,14 @@ class PublisherIntegrationTest extends FunSuite with ScalaFutures with StrictLog
   }
 
   test("Can publish messages to a (pre-existing) queue with Id") {
+    import SameThreadExecutionContext.implicitly
     val testQueueName = "bucky-publisher-test-2"
     val routingKey = RoutingKey(testQueueName)
     val exchange = ExchangeName("")
 
     val handler = new QueueWatcher[Delivery]
 
-    val amqpClient = IdAmqpClient(defaultConfig)
+    val amqpClient = FutureIdAmqpClient(defaultConfig)
 
     DeclarationExecutor(defaultDeclaration(QueueName(testQueueName)), amqpClient, 5.seconds)
     amqpClient.consumer(QueueName(testQueueName), handler)
@@ -49,7 +53,7 @@ class PublisherIntegrationTest extends FunSuite with ScalaFutures with StrictLog
 
     handler.nextMessage().futureValue.body.value shouldBe body.value
 
-    IdAmqpClient.closeAll(amqpClient)
+    FutureIdAmqpClient.closeAll(amqpClient)
   }
 
 

@@ -5,6 +5,8 @@ import com.itv.bucky.SameThreadExecutionContext.implicitly
 import com.itv.bucky.Unmarshaller._
 import com.itv.bucky.decl.{Exchange, Queue}
 import com.itv.bucky.pattern.requeue._
+import com.itv.bucky.lifecycle._
+import com.itv.bucky.future._
 import com.itv.lifecycle.Lifecycle
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
@@ -14,7 +16,7 @@ import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Random, Success}
-import com.itv.bucky.lifecycle._
+
 
 class RequeueIntegrationTest extends FunSuite with ScalaFutures {
 
@@ -160,7 +162,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
     }
   }
 
-  case class TestFixture(amqpClient: AmqpClient[Lifecycle], queueName: QueueName, requeueQueueName: QueueName, deadletterQueue: QueueWatcher[Delivery], publisher: Publisher[PublishCommand]) {
+  case class TestFixture(amqpClient: AmqpClient[Lifecycle, Future, Throwable], queueName: QueueName, requeueQueueName: QueueName, deadletterQueue: QueueWatcher[Delivery], publisher: Publisher[Future, PublishCommand]) {
     def publish(body: Payload, properties: MessageProperties = MessageProperties.persistentBasic): Future[Unit] = publisher(
       PublishCommand(ExchangeName(""), RoutingKey(queueName.value), properties, body))
   }
@@ -183,13 +185,13 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
     } yield TestFixture(client, QueueName(testQueueName), QueueName(testQueueName + ".requeue"), deadletterWatcher, publish)
   }
 
-  def testLifecycle[T](handler: RequeueHandler[T], requeuePolicy: RequeuePolicy, unmarshaller: PayloadUnmarshaller[T]): Lifecycle[TestFixture] = for {
+  def testLifecycle[T](handler: RequeueHandler[Future, T], requeuePolicy: RequeuePolicy, unmarshaller: PayloadUnmarshaller[T])(implicit M: Monad[Future]): Lifecycle[TestFixture] = for {
     testFixture <- baseTestLifecycle()
     consumer <- testFixture.amqpClient.requeueHandlerOf(testFixture.queueName, handler, requeuePolicy, unmarshaller)
   } yield testFixture
 
 
-  def testLifecycle(handler: RequeueHandler[Delivery], requeuePolicy: RequeuePolicy): Lifecycle[TestFixture] = for {
+  def testLifecycle(handler: RequeueHandler[Future, Delivery], requeuePolicy: RequeuePolicy): Lifecycle[TestFixture] = for {
     testFixture <- baseTestLifecycle()
     consumer <- testFixture.amqpClient.requeueOf(testFixture.queueName, handler, requeuePolicy)
   } yield testFixture
@@ -200,7 +202,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
 
 }
 
-object AlwaysRequeue extends RequeueHandler[String] {
+object AlwaysRequeue extends RequeueHandler[Future, String] {
   override def apply(message: String): Future[RequeueConsumeAction] =
     Future.successful(Requeue)
 }

@@ -1,12 +1,16 @@
 package com.itv.bucky
 
 import com.itv.bucky.Monad.Id
+import com.itv.bucky.future.{FutureAmqpClient, FutureIdAmqpClient}
 import com.itv.lifecycle.{Lifecycle, NoOpLifecycle}
 import com.rabbitmq.client.impl.AMQImpl.Basic
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.ScalaFutures
 import com.itv.bucky.lifecycle._
+import com.itv.bucky.future._
+
+import scala.concurrent.Future
 
 class GenericConsumerTest extends FunSuite with ScalaFutures {
 
@@ -82,13 +86,13 @@ class GenericConsumerTest extends FunSuite with ScalaFutures {
 
 
   def testId(unmarshaller: Unmarshaller[Payload, Payload], unmarshalFailureAction: ConsumeAction = DeadLetter, actionOnFailure: ConsumeAction = DeadLetter): Id[TestFixture] = {
-    import Monad.toIdOps
+    import Monad._
     val channel = new StubChannel()
-    val client = new IdAmqpClient(channel)
+    val client = new FutureIdAmqpClient(channel)
     val handler = new StubConsumeHandler[Payload]()
 
-    client.consumer(QueueName("blah"), AmqpClient.handlerOf(handler, unmarshaller, unmarshalFailureAction), actionOnFailure).map(_ =>TestFixture(channel, handler))
-
+    val of1: Handler[Future, Delivery] = AmqpClient.handlerOf(handler, unmarshaller, unmarshalFailureAction)
+    client.consumer(QueueName("blah"), of1, actionOnFailure).flatMap(_ => TestFixture(channel, handler))
   }
 
   def testLifecycle(unmarshaller: Unmarshaller[Payload, Payload], unmarshalFailureAction: ConsumeAction = DeadLetter, actionOnFailure: ConsumeAction = DeadLetter): Lifecycle[TestFixture] = {
@@ -96,10 +100,11 @@ class GenericConsumerTest extends FunSuite with ScalaFutures {
     val client = createClient(channel)
     val handler = new StubConsumeHandler[Payload]()
 
-    client.consumer(QueueName("blah"), AmqpClient.handlerOf(handler, unmarshaller, unmarshalFailureAction), actionOnFailure).map(_ => TestFixture(channel, handler))
+    val of1: Handler[Future, Delivery] = AmqpClient.handlerOf(handler, unmarshaller, unmarshalFailureAction)
+    client.consumer(QueueName("blah"), of1, actionOnFailure).map(_ => TestFixture(channel, handler))
   }
 
-  private def createClient(channel: StubChannel): RawAmqpClient[Lifecycle] = {
+  private def createClient(channel: StubChannel): FutureAmqpClient[Lifecycle] = {
     new LifecycleRawAmqpClient(NoOpLifecycle(channel))
   }
 

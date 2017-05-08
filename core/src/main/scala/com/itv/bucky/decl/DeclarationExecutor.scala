@@ -10,7 +10,7 @@ import scala.language.higherKinds
 
 
 object DeclarationExecutor extends StrictLogging{
-  def apply[M[_]](declarations: Iterable[Declaration], client: AmqpClient[M], timeout: FiniteDuration = 5.seconds): Id[Unit] = {
+  def apply[M[_], F[_], E](declarations: Iterable[Declaration], client: AmqpClient[M, F, E], timeout: FiniteDuration = 5.seconds): Id[Unit] = {
     logger.info(s"Applying the following declarations: $declarations")
 
     client.performOps(Declaration.runAll(declarations)) match {

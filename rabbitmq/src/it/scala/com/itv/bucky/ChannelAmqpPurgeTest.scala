@@ -9,6 +9,7 @@ import org.scalatest.concurrent.{Eventually, ScalaFutures}
 
 import scala.concurrent.duration._
 import scala.util.{Random, Success}
+import SameThreadExecutionContext.implicitly
 
 class ChannelAmqpPurgeTest extends FunSuite with ScalaFutures with StrictLogging {
 

@@ -12,6 +12,8 @@ import org.scalatest.Matchers._
 import org.scalatest.concurrent.ScalaFutures
 
 import scala.concurrent.duration._
+import SameThreadExecutionContext.implicitly
+import com.itv.bucky.future.{FutureAmqpClient, FutureIdAmqpClient}
 
 class PublisherTest extends FunSuite with ScalaFutures {
 
@@ -19,7 +21,7 @@ class PublisherTest extends FunSuite with ScalaFutures {
 
   test("Publishing only returns success once publication is acknowledged with Id") {
     val channel = new StubChannel()
-    val client = new IdAmqpClient(channel)
+    val client = new FutureIdAmqpClient(channel)
 
     val publish = client.publisher(timeout = Duration.Inf)
 
@@ -169,7 +171,7 @@ class PublisherTest extends FunSuite with ScalaFutures {
     }
   }
 
-  private def createClient(channel: StubChannel): RawAmqpClient[Lifecycle] = {
+  private def createClient(channel: StubChannel): FutureAmqpClient[Lifecycle] = {
     new LifecycleRawAmqpClient(NoOpLifecycle(channel))
   }
 }

@@ -5,6 +5,7 @@ import com.itv.bucky.lifecycle._
 import com.itv.lifecycle.Lifecycle
 import com.itv.bucky._
 import com.itv.bucky.decl._
+import com.itv.bucky.future._
 import com.itv.bucky.example.marshalling.Shared.Person
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -35,7 +36,7 @@ object MarshallingPublisher extends App {
     * A lifecycle is a monadic try/finally statement.
     * More detailed information is available here https://github.com/ITV/lifecycle
     */
-  val lifecycle: Lifecycle[Publisher[Person]] =
+  val lifecycle: Lifecycle[Publisher[Future, Person]] =
     for {
       amqpClient <- AmqpClientLifecycle(amqpClientConfig)
       _ <- DeclarationLifecycle(Declarations.all, amqpClient)
@@ -43,7 +44,7 @@ object MarshallingPublisher extends App {
     }
       yield publisher
 
-  Lifecycle.using(lifecycle) { publisher: Publisher[Person] =>
+  Lifecycle.using(lifecycle) { publisher: Publisher[Future, Person] =>
     val result: Future[Unit] = publisher(Person("Bob", 21))
     Await.result(result, 1.second)
   }

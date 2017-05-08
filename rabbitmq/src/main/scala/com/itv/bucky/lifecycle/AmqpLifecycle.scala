@@ -6,15 +6,19 @@ import com.itv.lifecycle.{Lifecycle, VanillaLifecycle}
 import com.rabbitmq.client.{Channel, Connection}
 import com.typesafe.scalalogging.StrictLogging
 
-case class AmqpClientLifecycle(config: AmqpClientConfig) extends Lifecycle[AmqpClient[Lifecycle]] with StrictLogging {
+import scala.concurrent.{ExecutionContext, Future}
+import scala.language.higherKinds
+import scala.concurrent.duration._
+
+case class AmqpClientLifecycle(config: AmqpClientConfig)(implicit executionContext: ExecutionContext) extends Lifecycle[AmqpClient[Lifecycle, Future, Throwable]] with StrictLogging {
 
   override type ServiceInstance = Connection
 
   override def start(): Connection = IdConnection(config)
 
-  override def unwrap(instance: Connection): AmqpClient[Lifecycle] = new LifecycleRawAmqpClient(AmqpChannelLifecycle(instance))
-
   override def shutdown(instance: Connection): Unit = IdConnection.close(instance)
+
+  override def unwrap(instance: Connection): AmqpClient[Lifecycle, Future, Throwable] = new LifecycleRawAmqpClient(AmqpChannelLifecycle(instance))
 }
 
 
@@ -25,10 +29,10 @@ case class AmqpChannelLifecycle(connection: Connection) extends VanillaLifecycle
 }
 
 
-import scala.concurrent.duration._
-import scala.language.higherKinds
 
-case class DeclarationLifecycle[M[_]](declarations: Iterable[Declaration], client: AmqpClient[M], timeout: FiniteDuration = 5.seconds) extends VanillaLifecycle[Unit]{
+
+
+case class DeclarationLifecycle[F[_], E](declarations: Iterable[Declaration], client: AmqpClient[Lifecycle, F, E], timeout: FiniteDuration = 5.seconds) extends VanillaLifecycle[Unit] {
 
   def start(): Unit = DeclarationExecutor(declarations, client, timeout)
 

@@ -1,13 +1,16 @@
-package com.itv.bucky
+package com.itv.bucky.future
 
-import java.util.concurrent.{ScheduledExecutorService, TimeoutException}
+import java.util.concurrent.ScheduledExecutorService
+
+import com.itv.bucky.{PublishCommand, Publisher}
 
 import scala.concurrent.duration.FiniteDuration
-import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.concurrent.{ExecutionContext, Future, Promise, TimeoutException}
+import scala.language.higherKinds
 
-class TimeoutPublisher(delegate: Publisher[PublishCommand],
-                       timeout: FiniteDuration)
-                      (ec: ScheduledExecutorService) extends Publisher[PublishCommand] {
+class FutureTimeoutPublisher(delegate: Publisher[Future, PublishCommand],
+                             timeout: FiniteDuration)
+                            (ec: ScheduledExecutorService) extends Publisher[Future, PublishCommand] {
   override def apply(cmd: PublishCommand): Future[Unit] = {
     val promise = Promise[Unit]
     ec.schedule(

@@ -4,6 +4,7 @@ import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
 import com.itv.bucky.decl._
 import com.itv.bucky._
 import com.itv.bucky.lifecycle._
+import com.itv.bucky.future._
 import com.itv.bucky.pattern.requeue._
 import com.itv.lifecycle.Lifecycle
 import com.typesafe.scalalogging.StrictLogging
@@ -23,7 +24,7 @@ object RequeueConsumer extends App with StrictLogging {
   val amqpClientConfig: AmqpClientConfig = AmqpClientConfig("33.33.33.11", 5672, "guest", "guest")
 
   val stringToLogRequeueHandler =
-    RequeueHandler { message: String =>
+    RequeueHandler[Future, String] { message: String =>
       Future {
         logger.info(message)
 

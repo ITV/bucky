@@ -6,20 +6,19 @@ import com.itv.bucky.decl._
 import com.typesafe.scalalogging.StrictLogging
 
 import scala.concurrent.duration.{Duration, FiniteDuration}
-import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 import scala.language.higherKinds
 
-trait AmqpClient[M[_]] {
+trait AmqpClient[B[_], F[_], E] {
 
   def publisherOf[T](builder: PublishCommandBuilder[T], timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS))
-                    (implicit M:Monad[M], executionContext: ExecutionContext): M[Publisher[T]] =
-    M.map(publisher(timeout))(AmqpClient.publisherOf(builder))
+                    (implicit M:Monad[B], F: MonadError[F, E]): B[Publisher[F, T]] = {
+    M.map(publisher(timeout))(p => AmqpClient.publisherOf(builder)(p)(F))
+  }
 
-  def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): M[Publisher[PublishCommand]]
+  def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): B[Publisher[F, PublishCommand]]
 
-  def consumer(queueName: QueueName, handler: Handler[Delivery], exceptionalAction: ConsumeAction = DeadLetter, prefetchCount: Int = 0)
-              (implicit executionContext: ExecutionContext): M[Unit]
+  def consumer(queueName: QueueName, handler: Handler[F, Delivery], exceptionalAction: ConsumeAction = DeadLetter, prefetchCount: Int = 0): B[Unit]
 
   def performOps(thunk: AmqpOps => Try[Unit]): Try[Unit]
 
@@ -37,22 +36,18 @@ trait AmqpOps {
 
 object AmqpClient extends StrictLogging {
 
-  def publisherOf[T](commandBuilder: PublishCommandBuilder[T])(publisher: Publisher[PublishCommand])
-                    (implicit executionContext: ExecutionContext): Publisher[T] = (message: T) =>
-    for {
-      publishCommand <- Future {
+  def publisherOf[F[_], T](commandBuilder: PublishCommandBuilder[T])(publisher: Publisher[F, PublishCommand])
+                    (implicit M: Monad[F]): Publisher[F, T] = (message: T) =>
+       M.flatMap(M.apply {
         commandBuilder.toPublishCommand(message)
-      }
-      _ <- publisher(publishCommand)
-    } yield ()
+      }){ publisher }
 
 
-  def deliveryHandlerOf[T](handler: Handler[T], unmarshaller: DeliveryUnmarshaller[T], unmarshalFailureAction: ConsumeAction = DeadLetter)
-                          (implicit ec: ExecutionContext): Handler[Delivery] =
-    new DeliveryUnmarshalHandler[T, ConsumeAction](unmarshaller)(handler, unmarshalFailureAction)
+  def deliveryHandlerOf[F[_], T](handler: Handler[F, T], unmarshaller: DeliveryUnmarshaller[T], unmarshalFailureAction: ConsumeAction = DeadLetter)(implicit monad: Monad[F]): Handler[F, Delivery] =
+    new DeliveryUnmarshalHandler[F, T, ConsumeAction](unmarshaller)(handler, unmarshalFailureAction)
 
-  def handlerOf[T](handler: Handler[T], unmarshaller: PayloadUnmarshaller[T], unmarshalFailureAction: ConsumeAction = DeadLetter)
-                  (implicit ec: ExecutionContext): Handler[Delivery] =
+  def handlerOf[F[_], T](handler: Handler[F, T], unmarshaller: PayloadUnmarshaller[T], unmarshalFailureAction: ConsumeAction = DeadLetter)
+                        (implicit monad: Monad[F]): Handler[F, Delivery] =
     deliveryHandlerOf(handler, Unmarshaller.toDeliveryUnmarshaller(unmarshaller), unmarshalFailureAction)
 
 }

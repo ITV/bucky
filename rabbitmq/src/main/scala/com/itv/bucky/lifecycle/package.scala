@@ -3,6 +3,7 @@ package com.itv.bucky
 import com.itv.lifecycle.{Lifecycle, NoOpLifecycle}
 
 
+
 package object lifecycle {
 
 
@@ -13,5 +14,6 @@ package object lifecycle {
 
     override def flatMap[A, B](m: Lifecycle[A])(f: (A) => Lifecycle[B]): Lifecycle[B] = m.flatMap(f)
   }
+
 
 }

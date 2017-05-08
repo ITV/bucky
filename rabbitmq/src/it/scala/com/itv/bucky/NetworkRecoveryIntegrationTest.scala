@@ -12,13 +12,16 @@ import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import scala.concurrent.duration._
 import scala.util.Random
 import com.itv.bucky.lifecycle._
+import com.itv.bucky.future._
+
+import scala.concurrent.Future
 
 
 class NetworkRecoveryIntegrationTest extends FunSuite with ScalaFutures {
 
   import com.itv.bucky.TestUtils._
 
-  def testLifecycle: Lifecycle[(Proxy, StubConsumeHandler[Unit], StubConsumeHandler[Unit], Publisher[Unit], Publisher[Unit])] = {
+  def testLifecycle: Lifecycle[(Proxy, StubConsumeHandler[Unit], StubConsumeHandler[Unit], Publisher[Future, Unit], Publisher[Future, Unit])] = {
     val queueA = QueueName("proxy" + Random.nextInt())
     val queueB = QueueName("proxy" + Random.nextInt())
     val amqpClientConfig = IntegrationUtils.config
