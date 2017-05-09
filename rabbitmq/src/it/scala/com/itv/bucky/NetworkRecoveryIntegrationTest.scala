@@ -21,7 +21,7 @@ class NetworkRecoveryIntegrationTest extends FunSuite with ScalaFutures {
 
   import com.itv.bucky.TestUtils._
 
-  def testLifecycle: Lifecycle[(Proxy, StubConsumeHandler[Unit], StubConsumeHandler[Unit], Publisher[Future, Unit], Publisher[Future, Unit])] = {
+  def testLifecycle: Lifecycle[(Proxy, StubConsumeHandler[Future, Unit], StubConsumeHandler[Future, Unit], Publisher[Future, Unit], Publisher[Future, Unit])] = {
     val queueA = QueueName("proxy" + Random.nextInt())
     val queueB = QueueName("proxy" + Random.nextInt())
     val amqpClientConfig = IntegrationUtils.config
@@ -29,8 +29,8 @@ class NetworkRecoveryIntegrationTest extends FunSuite with ScalaFutures {
     val marshaller: PayloadMarshaller[Unit] = PayloadMarshaller.lift(_ => Payload.from("hello"))
     val pcbA = publishCommandBuilder[Unit](marshaller) using ExchangeName("") using RoutingKey(queueA.value)
     val pcbB = publishCommandBuilder[Unit](marshaller) using ExchangeName("") using RoutingKey(queueB.value)
-    val handlerA = new StubConsumeHandler[Unit]
-    val handlerB = new StubConsumeHandler[Unit]
+    val handlerA = new StubConsumeHandler[Future, Unit]
+    val handlerB = new StubConsumeHandler[Future, Unit]
     val unmarshaller = Unmarshaller.liftResult[Payload, Unit] {
       _.unmarshal[String] match {
         case UnmarshalResult.Success(s) if s == "hello" => UnmarshalResult.Success(())

@@ -31,7 +31,7 @@ case object IdentityBindings extends Bindings {
   * @param bindings A mapping from routing key to queue name, defaults to identity.
   */
 class RabbitSimulator[M[_]](bindings: Bindings = IdentityBindings)(implicit M: Monad[M],
-                                                                   executionContext: ExecutionContext) extends AmqpClient[M, Future, Throwable] with StrictLogging {
+                                                                   executionContext: ExecutionContext) extends AmqpClient[M, Future, Throwable, Unit] with StrictLogging {
 
   case class Publication(queueName: QueueName, message: Payload, consumeActionValue: Future[ConsumeAction])
 

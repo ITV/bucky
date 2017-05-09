@@ -238,6 +238,27 @@ lazy val rabbitmq = project
     )
   )
 
+
+lazy val scalaz = project
+  .settings(name := "itv")
+  .settings(moduleName := "bucky-scalaz")
+  .settings(kernelSettings: _*)
+  .aggregate(core, test, rabbitmq)
+  .dependsOn(core, rabbitmq, test % "test,it")
+  .configs(IntegrationTest)
+  .settings(Defaults.itSettings)
+  .settings(
+    internalDependencyClasspath in IntegrationTest += Attributed.blank((classDirectory in Test).value),
+    parallelExecution in IntegrationTest := false
+  )
+  .settings(
+    libraryDependencies ++= Seq(
+      "com.rabbitmq" % "amqp-client" % amqpClientVersion,
+      "org.scalaz.stream" %% "scalaz-stream" % "0.8.6a",
+      "com.typesafe" % "config" % "1.2.1" % "it"
+    )
+  )
+
 lazy val root = (project in file("."))
   .aggregate(rabbitmq, xml, circe, argonaut, example, test, core)
   .settings(publishArtifact := false)

@@ -12,45 +12,13 @@ import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.language.higherKinds
 import scala.util.{Failure, Success, Try}
 
-abstract class FutureAmqpClient[M[_]](channelFactory: M[Channel])(implicit M: Monad[M], executionContext: ExecutionContext) extends AmqpClient[M, Future, Throwable] with StrictLogging {
-
-  def safePerform[T](future: => Future[T])(implicit executionContext: ExecutionContext): Future[T] = Future(future).flatMap(identity)
+abstract class FutureAmqpClient[M[_]](channelFactory: M[Channel])(implicit M: Monad[M], executionContext: ExecutionContext) extends AmqpClient[M, Future, Throwable, Unit] with StrictLogging {
 
   override def consumer(queueName: QueueName, handler: Handler[Future, Delivery], actionOnFailure: ConsumeAction = DeadLetter, prefetchCount: Int = 0): M[Unit] =
     M.flatMap(channelFactory) { (channel: Channel) =>
-      M.apply {
-        val consumerTag: ConsumerTag = ConsumerTag.create(queueName)
-        logger.info(s"Starting consumer on $queueName with $consumerTag and a prefetchCount of ")
-        Try {
-          channel.basicQos(prefetchCount)
-          channel.basicConsume(queueName.value, false, consumerTag.value, new DefaultConsumer(channel) {
-            override def handleDelivery(consumerTag: String, envelope: RabbitMQEnvelope, properties: BasicProperties, body: Array[Byte]): Unit = {
-              val delivery = Delivery(Payload(body), ConsumerTag(consumerTag), MessagePropertiesConverters(envelope), MessagePropertiesConverters(properties))
-              logger.debug("Received {} on {}", delivery, queueName)
-              safePerform(handler(delivery)).onComplete { result =>
-                val action = result match {
-                  case Success(outcome) => outcome
-                  case Failure(error) =>
-                    logger.error(s"Unhandled exception processing delivery ${envelope.getDeliveryTag}L on $queueName", error)
-                    actionOnFailure
-                }
-                logger.debug("Responding with {} to {} on {}", action, delivery, queueName)
-                action match {
-                  case Ack => getChannel.basicAck(envelope.getDeliveryTag, false)
-                  case DeadLetter => getChannel.basicNack(envelope.getDeliveryTag, false, false)
-                  case RequeueImmediately => getChannel.basicNack(envelope.getDeliveryTag, false, true)
-                }
-              }
-            }
-          })
-        } match {
-          case Success(_) => logger.info(s"Consumer on $queueName has been created!")
-          case Failure(exception) =>
-            logger.error(s"Failure when starting consumer on $queueName because ${exception.getMessage}", exception)
-            throw exception
-        }
-      }
+      M.apply(IdConsumer[Future, Throwable](channel, queueName, handler, actionOnFailure, prefetchCount) { _ => () })
     }
+
   import scala.collection.JavaConverters._
 
   def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): M[Publisher[Future, PublishCommand]] =
@@ -117,8 +85,8 @@ abstract class FutureAmqpClient[M[_]](channelFactory: M[Channel])(implicit M: Mo
   @inline private def box(x: AnyVal): AnyRef = x.asInstanceOf[AnyRef]
 
   private def publisherWrapperLifecycle(timeout: Duration): Publisher[Future, PublishCommand] => Publisher[Future, PublishCommand] = timeout match {
-      case finiteTimeout: FiniteDuration =>
-        new FutureTimeoutPublisher(_, finiteTimeout)(Executors.newSingleThreadScheduledExecutor())
-      case _ => identity
-    }
+    case finiteTimeout: FiniteDuration =>
+      new FutureTimeoutPublisher(_, finiteTimeout)(Executors.newSingleThreadScheduledExecutor())
+    case _ => identity
+  }
 }

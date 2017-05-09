@@ -9,7 +9,7 @@ import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.util.Try
 import scala.language.higherKinds
 
-trait AmqpClient[B[_], F[_], E] {
+trait AmqpClient[B[_], F[_], E, C] {
 
   def publisherOf[T](builder: PublishCommandBuilder[T], timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS))
                     (implicit M:Monad[B], F: MonadError[F, E]): B[Publisher[F, T]] = {
@@ -18,7 +18,7 @@ trait AmqpClient[B[_], F[_], E] {
 
   def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): B[Publisher[F, PublishCommand]]
 
-  def consumer(queueName: QueueName, handler: Handler[F, Delivery], exceptionalAction: ConsumeAction = DeadLetter, prefetchCount: Int = 0): B[Unit]
+  def consumer(queueName: QueueName, handler: Handler[F, Delivery], exceptionalAction: ConsumeAction = DeadLetter, prefetchCount: Int = 0): B[C]
 
   def performOps(thunk: AmqpOps => Try[Unit]): Try[Unit]
 

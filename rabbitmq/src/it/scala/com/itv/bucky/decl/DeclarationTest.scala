@@ -12,6 +12,7 @@ import org.scalatest.Matchers._
 import org.scalatest.concurrent.Eventually.eventually
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 
+import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.Random
 
@@ -30,7 +31,7 @@ class DeclarationTest extends FunSuite with ScalaFutures {
         shouldAutoDelete = false,
         Map.empty).run) shouldBe 'success
 
-      val handler = new StubConsumeHandler[Delivery]()
+      val handler = new StubConsumeHandler[Future, Delivery]()
       val lifecycle =
         for {
           _ <- amqpClient.consumer(QueueName(queueName), handler)
@@ -74,7 +75,7 @@ class DeclarationTest extends FunSuite with ScalaFutures {
 
       amqpClient.performOps(Declaration.runAll(declarations)) shouldBe 'success
 
-      val handler = new StubConsumeHandler[Delivery]()
+      val handler = new StubConsumeHandler[Future, Delivery]()
       val lifecycle =
         for {
           _ <- amqpClient.consumer(queueName, handler)

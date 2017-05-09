@@ -2,13 +2,59 @@ package com.itv.bucky
 
 import com.itv.bucky.Monad.Id
 import com.itv.bucky.decl.{Binding, Exchange, Queue}
-import com.rabbitmq.client.{Channel, Connection, ConnectionFactory}
+
+
 import com.typesafe.scalalogging.StrictLogging
+
+
 
 import scala.language.higherKinds
 import scala.util.{Failure, Success, Try}
 
+import com.itv.bucky.{Envelope => _, _}
+import com.rabbitmq.client.AMQP.BasicProperties
+import com.rabbitmq.client.{Envelope => RabbitMQEnvelope, _}
+import com.rabbitmq.client.{Channel, Connection, ConnectionFactory}
 
+object IdConsumer extends StrictLogging {
+
+  def apply[M[_], E](channel: Channel, queueName: QueueName, handler: Handler[M, Delivery], actionOnFailure: ConsumeAction, prefetchCount: Int = 0)
+                    (f: M[_] => Unit)(implicit M: MonadError[M, E]): Unit= {
+      val consumerTag: ConsumerTag = ConsumerTag.create(queueName)
+      logger.info(s"Starting consumer on $queueName with $consumerTag and a prefetchCount of ")
+      Try {
+        channel.basicQos(prefetchCount)
+        channel.basicConsume(queueName.value, false, consumerTag.value, RabbitConsumer(channel, queueName, handler, actionOnFailure)(f))
+      } match {
+        case Success(_) => logger.info(s"Consumer on $queueName has been created!")
+        case Failure(exception) =>
+          logger.error(s"Failure when starting consumer on $queueName because ${exception.getMessage}", exception)
+          throw exception
+      }
+  }
+}
+
+object RabbitConsumer extends StrictLogging {
+  def apply[M[_], E](channel: Channel, queueName: QueueName, handler: Handler[M, Delivery], actionOnFailure: ConsumeAction)(f: M[_] => Unit)(implicit M: MonadError[M, E]): Consumer = {
+    new DefaultConsumer(channel) {
+      override def handleDelivery(consumerTag: String, envelope: RabbitMQEnvelope, properties: BasicProperties, body: Array[Byte]): Unit = {
+        val delivery = Delivery(Payload(body), ConsumerTag(consumerTag), MessagePropertiesConverters(envelope), MessagePropertiesConverters(properties))
+        logger.debug("Received {} on {}", delivery, queueName)
+        f(M.map(M.handleError(M.flatMap(M.apply(handler(delivery)))(identity)) { error =>
+          logger.error(s"Unhandled exception processing delivery ${envelope.getDeliveryTag}L on $queueName", error)
+          M.apply(actionOnFailure)
+        }) { action =>
+          logger.debug("Responding with {} to {} on {}", action, delivery, queueName)
+          action match {
+            case Ack => channel.basicAck(envelope.getDeliveryTag, false)
+            case DeadLetter => channel.basicNack(envelope.getDeliveryTag, false, false)
+            case RequeueImmediately => channel.basicNack(envelope.getDeliveryTag, false, true)
+          }
+        })
+      }
+    }
+  }
+}
 
 object IdConnection extends StrictLogging {
   def apply(config: AmqpClientConfig): Id[Connection] = {
@@ -40,11 +86,28 @@ object IdConnection extends StrictLogging {
 }
 
 object IdChannel extends StrictLogging {
+  /**
+    * Close channel and connection associated with the IdAmqpClient
+    *
+    * Note: This should not be used if you share the connection
+    *
+    * @param channel the channel
+    */
+  def closeAll(channel: Channel): Unit = {
+    logger.info(s"Closing channel and conection for ${channel}")
+    val connection = channel.getConnection
+    IdChannel.close(channel)
+    IdConnection.close(connection)
+  }
 
   def close(channel: Channel): Unit =
     if (channel.getConnection.isOpen) {
       channel.close()
     }
+
+  def estimateMessageCount(channel: Channel, queueName: QueueName) =
+    Try(Option(channel.basicGet(queueName.value, false)).fold(0)(_.getMessageCount + 1))
+
 
   def apply(connection: Connection): Id[Channel] = {
     Try {

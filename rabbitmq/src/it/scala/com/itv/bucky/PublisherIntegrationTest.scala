@@ -53,7 +53,7 @@ class PublisherIntegrationTest extends FunSuite with ScalaFutures with StrictLog
 
     handler.nextMessage().futureValue.body.value shouldBe body.value
 
-    FutureIdAmqpClient.closeAll(amqpClient)
+    IdChannel.closeAll(amqpClient.channel)
   }
 
 

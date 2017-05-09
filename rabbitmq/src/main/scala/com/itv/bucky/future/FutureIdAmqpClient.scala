@@ -12,7 +12,7 @@ case class FutureIdAmqpClient(channel: Id[Channel])(implicit executionContext: E
   override def performOps(thunk: (AmqpOps) => Try[Unit]): Try[Unit] = thunk(ChannelAmqpOps(channel))
 
   override def estimatedMessageCount(queueName: QueueName): Try[Int] =
-    Try(Option(channel.basicGet(queueName.value, false)).fold(0)(_.getMessageCount + 1))
+    IdChannel.estimateMessageCount(channel, queueName)
 }
 
 
@@ -28,16 +28,4 @@ object FutureIdAmqpClient {
     )
   }
 
-  /**
-    * Close channel and connection associated with the IdAmqpClient
-    *
-    * Note: This should not be used if you share the connection
-    *
-    * @param client the IdAmqpClient
-    */
-  def closeAll(client: FutureIdAmqpClient): Unit = {
-    val connection = client.channel.getConnection
-    IdChannel.close(client.channel)
-    IdConnection.close(connection)
-  }
 }

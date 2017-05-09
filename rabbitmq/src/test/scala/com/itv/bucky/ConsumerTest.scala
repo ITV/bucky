@@ -3,6 +3,7 @@ package com.itv.bucky
 import com.itv.bucky.SameThreadExecutionContext.implicitly
 import com.itv.bucky.future.{FutureAmqpClient, FutureIdAmqpClient}
 import com.itv.bucky.lifecycle._
+import com.itv.bucky.future._
 import com.itv.lifecycle.{Lifecycle, NoOpLifecycle}
 import com.rabbitmq.client.impl.AMQImpl.Basic
 import org.scalatest.FunSuite
@@ -16,7 +17,7 @@ class ConsumerTest extends FunSuite {
     val channel = new StubChannel()
     val client = new FutureIdAmqpClient(channel)
 
-    val handler = new StubConsumeHandler[Delivery]()
+    val handler = new StubConsumeHandler[Future, Delivery]()
 
     client.consumer(QueueName("blah"), handler, prefetchCount = 12)
 
@@ -48,7 +49,7 @@ class ConsumerTest extends FunSuite {
     val channel = new StubChannel()
     val client = createClient(channel)
 
-    val handler = new StubConsumeHandler[Delivery]()
+    val handler = new StubConsumeHandler[Future, Delivery]()
 
     Lifecycle.using(client.consumer(QueueName("blah"), handler, prefetchCount = 12)) {
       _ =>
@@ -81,7 +82,7 @@ class ConsumerTest extends FunSuite {
     val channel = new StubChannel()
     val client = createClient(channel)
 
-    val handler = new StubConsumeHandler[Delivery]()
+    val handler = new StubConsumeHandler[Future, Delivery]()
 
     Lifecycle.using(client.consumer(QueueName("blah"), handler, actionOnFailure = DeadLetter)) {
       _ =>

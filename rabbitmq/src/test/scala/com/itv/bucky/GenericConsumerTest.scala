@@ -82,14 +82,14 @@ class GenericConsumerTest extends FunSuite with ScalaFutures {
     }
   }
 
-  case class TestFixture(channel: StubChannel, handler: StubConsumeHandler[Payload])
+  case class TestFixture(channel: StubChannel, handler: StubConsumeHandler[Future, Payload])
 
 
   def testId(unmarshaller: Unmarshaller[Payload, Payload], unmarshalFailureAction: ConsumeAction = DeadLetter, actionOnFailure: ConsumeAction = DeadLetter): Id[TestFixture] = {
     import Monad._
     val channel = new StubChannel()
     val client = new FutureIdAmqpClient(channel)
-    val handler = new StubConsumeHandler[Payload]()
+    val handler = new StubConsumeHandler[Future, Payload]()
 
     val of1: Handler[Future, Delivery] = AmqpClient.handlerOf(handler, unmarshaller, unmarshalFailureAction)
     client.consumer(QueueName("blah"), of1, actionOnFailure).flatMap(_ => TestFixture(channel, handler))
@@ -98,7 +98,7 @@ class GenericConsumerTest extends FunSuite with ScalaFutures {
   def testLifecycle(unmarshaller: Unmarshaller[Payload, Payload], unmarshalFailureAction: ConsumeAction = DeadLetter, actionOnFailure: ConsumeAction = DeadLetter): Lifecycle[TestFixture] = {
     val channel = new StubChannel()
     val client = createClient(channel)
-    val handler = new StubConsumeHandler[Payload]()
+    val handler = new StubConsumeHandler[Future, Payload]()
 
     val of1: Handler[Future, Delivery] = AmqpClient.handlerOf(handler, unmarshaller, unmarshalFailureAction)
     client.consumer(QueueName("blah"), of1, actionOnFailure).map(_ => TestFixture(channel, handler))
