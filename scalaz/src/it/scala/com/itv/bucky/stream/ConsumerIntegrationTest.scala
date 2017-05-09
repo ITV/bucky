@@ -8,12 +8,10 @@ import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import scala.concurrent.duration._
 import IntegrationUtils._
 import com.itv.bucky._
-import com.itv.bucky.decl._
 
 import scalaz.concurrent.Task
 import org.scalatest.Matchers._
 
-import scala.util.Random
 import scalaz.\/-
 
 
@@ -43,47 +41,47 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogg
   }
 
 
-  ignore("Can extract headers from consumed message") {
-    import com.itv.bucky.UnmarshalResult._
-
-    case class Bar(value: String)
-    case class Baz(value: String)
-    case class Foo(bar: Bar, baz: Baz)
-
-    val barUnmarshaller: Unmarshaller[Delivery, Bar] =
-      Unmarshaller liftResult { delivery =>
-        if (delivery.properties.headers.contains("bar"))
-          Bar(delivery.properties.headers("bar").toString).unmarshalSuccess
-        else
-          "delivery did not contain bar header".unmarshalFailure
-      }
-
-    val bazUnmarshaller: Unmarshaller[Delivery, Baz] =
-      toDeliveryUnmarshaller(Unmarshaller liftResult (_.unmarshal[String].map(Baz)))
-
-    val fooUnmarshaller: Unmarshaller[Delivery, Foo] =
-      (barUnmarshaller zip bazUnmarshaller) map { case (bar, baz) => Foo(bar, baz) }
-
-    val handler = new StubConsumeHandler[Task, Foo]
-
-    withPublisherAndConsumer(AmqpClient.deliveryHandlerOf(handler, fooUnmarshaller)) { app =>
-      handler.receivedMessages shouldBe 'empty
-
-      val expected = Foo(Bar("bar"), Baz("baz"))
-
-      val publishCommand = PublishCommand(ExchangeName(""),
-        RoutingKey("bucky-consumer-header-test"),
-        MessageProperties.persistentBasic.withHeader("bar" -> expected.bar.value),
-        Payload.from(expected.baz.value))
-
-      app.publish(publishCommand).unsafePerformSyncAttempt should ===(\/-(()))
-
-      eventually {
-        handler.receivedMessages should have size 1
-        handler.receivedMessages.head shouldBe expected
-      }
-    }
-  }
+//  test("Can extract headers from consumed message") {
+//    import com.itv.bucky.UnmarshalResult._
+//
+//    case class Bar(value: String)
+//    case class Baz(value: String)
+//    case class Foo(bar: Bar, baz: Baz)
+//
+//    val barUnmarshaller: Unmarshaller[Delivery, Bar] =
+//      Unmarshaller liftResult { delivery =>
+//        if (delivery.properties.headers.contains("bar"))
+//          Bar(delivery.properties.headers("bar").toString).unmarshalSuccess
+//        else
+//          "delivery did not contain bar header".unmarshalFailure
+//      }
+//
+//    val bazUnmarshaller: Unmarshaller[Delivery, Baz] =
+//      toDeliveryUnmarshaller(Unmarshaller liftResult (_.unmarshal[String].map(Baz)))
+//
+//    val fooUnmarshaller: Unmarshaller[Delivery, Foo] =
+//      (barUnmarshaller zip bazUnmarshaller) map { case (bar, baz) => Foo(bar, baz) }
+//
+//    val handler = new StubConsumeHandler[Task, Foo]
+//
+//    withPublisherAndConsumer(AmqpClient.deliveryHandlerOf(handler, fooUnmarshaller)) { app =>
+//      handler.receivedMessages shouldBe 'empty
+//
+//      val expected = Foo(Bar("bar"), Baz("baz"))
+//
+//      val publishCommand = PublishCommand(ExchangeName(""),
+//        RoutingKey("bucky-consumer-header-test"),
+//        MessageProperties.persistentBasic.withHeader("bar" -> expected.bar.value),
+//        Payload.from(expected.baz.value))
+//
+//      app.publish(publishCommand).unsafePerformSyncAttempt should ===(\/-(()))
+//
+//      eventually {
+//        handler.receivedMessages should have size 1
+//        handler.receivedMessages.head shouldBe expected
+//      }
+//    }
+//  }
 
   test("DeadLetter upon exception from handler") {
 

@@ -20,23 +20,30 @@ class EstimatedMessageCountTest extends FunSuite {
     estimatedMessageCountTest(1)
   }
 
-  test("A new queue with n messages published should have an estimated count of n") {
+  test(s"A new queue with n messages published should have an estimated count of n") {
     estimatedMessageCountTest(Random.nextInt(10))
+  }
+
+  test(s"A new queue with n messages published should have an estimated count of n composing tasks") {
+    //In this case, RabbitMQ selects the same delivery tag for multiple messages
+    estimatedMessageCountTest(Random.nextInt(10), composingTask = true)
   }
 
   implicit val patianceConfig: Eventually.PatienceConfig = Eventually.PatienceConfig(timeout = 5.seconds, 1.second)
 
-  def estimatedMessageCountTest(messagesToPublish: Int): Unit = {
+  def estimatedMessageCountTest(messagesToPublish: Int, composingTask: Boolean = false): Unit = {
     val queueName = randomQueue()
 
     withPublisher(queueName) { app =>
-      Task.gatherUnordered(
-        (1 to messagesToPublish).map(_ =>
+        val tasks = (1 to messagesToPublish).map(_ =>
           app.publish(PublishCommand(app.exchangeName, app.routingKey, MessageProperties.persistentBasic, randomPayload()))
         )
-      ).unsafePerformSyncAttempt
+      if (composingTask)
+        Task.gatherUnordered(tasks).unsafePerformSync
+        else
+      tasks.foreach(_.unsafePerformSyncAttempt)
     }
-    withPublisher(queueName, shouldDeclare = false) {app =>
+    withPublisher(queueName, shouldDeclare = false) { app =>
       Eventually.eventually {
         app.amqpClient.estimatedMessageCount(queueName) shouldBe Success(messagesToPublish)
       }

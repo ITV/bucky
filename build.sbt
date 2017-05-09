@@ -129,6 +129,7 @@ lazy val test = project
       "com.itv" %% "lifecycle" % itvLifecycleVersion,
       "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
       "org.apache.qpid" % "qpid-broker" % "6.0.4",
+      "io.netty" % "netty" % "3.4.2.Final",
       "org.scalatest" %% "scalatest" % scalaTestVersion
     )
   )
@@ -232,7 +233,6 @@ lazy val rabbitmq = project
       "com.rabbitmq" % "amqp-client" % amqpClientVersion,
       "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
       "org.scalatest" %% "scalatest" % scalaTestVersion % "test, it",
-      "io.netty" % "netty" % "3.4.2.Final" % "test,it",
       "com.typesafe" % "config" % "1.2.1" % "it",
       "org.mockito" % "mockito-core" % mockitoVersion % "test"
     )
@@ -260,5 +260,5 @@ lazy val scalaz = project
   )
 
 lazy val root = (project in file("."))
-  .aggregate(rabbitmq, xml, circe, argonaut, example, test, core)
+  .aggregate(rabbitmq, scalaz, xml, circe, argonaut, example, test, core)
   .settings(publishArtifact := false)

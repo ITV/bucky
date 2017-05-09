@@ -27,29 +27,20 @@ abstract class FutureAmqpClient[M[_]](channelFactory: M[Channel])(implicit M: Mo
         Try {
           logger.info(s"Creating publisher")
           val unconfirmedPublications = new java.util.TreeMap[Long, Promise[Unit]]()
+          def removePromises(deliveryTag: Long, multiple: Boolean): List[Promise[Unit]] = channel.synchronized {
+            if (multiple) {
+              val entries = unconfirmedPublications.headMap(deliveryTag + 1L)
+              val removedValues = entries.values().asScala.toList
+              entries.clear()
+              removedValues
+            } else {
+              Option(unconfirmedPublications.remove(deliveryTag)).toList
+            }
+          }
           channel.confirmSelect()
-          channel.addConfirmListener(new ConfirmListener {
-            override def handleAck(deliveryTag: Long, multiple: Boolean): Unit = {
-              logger.debug("Publish acknowledged with delivery tag {}L, multiple = {}", box(deliveryTag), box(multiple))
-              removePromises(deliveryTag, multiple).foreach(_.success(()))
-            }
-
-            override def handleNack(deliveryTag: Long, multiple: Boolean): Unit = {
-              logger.error("Publish negatively acknowledged with delivery tag {}L, multiple = {}", box(deliveryTag), box(multiple))
-              removePromises(deliveryTag, multiple).foreach(_.failure(new RuntimeException("AMQP server returned Nack for publication")))
-            }
-
-            private def removePromises(deliveryTag: Long, multiple: Boolean): List[Promise[Unit]] = channel.synchronized {
-              if (multiple) {
-                val entries = unconfirmedPublications.headMap(deliveryTag + 1L)
-                val removedValues = entries.values().asScala.toList
-                entries.clear()
-                removedValues
-              } else {
-                Option(unconfirmedPublications.remove(deliveryTag)).toList
-              }
-            }
-          })
+          IdChannel.confirmListener(channel) //
+          { (deliveryTag, multiple) => removePromises(deliveryTag, multiple).foreach(_.success(())) } //
+          { (deliveryTag, multiple) => removePromises(deliveryTag, multiple).foreach(_.failure(new RuntimeException("AMQP server returned Nack for publication"))) }
 
           publisherWrapperLifecycle(timeout)(cmd => channel.synchronized {
             val promise = Promise[Unit]()
@@ -80,6 +71,7 @@ abstract class FutureAmqpClient[M[_]](channelFactory: M[Channel])(implicit M: Mo
         }
       )
     }
+
 
   // Unfortunately explicit boxing seems necessary due to Scala inferring logger varargs as being of type AnyRef*
   @inline private def box(x: AnyVal): AnyRef = x.asInstanceOf[AnyRef]

@@ -94,10 +94,29 @@ object IdChannel extends StrictLogging {
     * @param channel the channel
     */
   def closeAll(channel: Channel): Unit = {
-    logger.info(s"Closing channel and conection for ${channel}")
+    logger.info(s"Closing channel and conection for $channel")
     val connection = channel.getConnection
     IdChannel.close(channel)
     IdConnection.close(connection)
+  }
+
+
+  // Unfortunately explicit boxing seems necessary due to Scala inferring logger varargs as being of type AnyRef*
+  @inline private def box(x: AnyVal): AnyRef = x.asInstanceOf[AnyRef]
+
+  def confirmListener(channel: Channel)(success: (Long, Boolean) => Unit)(failure: (Long, Boolean) => Unit) = {
+    logger.info(s"Create confirm listener for channel $channel")
+    channel.addConfirmListener(new ConfirmListener {
+      override def handleAck(deliveryTag: Long, multiple: Boolean): Unit = {
+        logger.debug("Publish acknowledged with delivery tag {}L, multiple = {}", box(deliveryTag), box(multiple))
+        success(deliveryTag, multiple)
+      }
+
+      override def handleNack(deliveryTag: Long, multiple: Boolean): Unit = {
+        logger.error("Publish negatively acknowledged with delivery tag {}L, multiple = {}", box(deliveryTag), box(multiple))
+        failure(deliveryTag, multiple)
+      }
+    })
   }
 
   def close(channel: Channel): Unit =
