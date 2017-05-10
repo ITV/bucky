@@ -202,5 +202,4 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
 
 }
 
-object FutureAlwaysRequeue extends AlwaysRequeue[Future, Throwable]
 

@@ -1,7 +1,7 @@
 package com.itv.bucky.task
 
 import com.itv.bucky.Monad.Id
-import com.itv.bucky.{MessagePropertiesConverters, _}
+import com.itv.bucky._
 import com.rabbitmq.client.Channel
 import com.typesafe.scalalogging.StrictLogging
 
@@ -11,9 +11,7 @@ import scala.util.Try
 import scalaz.{-\/, \/, \/-}
 import scalaz.concurrent.Task
 
-
 case class TaskAmqpClient(channel: Id[Channel]) extends AmqpClient[Id, Task, Throwable, Task[Unit]] with StrictLogging {
-
 
   type Register = (\/[Throwable, Unit]) => Unit
 

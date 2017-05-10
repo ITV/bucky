@@ -21,21 +21,26 @@ object IntegrationUtils extends StrictLogging {
     AmqpClientConfig(config.getString("rmq.host"), config.getInt("rmq.port"), config.getString("rmq.username"), config.getString("rmq.password"))
   }
 
-  case class TestFixture(publish: Publisher[Task, PublishCommand], routingKey: RoutingKey, exchangeName: ExchangeName, queueName: QueueName, amqpClient: TaskAmqpClient, dlqHandler: Option[StubConsumeHandler[Task, Delivery]] = None)
+  case class TestFixture(publisher: Publisher[Task, PublishCommand], routingKey: RoutingKey, exchangeName: ExchangeName, queueName: QueueName, amqpClient: TaskAmqpClient, requeueQueueName: QueueName, dlqHandler: Option[StubConsumeHandler[Task, Delivery]] = None) {
+    def publish(body: Payload, properties: MessageProperties = MessageProperties.persistentBasic): Task[Unit] = publisher(
+      PublishCommand(exchangeName, RoutingKey(queueName.value), properties, body))
+  }
 
 
   sealed trait RequeueStrategy
 
-  case object NoneRequeue extends RequeueStrategy
+  case object NoneHandler extends RequeueStrategy
 
-  case object SimpleRequeue extends RequeueStrategy
+  case class NoneRequeue(handler: Handler[Task, Delivery]) extends RequeueStrategy
 
-  case class DeliveryRequeue(handler: RequeueHandler[Task, Delivery], requeuePolicy: RequeuePolicy) extends RequeueStrategy
+  case class SimpleRequeue(handler: Handler[Task, Delivery]) extends RequeueStrategy
+
+  case class RawRequeue(handler: RequeueHandler[Task, Delivery], requeuePolicy: RequeuePolicy) extends RequeueStrategy
 
   case class TypeRequeue[T](handler: RequeueHandler[Task, T], requeuePolicy: RequeuePolicy, unmarshaller: PayloadUnmarshaller[T]) extends RequeueStrategy
 
 
-  def withPublisher(testQueueName: QueueName = randomQueue(), requeueStrategy: RequeueStrategy = NoneRequeue, shouldDeclare: Boolean = true)(f: TestFixture => Unit): Unit = {
+  def withPublisher(testQueueName: QueueName = randomQueue(), requeueStrategy: RequeueStrategy = NoneHandler, shouldDeclare: Boolean = true)(f: TestFixture => Unit): Unit = {
     val routingKey = RoutingKey(testQueueName.value)
 
     val exchange = ExchangeName("")
@@ -43,8 +48,8 @@ object IntegrationUtils extends StrictLogging {
     val amqpClient = TaskAmqpClient(IntegrationUtils.config)
 
     val declaration = requeueStrategy match {
-      case NoneRequeue => defaultDeclaration(testQueueName)
-      case SimpleRequeue => basicRequeueDeclarations(testQueueName, retryAfter = 1.second) collect {
+      case NoneRequeue(_) => defaultDeclaration(testQueueName)
+      case SimpleRequeue(_) => basicRequeueDeclarations(testQueueName, retryAfter = 1.second) collect {
         case ex: Exchange => ex.autoDelete.expires(1.minute)
         case q: Queue => q.autoDelete.expires(1.minute)
       }
@@ -59,7 +64,7 @@ object IntegrationUtils extends StrictLogging {
       DeclarationExecutor(declaration, amqpClient, 5.seconds)
 
     val publisher: Publisher[Task, PublishCommand] = amqpClient.publisher()
-    f(TestFixture(publisher, routingKey, exchange, testQueueName, amqpClient))
+    f(TestFixture(publisher, routingKey, exchange, testQueueName, amqpClient, QueueName(s"${testQueueName.value}.requeue")))
 
     IdChannel.closeAll(amqpClient.channel)
 
@@ -78,26 +83,31 @@ object IntegrationUtils extends StrictLogging {
     QueueName(s"bucky-queue-${new Random().nextInt(10000)}")
 
 
-  def withPublisherAndConsumer(handler: Handler[Task, Delivery],
-                               queueName: QueueName = randomQueue(),
-                               requeueStrategy: RequeueStrategy = NoneRequeue)(f: TestFixture => Unit): Unit = {
+  def getHeader(header: String, properties: MessageProperties): Option[String] =
+    properties.headers.get(header).map(_.toString)
+
+
+  def withPublisherAndConsumer(queueName: QueueName = randomQueue(),
+                               requeueStrategy: RequeueStrategy)(f: TestFixture => Unit): Unit = {
     withPublisher(queueName, requeueStrategy = requeueStrategy) { app =>
 
       val consumer: Task[Unit] = requeueStrategy match {
-        case DeliveryRequeue(requeueHandler, requeuePolicy) =>
+        case NoneHandler => Task.now(())
+        case RawRequeue(requeueHandler, requeuePolicy) =>
           app.amqpClient.requeueOf(app.queueName, requeueHandler, requeuePolicy)
         case TypeRequeue(requeueHandler, requeuePolicy, unmarshaller) =>
           app.amqpClient.requeueHandlerOf(app.queueName, requeueHandler, requeuePolicy, unmarshaller)
-        case _ => app.amqpClient.consumer(app.queueName, handler)
+        case SimpleRequeue(handler) => app.amqpClient.consumer(app.queueName, handler)
+        case NoneRequeue(handler) => app.amqpClient.consumer(app.queueName, handler)
       }
 
       consumer.unsafePerformAsync { result =>
         logger.info(s"Closing consumer ${app.queueName}: $result")
       }
 
-
       val dlqHandler = requeueStrategy match {
-        case NoneRequeue => None
+        case NoneHandler => None
+        case NoneRequeue(_) => None
         case _ =>
           val dlqHandler = new StubConsumeHandler[Task, Delivery]
           val dlqQueueName = QueueName(s"${queueName.value}.dlq")

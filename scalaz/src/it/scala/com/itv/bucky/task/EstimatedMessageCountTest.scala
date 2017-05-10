@@ -38,7 +38,7 @@ class EstimatedMessageCountTest extends FunSuite {
 
     withPublisher(queueName) { app =>
       val tasks = (1 to messagesToPublish).map(_ =>
-        app.publish(PublishCommand(app.exchangeName, app.routingKey, MessageProperties.persistentBasic, randomPayload()))
+        app.publisher(PublishCommand(app.exchangeName, app.routingKey, MessageProperties.persistentBasic, randomPayload()))
       )
       if (composingTask)
         Task.gatherUnordered(tasks).unsafePerformSync

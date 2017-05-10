@@ -19,7 +19,7 @@ class ChannelAmqpPurgeTest extends FunSuite with ScalaFutures with StrictLogging
     val queueName = randomQueue()
 
     withPublisher(queueName) { app =>
-      app.publish(PublishCommand(app.exchangeName, app.routingKey, MessageProperties.persistentBasic, randomPayload())).unsafePerformSyncAttempt shouldBe \/-(())
+      app.publisher(PublishCommand(app.exchangeName, app.routingKey, MessageProperties.persistentBasic, randomPayload())).unsafePerformSyncAttempt shouldBe \/-(())
 
     }
     withPublisher(queueName, shouldDeclare = false) { app =>

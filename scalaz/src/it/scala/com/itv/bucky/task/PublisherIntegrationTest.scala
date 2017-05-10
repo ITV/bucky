@@ -20,10 +20,10 @@ class PublisherIntegrationTest extends FunSuite with ScalaFutures with StrictLog
 
     val handler = new StubConsumeHandler[Task, Delivery]
 
-    withPublisherAndConsumer(handler) { app =>
+    withPublisherAndConsumer(requeueStrategy = NoneRequeue(handler)) { app =>
       val body = randomPayload()
 
-      app.publish(PublishCommand(app.exchangeName, app.routingKey, MessageProperties.textPlain, body)).unsafePerformSyncAttempt shouldBe \/-(())
+      app.publisher(PublishCommand(app.exchangeName, app.routingKey, MessageProperties.textPlain, body)).unsafePerformSyncAttempt shouldBe \/-(())
 
       eventually {
         handler.receivedMessages should have size 1
