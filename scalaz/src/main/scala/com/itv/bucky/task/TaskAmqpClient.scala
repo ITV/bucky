@@ -5,8 +5,6 @@ import com.itv.bucky.{MessagePropertiesConverters, _}
 import com.rabbitmq.client.Channel
 import com.typesafe.scalalogging.StrictLogging
 
-import scala.annotation.tailrec
-import scala.collection.mutable.TreeMap
 import scala.concurrent.duration.Duration
 import scala.language.higherKinds
 import scala.util.Try
@@ -14,7 +12,7 @@ import scalaz.{-\/, \/, \/-}
 import scalaz.concurrent.Task
 
 
-case class StreamAmqpClient(channel: Id[Channel]) extends AmqpClient[Id, Task, Throwable, Task[Unit]] with StrictLogging {
+case class TaskAmqpClient(channel: Id[Channel]) extends AmqpClient[Id, Task, Throwable, Task[Unit]] with StrictLogging {
 
   type Register = (\/[Throwable, Unit]) => Unit
 
@@ -80,14 +78,14 @@ case class StreamAmqpClient(channel: Id[Channel]) extends AmqpClient[Id, Task, T
 }
 
 
-object StreamAmqpClient extends StrictLogging {
+object TaskAmqpClient extends StrictLogging {
 
   import Monad._
 
-  def apply(config: AmqpClientConfig): StreamAmqpClient = IdConnection(config).flatMap(
+  def apply(config: AmqpClientConfig): TaskAmqpClient = IdConnection(config).flatMap(
     IdChannel(_)
   ).flatMap(
-    StreamAmqpClient(_)
+    TaskAmqpClient(_)
   )
 
 }

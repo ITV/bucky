@@ -22,7 +22,7 @@ object IntegrationUtils extends StrictLogging {
     AmqpClientConfig(config.getString("rmq.host"), config.getInt("rmq.port"), config.getString("rmq.username"), config.getString("rmq.password"))
   }
 
-  case class TestFixture(publish: Publisher[Task, PublishCommand], routingKey: RoutingKey, exchangeName: ExchangeName, queueName: QueueName, amqpClient: StreamAmqpClient, dlqHandler: Option[StubConsumeHandler[Task, Delivery]] = None)
+  case class TestFixture(publish: Publisher[Task, PublishCommand], routingKey: RoutingKey, exchangeName: ExchangeName, queueName: QueueName, amqpClient: TaskAmqpClient, dlqHandler: Option[StubConsumeHandler[Task, Delivery]] = None)
 
 
   def withPublisher(testQueueName: QueueName = randomQueue(), shouldDeadLetter: Boolean = false, shouldDeclare: Boolean = true)(f: TestFixture => Unit): Unit = {
@@ -30,7 +30,7 @@ object IntegrationUtils extends StrictLogging {
 
     val exchange = ExchangeName("")
 
-    val amqpClient = StreamAmqpClient(IntegrationUtils.config)
+    val amqpClient = TaskAmqpClient(IntegrationUtils.config)
 
     val declaration = if (shouldDeadLetter)
       basicRequeueDeclarations(testQueueName, retryAfter = 1.second) collect {

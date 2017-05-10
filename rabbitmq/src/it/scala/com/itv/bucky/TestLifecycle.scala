@@ -9,6 +9,7 @@ import com.itv.lifecycle.{Lifecycle, NoOpLifecycle}
 import scala.concurrent.{ExecutionContext, Future}
 
 object TestLifecycle {
+
   import IntegrationUtils._
 
   val defaultConfig = AmqpClientConfig("localhost", 5672, "guest", "guest", networkRecoveryInterval = None)

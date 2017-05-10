@@ -6,6 +6,7 @@ import com.itv.bucky.decl._
 import scala.concurrent.duration._
 
 object IntegrationUtils {
+  
   def defaultDeclaration(queueName: QueueName): List[Queue] =
     List(queueName).map(Queue(_).autoDelete.expires(2.minutes))
 

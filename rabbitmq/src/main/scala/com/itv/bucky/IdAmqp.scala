@@ -3,22 +3,18 @@ package com.itv.bucky
 import com.itv.bucky.Monad.Id
 import com.itv.bucky.decl.{Binding, Exchange, Queue}
 
-
 import com.typesafe.scalalogging.StrictLogging
-
-
 import scala.language.higherKinds
 import scala.util.{Failure, Success, Try}
 
-import com.itv.bucky.{Envelope => _, _}
 import com.rabbitmq.client.AMQP.BasicProperties
 import com.rabbitmq.client.{Envelope => RabbitMQEnvelope, _}
 import com.rabbitmq.client.{Channel, Connection, ConnectionFactory}
 
 object IdConsumer extends StrictLogging {
 
-  def apply[M[_], E](channel: Channel, queueName: QueueName, handler: Handler[M, Delivery], actionOnFailure: ConsumeAction, prefetchCount: Int = 0)
-                    (f: M[_] => Unit)(implicit M: MonadError[M, E]): Unit = {
+  def apply[F[_], E](channel: Channel, queueName: QueueName, handler: Handler[F, Delivery], actionOnFailure: ConsumeAction, prefetchCount: Int = 0)
+                    (f: F[_] => Unit)(implicit M: MonadError[F, E]): Unit = {
     val consumerTag: ConsumerTag = ConsumerTag.create(queueName)
     logger.info(s"Starting consumer on $queueName with $consumerTag and a prefetchCount of ")
     Try {
@@ -34,7 +30,7 @@ object IdConsumer extends StrictLogging {
 }
 
 object RabbitConsumer extends StrictLogging {
-  def apply[M[_], E](channel: Channel, queueName: QueueName, handler: Handler[M, Delivery], actionOnFailure: ConsumeAction)(f: M[_] => Unit)(implicit M: MonadError[M, E]): Consumer = {
+  def apply[F[_], E](channel: Channel, queueName: QueueName, handler: Handler[F, Delivery], actionOnFailure: ConsumeAction)(f: F[_] => Unit)(implicit M: MonadError[F, E]): Consumer = {
     new DefaultConsumer(channel) {
       override def handleDelivery(consumerTag: String, envelope: RabbitMQEnvelope, properties: BasicProperties, body: Array[Byte]): Unit = {
         val delivery = Delivery(Payload(body), ConsumerTag(consumerTag), MessagePropertiesConverters(envelope), MessagePropertiesConverters(properties))
@@ -121,13 +117,13 @@ object IdChannel extends StrictLogging {
       toComplete.foreach(complete)
     }
 
-    def addPendingConfirmation(deliveryTag: Long, register: T) = {
+    def addPendingConfirmation(deliveryTag: Long, pendingConfirmation: T) = {
       unconfirmedPublications.synchronized {
-        unconfirmedPublications.put(deliveryTag, Option(unconfirmedPublications.get(deliveryTag)).toList.flatten.+:(register))
+        unconfirmedPublications.put(deliveryTag, Option(unconfirmedPublications.get(deliveryTag)).toList.flatten.+:(pendingConfirmation))
       }
     }
 
-    private def pop[T](deliveryTag: Long, multiple: Boolean) = {
+    private def pop(deliveryTag: Long, multiple: Boolean) = {
       if (multiple) {
         val entries = unconfirmedPublications.headMap(deliveryTag + 1L)
         val removedValues = entries.values().asScala.toList
