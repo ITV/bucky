@@ -5,7 +5,6 @@ import com.itv.bucky.Unmarshaller._
 import com.itv.bucky._
 import com.itv.bucky.decl._
 
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.{FiniteDuration, _}
 import scala.language.higherKinds
 
