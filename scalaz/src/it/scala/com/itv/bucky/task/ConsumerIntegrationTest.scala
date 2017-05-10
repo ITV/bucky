@@ -87,7 +87,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogg
 
     val handler = new StubConsumeHandler[Task, Delivery]()
 
-    withPublisherAndConsumer(handler, shouldDeadLetter = true) { app =>
+    withPublisherAndConsumer(handler, requeueStrategy = SimpleRequeue) { app =>
       app.dlqHandler.get.receivedMessages shouldBe 'empty
       handler.nextException = Some(new RuntimeException("Hello, world"))
       val expectedMessage = "Message to dlq"

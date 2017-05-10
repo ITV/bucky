@@ -202,9 +202,5 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
 
 }
 
-object AlwaysRequeue extends RequeueHandler[Future, String] {
-  override def apply(message: String): Future[RequeueConsumeAction] =
-    Future.successful(Requeue)
-}
-
+object FutureAlwaysRequeue extends AlwaysRequeue[Future, Throwable]
 
