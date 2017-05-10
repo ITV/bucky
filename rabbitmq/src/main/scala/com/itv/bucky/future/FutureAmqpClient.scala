@@ -3,7 +3,6 @@ package com.itv.bucky.future
 import java.util.concurrent.{Executors, TimeUnit}
 
 import com.itv.bucky.{Envelope => _, _}
-import com.rabbitmq.client.AMQP.BasicProperties
 import com.rabbitmq.client.{Envelope => RabbitMQEnvelope, _}
 import com.typesafe.scalalogging.StrictLogging
 
@@ -19,34 +18,21 @@ abstract class FutureAmqpClient[M[_]](channelFactory: M[Channel])(implicit M: Mo
       M.apply(IdConsumer[Future, Throwable](channel, queueName, handler, actionOnFailure, prefetchCount) { _ => () })
     }
 
-  import scala.collection.JavaConverters._
-
   def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): M[Publisher[Future, PublishCommand]] =
     M.flatMap(channelFactory) { channel: Channel =>
       M.apply(
         Try {
           logger.info(s"Creating publisher")
-          val unconfirmedPublications = new java.util.TreeMap[Long, Promise[Unit]]()
-          def removePromises(deliveryTag: Long, multiple: Boolean): List[Promise[Unit]] = channel.synchronized {
-            if (multiple) {
-              val entries = unconfirmedPublications.headMap(deliveryTag + 1L)
-              val removedValues = entries.values().asScala.toList
-              entries.clear()
-              removedValues
-            } else {
-              Option(unconfirmedPublications.remove(deliveryTag)).toList
-            }
-          }
-          channel.confirmSelect()
-          IdChannel.confirmListener(channel) //
-          { (deliveryTag, multiple) => removePromises(deliveryTag, multiple).foreach(_.success(())) } //
-          { (deliveryTag, multiple) => removePromises(deliveryTag, multiple).foreach(_.failure(new RuntimeException("AMQP server returned Nack for publication"))) }
+
+          val unconfirmedPublications =IdChannel.confirmListener[Promise[Unit]](channel) //
+          { _.success(()) } //
+          { _.failure(new RuntimeException("AMQP server returned Nack for publication")) }
 
           publisherWrapperLifecycle(timeout)(cmd => channel.synchronized {
             val promise = Promise[Unit]()
             val deliveryTag = channel.getNextPublishSeqNo
             logger.debug("Publishing with delivery tag {}L to {}:{} with {}: {}", box(deliveryTag), cmd.exchange, cmd.routingKey, cmd.basicProperties, cmd.body)
-            unconfirmedPublications.put(deliveryTag, promise)
+            unconfirmedPublications.addPendingConfirmation(deliveryTag, promise)
             try {
               channel.basicPublish(cmd.exchange.value, cmd.routingKey.value, false, false, MessagePropertiesConverters(cmd.basicProperties), cmd.body.value)
             } catch {
@@ -56,7 +42,7 @@ abstract class FutureAmqpClient[M[_]](channelFactory: M[Channel])(implicit M: Mo
                 }L to ${
                   cmd.description
                 }", exception)
-                unconfirmedPublications.remove(deliveryTag).failure(exception)
+                unconfirmedPublications.completeConfirmation(deliveryTag)(_.failure(exception))
             }
             promise.future
           })

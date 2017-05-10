@@ -20,34 +20,13 @@ case class StreamAmqpClient(channel: Id[Channel]) extends AmqpClient[Id, Task, T
 
   override def publisher(timeout: Duration): Id[Publisher[Task, PublishCommand]] = {
     logger.info(s"Creating publisher")
-    channel.confirmSelect()
-
-    case class Confirmation(deliveryTag: Long, multiple: Boolean, failure: Boolean)
-
-
-    val unconfirmedPublications = new java.util.TreeMap[Long, List[Register]]()
-
-    import scala.collection.JavaConverters._
-
-    def removeRegisters(deliveryTag: Long, multiple: Boolean) =
-      if (multiple) {
-        val entries = unconfirmedPublications.headMap(deliveryTag + 1L)
-        val removedValues = entries.values().asScala.toList
-        entries.clear()
-        removedValues
-      }
-      else {
-        Option(unconfirmedPublications.remove(deliveryTag)).toList
-      }
-    IdChannel.confirmListener(channel) //
-    { (deliveryTagDone, multiple) =>
-      removeRegisters(deliveryTagDone, multiple).flatten.foreach(_.apply(\/-(())))
-
+    val pendingConfirmations = IdChannel.confirmListener[Register](channel) //
+    {
+      _.apply(\/-(()))
     } //
-    { (deliveryTag, multiple) =>
-      removeRegisters(deliveryTag, multiple).flatten.foreach(_.apply(-\/(new RuntimeException(s"AMQP server returned Nack for publication: $deliveryTag"))))
+    {
+      _.apply(-\/(new RuntimeException(s"AMQP server returned Nack for publications")))
     }
-
 
     (cmd: PublishCommand) => {
       for {
@@ -58,9 +37,7 @@ case class StreamAmqpClient(channel: Id[Channel]) extends AmqpClient[Id, Task, T
         }
         _ <- Task.taskInstance.both(Task.async { (register: (\/[Throwable, Unit]) => Unit) =>
           logger.debug(s"Waiting to be called for delivery tag: $deliveryTag")
-          unconfirmedPublications.synchronized {
-            unconfirmedPublications.put(deliveryTag, Option(unconfirmedPublications.get(deliveryTag)).toList.flatten.+:(register))
-          }
+          pendingConfirmations.addPendingConfirmation(deliveryTag, register)
         }.onFinish { _ =>
           Task {
             logger.debug(s"Message $deliveryTag has been delivered!")
@@ -75,13 +52,13 @@ case class StreamAmqpClient(channel: Id[Channel]) extends AmqpClient[Id, Task, T
               logger.error(s"Failed to publish message with delivery tag ${deliveryTag}L to ${
                 cmd.description
               }", exception)
+              pendingConfirmations.completeConfirmation(deliveryTag)(_.apply(-\/(exception)))
               Task.fail(exception)
           })
       } yield ()
 
     }
   }
-
 
   override def consumer(queueName: QueueName, handler: Handler[Task, Delivery], actionOnFailure: ConsumeAction = DeadLetter, prefetchCount: Int = 0): Id[Task[Unit]] = {
     Task.async {

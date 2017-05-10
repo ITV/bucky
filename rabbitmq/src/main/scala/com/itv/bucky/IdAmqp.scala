@@ -7,7 +7,6 @@ import com.itv.bucky.decl.{Binding, Exchange, Queue}
 import com.typesafe.scalalogging.StrictLogging
 
 
-
 import scala.language.higherKinds
 import scala.util.{Failure, Success, Try}
 
@@ -19,18 +18,18 @@ import com.rabbitmq.client.{Channel, Connection, ConnectionFactory}
 object IdConsumer extends StrictLogging {
 
   def apply[M[_], E](channel: Channel, queueName: QueueName, handler: Handler[M, Delivery], actionOnFailure: ConsumeAction, prefetchCount: Int = 0)
-                    (f: M[_] => Unit)(implicit M: MonadError[M, E]): Unit= {
-      val consumerTag: ConsumerTag = ConsumerTag.create(queueName)
-      logger.info(s"Starting consumer on $queueName with $consumerTag and a prefetchCount of ")
-      Try {
-        channel.basicQos(prefetchCount)
-        channel.basicConsume(queueName.value, false, consumerTag.value, RabbitConsumer(channel, queueName, handler, actionOnFailure)(f))
-      } match {
-        case Success(_) => logger.info(s"Consumer on $queueName has been created!")
-        case Failure(exception) =>
-          logger.error(s"Failure when starting consumer on $queueName because ${exception.getMessage}", exception)
-          throw exception
-      }
+                    (f: M[_] => Unit)(implicit M: MonadError[M, E]): Unit = {
+    val consumerTag: ConsumerTag = ConsumerTag.create(queueName)
+    logger.info(s"Starting consumer on $queueName with $consumerTag and a prefetchCount of ")
+    Try {
+      channel.basicQos(prefetchCount)
+      channel.basicConsume(queueName.value, false, consumerTag.value, RabbitConsumer(channel, queueName, handler, actionOnFailure)(f))
+    } match {
+      case Success(_) => logger.info(s"Consumer on $queueName has been created!")
+      case Failure(exception) =>
+        logger.error(s"Failure when starting consumer on $queueName because ${exception.getMessage}", exception)
+        throw exception
+    }
   }
 }
 
@@ -104,19 +103,59 @@ object IdChannel extends StrictLogging {
   // Unfortunately explicit boxing seems necessary due to Scala inferring logger varargs as being of type AnyRef*
   @inline private def box(x: AnyVal): AnyRef = x.asInstanceOf[AnyRef]
 
-  def confirmListener(channel: Channel)(success: (Long, Boolean) => Unit)(failure: (Long, Boolean) => Unit) = {
+
+  case class PendingConfirmations[T](unconfirmedPublications: java.util.TreeMap[Long, List[T]] = new java.util.TreeMap[Long, List[T]]()) {
+
+    import scala.collection.JavaConverters._
+
+    def completeConfirmation(deliveryTag: Long, multiple: Boolean)(complete: T => Unit): Unit =
+      pop(deliveryTag, multiple).foreach(complete)
+
+
+    def completeConfirmation(deliveryTag: Long)(complete: T => Unit): Unit = {
+      val result = pop(deliveryTag, multiple = false)
+      val toComplete = if (result.isEmpty)
+        pop(deliveryTag, multiple = false)
+      else
+        result
+      toComplete.foreach(complete)
+    }
+
+    def addPendingConfirmation(deliveryTag: Long, register: T) = {
+      unconfirmedPublications.synchronized {
+        unconfirmedPublications.put(deliveryTag, Option(unconfirmedPublications.get(deliveryTag)).toList.flatten.+:(register))
+      }
+    }
+
+    private def pop[T](deliveryTag: Long, multiple: Boolean) = {
+      if (multiple) {
+        val entries = unconfirmedPublications.headMap(deliveryTag + 1L)
+        val removedValues = entries.values().asScala.toList
+        entries.clear()
+        removedValues.flatten
+      }
+      else {
+        Option(unconfirmedPublications.remove(deliveryTag)).toList.flatten
+      }
+    }
+  }
+
+  def confirmListener[T](channel: Channel)(success: T => Unit)(failure: T => Unit): PendingConfirmations[T] = {
+    channel.confirmSelect()
+    val pendingConfirmations = new PendingConfirmations[T]()
     logger.info(s"Create confirm listener for channel $channel")
     channel.addConfirmListener(new ConfirmListener {
       override def handleAck(deliveryTag: Long, multiple: Boolean): Unit = {
         logger.debug("Publish acknowledged with delivery tag {}L, multiple = {}", box(deliveryTag), box(multiple))
-        success(deliveryTag, multiple)
+        pendingConfirmations.completeConfirmation(deliveryTag, multiple)(success)
       }
 
       override def handleNack(deliveryTag: Long, multiple: Boolean): Unit = {
         logger.error("Publish negatively acknowledged with delivery tag {}L, multiple = {}", box(deliveryTag), box(multiple))
-        failure(deliveryTag, multiple)
+        pendingConfirmations.completeConfirmation(deliveryTag, multiple)(failure)
       }
     })
+    pendingConfirmations
   }
 
   def close(channel: Channel): Unit =
