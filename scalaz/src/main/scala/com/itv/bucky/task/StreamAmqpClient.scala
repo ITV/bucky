@@ -1,4 +1,4 @@
-package com.itv.bucky.stream
+package com.itv.bucky.task
 
 import com.itv.bucky.Monad.Id
 import com.itv.bucky.{MessagePropertiesConverters, _}

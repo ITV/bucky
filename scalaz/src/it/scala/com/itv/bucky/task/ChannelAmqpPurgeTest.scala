@@ -1,6 +1,6 @@
-package com.itv.bucky.stream
+package com.itv.bucky.task
 
-import com.itv.bucky.stream.IntegrationUtils._
+import com.itv.bucky.task.IntegrationUtils._
 import com.itv.bucky.{MessageProperties, PublishCommand}
 import com.typesafe.scalalogging.StrictLogging
 import org.scalatest.FunSuite

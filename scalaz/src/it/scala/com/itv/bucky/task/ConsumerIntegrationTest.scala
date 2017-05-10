@@ -1,4 +1,4 @@
-package com.itv.bucky.stream
+package com.itv.bucky.task
 
 import com.itv.bucky.Unmarshaller._
 import com.typesafe.scalalogging.StrictLogging

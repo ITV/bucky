@@ -1,4 +1,4 @@
-package com.itv.bucky.stream
+package com.itv.bucky.task
 
 import com.itv.bucky._
 import com.itv.bucky.decl._
