@@ -24,28 +24,19 @@ abstract class FutureAmqpClient[M[_]](channelFactory: M[Channel])(implicit M: Mo
         Try {
           logger.info(s"Creating publisher")
 
-          val unconfirmedPublications =IdChannel.confirmListener[Promise[Unit]](channel) //
-          { _.success(()) } //
-          { _.failure(new RuntimeException("AMQP server returned Nack for publication")) }
+          val unconfirmedPublications = IdChannel.confirmListener[Promise[Unit]](channel) //
+          {
+            _.success(())
+          } //
+          { (p, e) =>
+            p.failure(e)
+          }
 
-          publisherWrapperLifecycle(timeout)(cmd => channel.synchronized {
+          publisherWrapperLifecycle(timeout) { cmd =>
             val promise = Promise[Unit]()
-            val deliveryTag = channel.getNextPublishSeqNo
-            logger.debug("Publishing with delivery tag {}L to {}:{} with {}: {}", box(deliveryTag), cmd.exchange, cmd.routingKey, cmd.basicProperties, cmd.body)
-            unconfirmedPublications.addPendingConfirmation(deliveryTag, promise)
-            try {
-              channel.basicPublish(cmd.exchange.value, cmd.routingKey.value, false, false, MessagePropertiesConverters(cmd.basicProperties), cmd.body.value)
-            } catch {
-              case exception: Exception =>
-                logger.error(s"Failed to publish message with delivery tag ${
-                  deliveryTag
-                }L to ${
-                  cmd.description
-                }", exception)
-                unconfirmedPublications.completeConfirmation(deliveryTag)(_.failure(exception))
-            }
+            IdPublisher.publish(channel, cmd, promise, unconfirmedPublications) { (t, e) => t.failure(e) }
             promise.future
-          })
+          }
         } match {
           case Success(publisher) =>
             logger.info(s"Publisher has been created successfully!")
@@ -58,9 +49,6 @@ abstract class FutureAmqpClient[M[_]](channelFactory: M[Channel])(implicit M: Mo
       )
     }
 
-
-  // Unfortunately explicit boxing seems necessary due to Scala inferring logger varargs as being of type AnyRef*
-  @inline private def box(x: AnyVal): AnyRef = x.asInstanceOf[AnyRef]
 
   private def publisherWrapperLifecycle(timeout: Duration): Publisher[Future, PublishCommand] => Publisher[Future, PublishCommand] = timeout match {
     case finiteTimeout: FiniteDuration =>

@@ -1,15 +1,47 @@
 package com.itv.bucky
 
+import java.util.concurrent.TimeUnit
+
+import com.itv.bucky.IdChannel.PendingConfirmations
 import com.itv.bucky.Monad.Id
 import com.itv.bucky.decl.{Binding, Exchange, Queue}
-
 import com.typesafe.scalalogging.StrictLogging
+
 import scala.language.higherKinds
 import scala.util.{Failure, Success, Try}
-
 import com.rabbitmq.client.AMQP.BasicProperties
 import com.rabbitmq.client.{Envelope => RabbitMQEnvelope, _}
 import com.rabbitmq.client.{Channel, Connection, ConnectionFactory}
+import com.itv.bucky.{Envelope => _, _}
+import com.rabbitmq.client.{Envelope => RabbitMQEnvelope, _}
+
+
+object IdPublisher extends StrictLogging {
+
+  def publish[R](channel: Channel, cmd: PublishCommand, pendingConfirmation: R, pendingConfirmations: PendingConfirmations[R])(fail: (R, Exception) => Unit): Unit = {
+    channel.synchronized {
+      val deliveryTag = channel.getNextPublishSeqNo
+      logger.debug("Publishing with delivery tag {}L to {}:{} with {}: {}", box(deliveryTag), cmd.exchange, cmd.routingKey, cmd.basicProperties, cmd.body)
+      pendingConfirmations.addPendingConfirmation(deliveryTag, pendingConfirmation)
+      try {
+        channel.basicPublish(cmd.exchange.value, cmd.routingKey.value, false, false, MessagePropertiesConverters(cmd.basicProperties), cmd.body.value)
+      } catch {
+        case exception: Exception =>
+          logger.error(s"Failed to publish message with delivery tag ${
+            deliveryTag
+          }L to ${
+            cmd.description
+          }", exception)
+          pendingConfirmations.completeConfirmation(deliveryTag)(t => fail(t, exception))
+
+      }
+    }
+  }
+
+  // Unfortunately explicit boxing seems necessary due to Scala inferring logger varargs as being of type AnyRef*
+  @inline private def box(x: AnyVal): AnyRef = x.asInstanceOf[AnyRef]
+
+}
 
 object IdConsumer extends StrictLogging {
 
@@ -136,7 +168,7 @@ object IdChannel extends StrictLogging {
     }
   }
 
-  def confirmListener[T](channel: Channel)(success: T => Unit)(failure: T => Unit): PendingConfirmations[T] = {
+  def confirmListener[T](channel: Channel)(success: T => Unit)(fail: (T, Exception) => Unit): PendingConfirmations[T] = {
     channel.confirmSelect()
     val pendingConfirmations = new PendingConfirmations[T]()
     logger.info(s"Create confirm listener for channel $channel")
@@ -148,7 +180,7 @@ object IdChannel extends StrictLogging {
 
       override def handleNack(deliveryTag: Long, multiple: Boolean): Unit = {
         logger.error("Publish negatively acknowledged with delivery tag {}L, multiple = {}", box(deliveryTag), box(multiple))
-        pendingConfirmations.completeConfirmation(deliveryTag, multiple)(failure)
+        pendingConfirmations.completeConfirmation(deliveryTag, multiple)(fail(_, new RuntimeException("AMQP server returned Nack for publication")))
       }
     })
     pendingConfirmations
