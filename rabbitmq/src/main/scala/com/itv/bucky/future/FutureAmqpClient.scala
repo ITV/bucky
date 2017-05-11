@@ -2,8 +2,8 @@ package com.itv.bucky.future
 
 import java.util.concurrent.{Executors, TimeUnit}
 
-import com.itv.bucky.{Envelope => _, _}
-import com.rabbitmq.client.{Envelope => RabbitMQEnvelope, _}
+import com.itv.bucky._
+import com.rabbitmq.client.{Channel => RabbitChannel}
 import com.typesafe.scalalogging.StrictLogging
 
 import scala.concurrent.duration.{Duration, FiniteDuration}
@@ -11,20 +11,23 @@ import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.language.higherKinds
 import scala.util.{Failure, Success, Try}
 
-abstract class FutureAmqpClient[M[_]](channelFactory: M[Channel])(implicit M: Monad[M], executionContext: ExecutionContext) extends AmqpClient[M, Future, Throwable, Unit] with StrictLogging {
+abstract class FutureAmqpClient[M[_]](channelFactory: M[RabbitChannel])(implicit M: Monad[M], executionContext: ExecutionContext) extends AmqpClient[M, Future, Throwable, Unit] with StrictLogging {
 
   override def consumer(queueName: QueueName, handler: Handler[Future, Delivery], actionOnFailure: ConsumeAction = DeadLetter, prefetchCount: Int = 0): M[Unit] =
-    M.flatMap(channelFactory) { (channel: Channel) =>
-      M.apply(IdConsumer[Future, Throwable](channel, queueName, handler, actionOnFailure, prefetchCount) { _ => () })
+    M.flatMap(channelFactory) { (channel: RabbitChannel) =>
+      M.apply{
+        val consumer = Consumer.defaultConsumer(channel, queueName, handler, actionOnFailure)
+        Consumer[Future, Throwable](channel, queueName, consumer, prefetchCount)
+      }
     }
 
   def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): M[Publisher[Future, PublishCommand]] =
-    M.flatMap(channelFactory) { channel: Channel =>
+    M.flatMap(channelFactory) { channel: RabbitChannel =>
       M.apply(
         Try {
           logger.info(s"Creating publisher")
 
-          val unconfirmedPublications = IdChannel.confirmListener[Promise[Unit]](channel) //
+          val unconfirmedPublications = Publisher.confirmListener[Promise[Unit]](channel) //
           {
             _.success(())
           } //
@@ -34,7 +37,7 @@ abstract class FutureAmqpClient[M[_]](channelFactory: M[Channel])(implicit M: Mo
 
           publisherWrapperLifecycle(timeout) { cmd =>
             val promise = Promise[Unit]()
-            IdPublisher.publish(channel, cmd, promise, unconfirmedPublications) { (t, e) => t.failure(e) }
+            Publisher.publish(channel, cmd, promise, unconfirmedPublications) { (t, e) => t.failure(e) }
             promise.future
           }
         } match {

@@ -67,7 +67,7 @@ object IntegrationUtils extends StrictLogging {
     f(TestFixture(publisher, routingKey, exchange, testQueueName, amqpClient, QueueName(s"${testQueueName.value}.requeue")))
 
     logger.info(s"Closing the the publisher")
-    IdChannel.closeAll(amqpClient.channel)
+    Channel.closeAll(amqpClient.channel)
 
   }
 
@@ -92,8 +92,9 @@ object IntegrationUtils extends StrictLogging {
                                requeueStrategy: RequeueStrategy)(f: TestFixture => Unit): Unit = {
     withPublisher(queueName, requeueStrategy = requeueStrategy) { app =>
 
-      val consumer: Task[Unit] = requeueStrategy match {
-        case NoneHandler => Task.now(())
+      import scalaz.stream.Process
+      val consumer: Process[Task, Unit] = requeueStrategy match {
+        case NoneHandler => Process.empty[Task, Unit]
         case RawRequeue(requeueHandler, requeuePolicy) =>
           app.amqpClient.requeueOf(app.queueName, requeueHandler, requeuePolicy)
         case TypeRequeue(requeueHandler, requeuePolicy, unmarshaller) =>
@@ -102,7 +103,7 @@ object IntegrationUtils extends StrictLogging {
         case NoneRequeue(handler) => app.amqpClient.consumer(app.queueName, handler)
       }
 
-      consumer.unsafePerformAsync { result =>
+      consumer.run.unsafePerformAsync { result =>
         logger.info(s"Closing consumer ${app.queueName}: $result")
       }
 
@@ -112,9 +113,10 @@ object IntegrationUtils extends StrictLogging {
         case _ =>
           val dlqHandler = new StubConsumeHandler[Task, Delivery]
           val dlqQueueName = QueueName(s"${queueName.value}.dlq")
-          app.amqpClient.consumer(dlqQueueName, dlqHandler).unsafePerformAsync { result =>
-            logger.info(s"Closing consumer for dlq $dlqQueueName: $result")
+          app.amqpClient.consumer(dlqQueueName, dlqHandler).run.unsafePerformAsync { result =>
+            logger.info(s"Closing dead letter consumer $dlqQueueName}: $result")
           }
+
           Some(dlqHandler)
       }
 

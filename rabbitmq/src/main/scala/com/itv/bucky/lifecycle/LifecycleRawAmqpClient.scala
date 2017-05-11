@@ -3,17 +3,17 @@ package com.itv.bucky.lifecycle
 import com.itv.bucky._
 import com.itv.bucky.future.FutureAmqpClient
 import com.itv.lifecycle.Lifecycle
-import com.rabbitmq.client.Channel
+import com.rabbitmq.client.{Channel => RabbitChannel}
 
 import scala.concurrent.ExecutionContext
 import scala.util.Try
 
-class LifecycleRawAmqpClient(channelFactory: Lifecycle[Channel])(implicit executionContext: ExecutionContext) extends FutureAmqpClient[Lifecycle](channelFactory) {
+class LifecycleRawAmqpClient(channelFactory: Lifecycle[RabbitChannel])(implicit executionContext: ExecutionContext) extends FutureAmqpClient[Lifecycle](channelFactory) {
 
   override def performOps(thunk: (AmqpOps) => Try[Unit]): Try[Unit] = Lifecycle.using(channelFactory)(channel => thunk(ChannelAmqpOps(channel)))
 
   override def estimatedMessageCount(queueName: QueueName): Try[Int] =  Lifecycle.using(channelFactory) { channel =>
-    IdChannel.estimateMessageCount(channel, queueName)
+    Channel.estimateMessageCount(channel, queueName)
   }
 
 

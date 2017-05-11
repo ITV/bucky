@@ -1,15 +1,12 @@
 package com.itv.bucky
 
-import java.io.File
-
-import com.itv.bucky.decl.Declaration
+§import com.itv.bucky.decl.Declaration
 import com.itv.bucky.lifecycle._
-import com.itv.lifecycle.{Lifecycle, NoOpLifecycle}
+import com.itv.lifecycle.Lifecycle
 
 import scala.concurrent.{ExecutionContext, Future}
 
 object TestLifecycle {
-
   import IntegrationUtils._
 
   val defaultConfig = AmqpClientConfig("localhost", 5672, "guest", "guest", networkRecoveryInterval = None)
@@ -17,7 +14,6 @@ object TestLifecycle {
   def base(declarations: List[Declaration], config: AmqpClientConfig = defaultConfig)
           (implicit executionContext: ExecutionContext): Lifecycle[(AmqpClient[Lifecycle, Future, Throwable, Unit], Publisher[Future, PublishCommand])] = {
     for {
-      _ <- if (config.host == "localhost") LocalAmqpServer(passwordFile = new File("src/it/resources/qpid-passwd")) else NoOpLifecycle(())
       amqpClient <- AmqpClientLifecycle(config)
       _ <- DeclarationLifecycle(declarations, amqpClient)
       publisher <- amqpClient.publisher()

@@ -3,7 +3,6 @@ package com.itv.bucky
 import com.itv.bucky.IntegrationUtils.defaultDeclaration
 import com.itv.bucky.SameThreadExecutionContext.implicitly
 import com.itv.bucky.decl.DeclarationExecutor
-import com.itv.bucky.future.FutureIdAmqpClient
 import com.itv.bucky.future._
 import com.itv.lifecycle.Lifecycle
 import com.typesafe.scalalogging.StrictLogging
@@ -53,7 +52,7 @@ class PublisherIntegrationTest extends FunSuite with ScalaFutures with StrictLog
 
     handler.nextMessage().futureValue.body.value shouldBe body.value
 
-    IdChannel.closeAll(amqpClient.channel)
+    Channel.closeAll(amqpClient.channel)
   }
 
 
