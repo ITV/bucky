@@ -106,7 +106,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogg
       _ <- DeclarationLifecycle(declarations, amqpClient)
       publisher <- amqpClient.publisher()
 
-      consumer <- amqpClient.consumer(queueName, handler)
+      _ <- amqpClient.consumer(queueName, handler)
 
       _ <- amqpClient.consumer(QueueName(s"${queueName.value}.dlq"), dlqHandler)
     } {

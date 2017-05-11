@@ -37,20 +37,14 @@ case class TaskAmqpClient(channel: Id[Channel]) extends AmqpClient[Id, Task, Thr
         }
     }
 
-
   override def performOps(thunk: (AmqpOps) => Try[Unit]): Try[Unit] = thunk(ChannelAmqpOps(channel))
 
   override def estimatedMessageCount(queueName: QueueName): Try[Int] = IdChannel.estimateMessageCount(channel, queueName)
-
-
-  // Unfortunately explicit boxing seems necessary due to Scala inferring logger varargs as being of type AnyRef*
-  @inline private def box(x: AnyVal): AnyRef = x.asInstanceOf[AnyRef]
 
 }
 
 
 object TaskAmqpClient extends StrictLogging {
-
   import Monad._
 
   def apply(config: AmqpClientConfig): TaskAmqpClient = IdConnection(config).flatMap(
@@ -58,5 +52,4 @@ object TaskAmqpClient extends StrictLogging {
   ).flatMap(
     TaskAmqpClient(_)
   )
-
 }

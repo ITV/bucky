@@ -66,6 +66,7 @@ object IntegrationUtils extends StrictLogging {
     val publisher: Publisher[Task, PublishCommand] = amqpClient.publisher()
     f(TestFixture(publisher, routingKey, exchange, testQueueName, amqpClient, QueueName(s"${testQueueName.value}.requeue")))
 
+    logger.info(s"Closing the the publisher")
     IdChannel.closeAll(amqpClient.channel)
 
   }
@@ -118,6 +119,8 @@ object IntegrationUtils extends StrictLogging {
       }
 
       f(app.copy(dlqHandler = dlqHandler))
+
+      logger.info(s"Closing the the consumer")
     }
   }
 
