@@ -3,6 +3,7 @@ package com.itv.bucky.task
 import com.itv.bucky._
 import com.itv.bucky.decl._
 import com.itv.bucky.pattern.requeue._
+import com.itv.lifecycle.Lifecycle
 import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.StrictLogging
 
@@ -12,6 +13,7 @@ import scalaz.concurrent.Task
 
 
 object IntegrationUtils extends StrictLogging {
+
   def defaultDeclaration(queueName: QueueName): List[Queue] =
     List(queueName).map(Queue(_).autoDelete.expires(2.minutes))
 
@@ -45,30 +47,31 @@ object IntegrationUtils extends StrictLogging {
 
     val exchange = ExchangeName("")
 
-    val amqpClient = TaskAmqpClient(IntegrationUtils.config)
+    Lifecycle.using(DefaultTaskAmqpClientLifecycle(IntegrationUtils.config)) { client =>
 
-    val declaration = requeueStrategy match {
-      case NoneRequeue(_) => defaultDeclaration(testQueueName)
-      case SimpleRequeue(_) => basicRequeueDeclarations(testQueueName, retryAfter = 1.second) collect {
-        case ex: Exchange => ex.autoDelete.expires(1.minute)
-        case q: Queue => q.autoDelete.expires(1.minute)
-      }
-      case _ =>
-        logger.debug(s"Requeue declarations")
-        requeueDeclarations(testQueueName, RoutingKey(testQueueName.value), Exchange(ExchangeName(s"${testQueueName.value}.dlx")), retryAfter = 1.second) collect {
-        case ex: Exchange => ex.autoDelete.expires(1.minute)
-        case q: Queue => q.autoDelete.expires(1.minute)
+      val declaration = requeueStrategy match {
+        case NoneRequeue(_) => defaultDeclaration(testQueueName)
+        case SimpleRequeue(_) => basicRequeueDeclarations(testQueueName, retryAfter = 1.second) collect {
+          case ex: Exchange => ex.autoDelete.expires(1.minute)
+          case q: Queue => q.autoDelete.expires(1.minute)
+        }
+        case _ =>
+          logger.debug(s"Requeue declarations")
+          requeueDeclarations(testQueueName, RoutingKey(testQueueName.value), Exchange(ExchangeName(s"${testQueueName.value}.dlx")), retryAfter = 1.second) collect {
+            case ex: Exchange => ex.autoDelete.expires(1.minute)
+            case q: Queue => q.autoDelete.expires(1.minute)
+          }
+
       }
 
+      if (shouldDeclare)
+        DeclarationExecutor(declaration, client, 5.seconds)
+
+      val publisher: Publisher[Task, PublishCommand] = client.publisher()
+      f(TestFixture(publisher, routingKey, exchange, testQueueName, client, QueueName(s"${testQueueName.value}.requeue")))
+
+      logger.debug(s"Closing the the publisher")
     }
-
-    if (shouldDeclare)
-      DeclarationExecutor(declaration, amqpClient, 5.seconds)
-
-    val publisher: Publisher[Task, PublishCommand] = amqpClient.publisher()
-    f(TestFixture(publisher, routingKey, exchange, testQueueName, amqpClient, QueueName(s"${testQueueName.value}.requeue")))
-
-    logger.debug(s"Closing the the publisher")
   }
 
 
@@ -119,9 +122,7 @@ object IntegrationUtils extends StrictLogging {
 
       consumer.run.unsafePerformAsync { result =>
         logger.info(s"Closing consumer ${app.queueName}: $result")
-        Channel.closeAll(app.amqpClient.channel)
       }
-
 
 
       f(app.copy(dlqHandler = dlqHandler))

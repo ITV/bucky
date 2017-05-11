@@ -32,6 +32,4 @@ class PublisherIntegrationTest extends FunSuite with ScalaFutures with StrictLog
 
     }
   }
-
-
 }
