@@ -41,7 +41,7 @@ case class TaskAmqpClient(channel: Id[RabbitChannel]) extends AmqpClient[Id, Tas
       val consumer: RabbitMqConsumer = new DefaultConsumer(channel) {
         override def handleDelivery(consumerTag: String, envelope: Envelope, properties: BasicProperties, body: Array[Byte]): Unit = {
           messages.enqueueOne(Consumer.deliveryFrom(consumerTag, envelope, properties, body)).unsafePerformAsync { r =>
-            logger.debug(s"$r")
+//FIXME            logger.debug(s"$r")
           }
         }
       }

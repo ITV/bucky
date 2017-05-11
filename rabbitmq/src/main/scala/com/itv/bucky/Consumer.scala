@@ -29,16 +29,17 @@ object Consumer extends StrictLogging {
     new DefaultConsumer(channel) {
       override def handleDelivery(consumerTag: String, envelope: RabbitMQEnvelope, properties: BasicProperties, body: Array[Byte]): Unit = {
         val delivery = deliveryFrom(consumerTag, envelope, properties, body)
-        logger.debug("Received {} on {}", delivery, queueName)
           Consumer.processDelivery(channel, queueName, handler, actionOnFailure, delivery)
       }
     }
 
   def processDelivery[E, F[_]](channel: Channel, queueName: QueueName, handler: Handler[F, Delivery], actionOnFailure: ConsumeAction, delivery: Delivery)(implicit F: MonadError[F, E]) =
-    F.map(F.handleError(F.flatMap(F.apply(handler(delivery)))(identity)) { error =>
+    F.map{
+      logger.debug("Received {} on {}", delivery, queueName)
+      F.handleError(F.flatMap(F.apply(handler(delivery)))(identity)) { error =>
       logger.error(s"Unhandled exception processing delivery ${delivery.envelope.deliveryTag}L on $queueName", error)
       F.apply(actionOnFailure)
-    }) { action =>
+    }} { action =>
       logger.debug("Responding with {} to {} on {}", action, delivery, queueName)
       action match {
         case Ack => channel.basicAck(delivery.envelope.deliveryTag, false)

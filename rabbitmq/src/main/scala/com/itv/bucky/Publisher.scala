@@ -8,7 +8,8 @@ import com.rabbitmq.client._
 
 object Publisher extends StrictLogging {
 
-  def publish[R](channel: Channel, cmd: PublishCommand, pendingConfirmation: R, pendingConfirmations: PendingConfirmations[R])(fail: (R, Exception) => Unit): Unit =
+  def publish[R](channel: Channel, cmd: PublishCommand, pendingConfirmation: R, pendingConfirmations: PendingConfirmations[R])(fail: (R, Exception) => Unit): Unit = {
+    logger.debug(s"Acquire the channel: $channel")
     channel.synchronized {
       val deliveryTag = channel.getNextPublishSeqNo
       logger.debug("Publishing with delivery tag {}L to {}:{} with {}: {}", box(deliveryTag), cmd.exchange, cmd.routingKey, cmd.basicProperties, cmd.body)
@@ -26,6 +27,8 @@ object Publisher extends StrictLogging {
 
       }
     }
+    logger.debug(s"Release the channel: $channel")
+  }
 
 
   // Unfortunately explicit boxing seems necessary due to Scala inferring logger varargs as being of type AnyRef*

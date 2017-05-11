@@ -53,7 +53,9 @@ object IntegrationUtils extends StrictLogging {
         case ex: Exchange => ex.autoDelete.expires(1.minute)
         case q: Queue => q.autoDelete.expires(1.minute)
       }
-      case _ => requeueDeclarations(testQueueName, RoutingKey(testQueueName.value), Exchange(ExchangeName(s"${testQueueName.value}.dlx")), retryAfter = 1.second) collect {
+      case _ =>
+        logger.debug(s"Requeue declarations")
+        requeueDeclarations(testQueueName, RoutingKey(testQueueName.value), Exchange(ExchangeName(s"${testQueueName.value}.dlx")), retryAfter = 1.second) collect {
         case ex: Exchange => ex.autoDelete.expires(1.minute)
         case q: Queue => q.autoDelete.expires(1.minute)
       }
@@ -66,9 +68,7 @@ object IntegrationUtils extends StrictLogging {
     val publisher: Publisher[Task, PublishCommand] = amqpClient.publisher()
     f(TestFixture(publisher, routingKey, exchange, testQueueName, amqpClient, QueueName(s"${testQueueName.value}.requeue")))
 
-    logger.info(s"Closing the the publisher")
-    Channel.closeAll(amqpClient.channel)
-
+    logger.debug(s"Closing the the publisher")
   }
 
 
@@ -92,6 +92,20 @@ object IntegrationUtils extends StrictLogging {
                                requeueStrategy: RequeueStrategy)(f: TestFixture => Unit): Unit = {
     withPublisher(queueName, requeueStrategy = requeueStrategy) { app =>
 
+      val dlqHandler = requeueStrategy match {
+        case NoneHandler => None
+        case NoneRequeue(_) => None
+        case _ =>
+          logger.debug(s"Create dlq handler")
+          val dlqHandler = new StubConsumeHandler[Task, Delivery]
+          val dlqQueueName = QueueName(s"${queueName.value}.dlq")
+          app.amqpClient.consumer(dlqQueueName, dlqHandler).run.unsafePerformAsync { result =>
+            logger.info(s"Closing dead letter consumer $dlqQueueName}: $result")
+          }
+
+          Some(dlqHandler)
+      }
+
       import scalaz.stream.Process
       val consumer: Process[Task, Unit] = requeueStrategy match {
         case NoneHandler => Process.empty[Task, Unit]
@@ -105,20 +119,10 @@ object IntegrationUtils extends StrictLogging {
 
       consumer.run.unsafePerformAsync { result =>
         logger.info(s"Closing consumer ${app.queueName}: $result")
+        Channel.closeAll(app.amqpClient.channel)
       }
 
-      val dlqHandler = requeueStrategy match {
-        case NoneHandler => None
-        case NoneRequeue(_) => None
-        case _ =>
-          val dlqHandler = new StubConsumeHandler[Task, Delivery]
-          val dlqQueueName = QueueName(s"${queueName.value}.dlq")
-          app.amqpClient.consumer(dlqQueueName, dlqHandler).run.unsafePerformAsync { result =>
-            logger.info(s"Closing dead letter consumer $dlqQueueName}: $result")
-          }
 
-          Some(dlqHandler)
-      }
 
       f(app.copy(dlqHandler = dlqHandler))
 

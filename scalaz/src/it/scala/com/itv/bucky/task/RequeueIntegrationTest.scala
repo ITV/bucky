@@ -12,7 +12,7 @@ import org.scalatest.concurrent.Eventually.eventually
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 
 import scala.concurrent.duration._
-import scala.util.Success
+import scala.util.{Random, Success}
 import scalaz.\/-
 import scalaz.concurrent.Task
 
@@ -129,7 +129,41 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures with StrictLoggi
   }
 
 
+  test(s"It should deadletter the message after maximumProcessAttempts unsuccessful attempts to process") {
+    val handler = new StubRequeueHandler[Task, Int]
+    withPublisherAndConsumer(requeueStrategy = TypeRequeue(handler, requeuePolicy, intMessageDeserializer)) { app =>
+      handler.nextResponse = Task.now(Requeue)
 
+      val payload = Payload.from(1)
+      app.publish(payload).unsafePerformSyncAttempt shouldBe published
+
+      eventually {
+        handler.receivedMessages.size shouldBe requeuePolicy.maximumProcessAttempts
+        app.amqpClient.estimatedMessageCount(app.queueName) shouldBe Success(0)
+        app.amqpClient.estimatedMessageCount(app.requeueQueueName) shouldBe Success(0)
+        app.dlqHandler.get.receivedMessages.map(_.body) shouldBe List(payload)
+      }
+    }
+  }
+
+
+  test(s"It should deadletter the message if requeued and maximumProcessAttempts is < 1") {
+    val handler = new StubRequeueHandler[Task, Int]
+    val negativeProcessAttemptsRequeuePolicy = RequeuePolicy(Random.nextInt(10) * -1, 1.second)
+    withPublisherAndConsumer(requeueStrategy = TypeRequeue(handler, negativeProcessAttemptsRequeuePolicy, intMessageDeserializer)) { app =>
+      handler.nextResponse = Task.now(Requeue)
+
+      val payload = Payload.from(1)
+      app.publish(payload).unsafePerformSyncAttempt shouldBe published
+
+      eventually {
+        handler.receivedMessages.size shouldBe 1
+        app.amqpClient.estimatedMessageCount(app.queueName) shouldBe Success(0)
+        app.amqpClient.estimatedMessageCount(app.requeueQueueName) shouldBe Success(0)
+        app.dlqHandler.get.receivedMessages.map(_.body) shouldBe List(payload)
+      }
+    }
+  }
 
 
 }
