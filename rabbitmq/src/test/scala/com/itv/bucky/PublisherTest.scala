@@ -17,7 +17,7 @@ import com.itv.bucky.future.{FutureAmqpClient, FutureIdAmqpClient}
 
 class PublisherTest extends FunSuite with ScalaFutures {
 
-  import TestUtils._
+  import BuckyUtils._
 
   test("Publishing only returns success once publication is acknowledged with Id") {
     val channel = new StubChannel()

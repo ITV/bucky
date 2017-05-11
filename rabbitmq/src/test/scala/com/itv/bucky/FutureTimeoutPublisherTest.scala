@@ -18,7 +18,7 @@ import scala.concurrent.{Await, Future, Promise}
 import scala.util.{Failure, Success}
 
 class FutureTimeoutPublisherTest extends FunSuite with ScalaFutures {
-  import TestUtils._
+  import BuckyUtils._
 
   test("Returns result of delegate publisher if result occurs before timeout") {
     val command1 = anyPublishCommand()

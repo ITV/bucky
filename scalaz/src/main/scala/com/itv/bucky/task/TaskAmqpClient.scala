@@ -28,7 +28,7 @@ case class TaskAmqpClient(channel: Id[RabbitChannel]) extends AmqpClient[Id, Tas
     cmd =>
       Task.async { pendingConfirmation: Register =>
         Publisher.publish[Register](channel, cmd, pendingConfirmation, pendingConfirmations)(handleFailure)
-      }
+      }.timed(timeout)
   }
 
   override def consumer(queueName: QueueName, handler: Handler[Task, Delivery], actionOnFailure: ConsumeAction = DeadLetter, prefetchCount: Int = 0): Id[Process[Task, Unit]] = {

@@ -130,7 +130,8 @@ lazy val test = project
       "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
       "org.apache.qpid" % "qpid-broker" % "6.0.4",
       "io.netty" % "netty" % "3.4.2.Final",
-      "org.scalatest" %% "scalatest" % scalaTestVersion
+      "org.scalatest" %% "scalatest" % scalaTestVersion,
+      "com.rabbitmq" % "amqp-client" % amqpClientVersion
     )
   )
 
