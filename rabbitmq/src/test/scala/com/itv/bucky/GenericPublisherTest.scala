@@ -3,7 +3,6 @@ package com.itv.bucky
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.ScalaFutures
-import com.itv.bucky.lifecycle._
 import com.itv.bucky.future._
 
 import scala.concurrent.Future
@@ -62,7 +61,7 @@ class GenericPublisherTest extends FunSuite with ScalaFutures {
     }
 
 
-  private def createClient(): StubPublisher[PublishCommand] = {
-    new StubPublisher[PublishCommand]()
+  private def createClient(): StubPublisher[Future, PublishCommand] = {
+    new StubPublisher[Future, PublishCommand]()
   }
 }

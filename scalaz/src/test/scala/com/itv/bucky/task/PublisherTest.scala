@@ -2,9 +2,7 @@ package com.itv.bucky.task
 
 import java.io.IOException
 import java.util.concurrent.TimeoutException
-import java.util.concurrent.atomic.AtomicReference
 
-import com.itv.bucky.AtomicRef.Ref
 import com.itv.bucky.task.TaskExt._
 import com.itv.bucky._
 import com.rabbitmq.client.AMQP.Basic.Publish
@@ -16,8 +14,6 @@ import org.scalatest.Matchers._
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 
 import scala.concurrent.duration._
-import scalaz.\/
-import scalaz.concurrent.Task
 
 
 class PublisherTest extends FunSuite with ScalaFutures {
@@ -32,7 +28,7 @@ class PublisherTest extends FunSuite with ScalaFutures {
       channel.transmittedCommands should have size 1
       channel.transmittedCommands.last shouldBe an[AMQP.Confirm.Select]
 
-      val task = publish(anyPublishCommand())
+      val task = resultFrom(publish(anyPublishCommand()))
 
       channel.transmittedCommands should have size 2
       channel.transmittedCommands.last shouldBe an[AMQP.Basic.Publish]
@@ -52,7 +48,7 @@ class PublisherTest extends FunSuite with ScalaFutures {
       channel.transmittedCommands should have size 1
       channel.transmittedCommands.last shouldBe an[Select]
 
-      val task = publish(anyPublishCommand())
+      val task = resultFrom(publish(anyPublishCommand()))
 
       channel.transmittedCommands should have size 2
       channel.transmittedCommands.last shouldBe an[Publish]
@@ -70,7 +66,7 @@ class PublisherTest extends FunSuite with ScalaFutures {
     withPublisher(timeout = 100.hours) { publisher =>
       import publisher._
 
-      val task = publish(anyPublishCommand())
+      val task = resultFrom(publish(anyPublishCommand()))
 
       task shouldBe 'running
 
@@ -85,9 +81,9 @@ class PublisherTest extends FunSuite with ScalaFutures {
     withPublisher(timeout = 100.hours) { publisher =>
       import publisher._
 
-      val task1 = publish(anyPublishCommand())
-      val task2 = publish(anyPublishCommand())
-      val task3 = publish(anyPublishCommand())
+      val task1 = resultFrom(publish(anyPublishCommand()))
+      val task2 = resultFrom(publish(anyPublishCommand()))
+      val task3 = resultFrom(publish(anyPublishCommand()))
 
       task1 shouldBe 'running
       task2 shouldBe 'running
@@ -112,9 +108,9 @@ class PublisherTest extends FunSuite with ScalaFutures {
       withPublisher(timeout = 100.hours) { publisher =>
         import publisher._
 
-        val task1 = publish(anyPublishCommand())
-        val task2 = publish(anyPublishCommand())
-        val task3 = publish(anyPublishCommand())
+        val task1 = resultFrom(publish(anyPublishCommand()))
+        val task2 = resultFrom(publish(anyPublishCommand()))
+        val task3 = resultFrom(publish(anyPublishCommand()))
 
         task1 should not be 'completed
         task2 should not be 'completed
@@ -147,7 +143,7 @@ class PublisherTest extends FunSuite with ScalaFutures {
         channel.transmittedCommands should have size 1
         channel.transmittedCommands.last shouldBe an[AMQP.Confirm.Select]
 
-        val task = publish(anyPublishCommand())
+        val task = resultFrom(publish(anyPublishCommand()))
 
         eventually {
           task.failure.getMessage should ===(expectedMsg)
@@ -160,60 +156,12 @@ class PublisherTest extends FunSuite with ScalaFutures {
       withPublisher(timeout = 10.millis) { publisher =>
         import publisher._
 
-        val result = publish(anyPublishCommand())
+        val result = resultFrom(publish(anyPublishCommand()))
 
         eventually {
           result.failure shouldBe a[TimeoutException]
         }
       }
     }
-
-  case class TestPublisher(channel: StubChannel, publisher: Publisher[Task, PublishCommand]) {
-
-
-    def publish(command: PublishCommand): TaskStatus = {
-      val status = TaskStatus(new AtomicReference[Option[TaskResult]](None))
-      publisher(anyPublishCommand()).unsafePerformAsync { result =>
-        status.complete(result)
-      }
-      status
-    }
-
-  }
-
-
-  case class TaskStatus(status: Ref[Option[TaskResult]]) {
-    def complete(result: \/[Throwable, Unit]) = status.set(Some(result))
-
-    def isRunning = status.get().isEmpty
-    def isCompleted = status.get().isDefined
-
-    def isSuccess: Boolean = status.get().fold(fail(s"It is running!!!")) { result =>
-      result.fold[Boolean](
-        (e: Throwable) =>
-          fail(s"It should not fail")
-        ,
-        _ => true
-      )
-    }
-
-
-    def failure: Throwable = status.get().fold(fail(s"It is running!!!")) { result =>
-      result.fold[Throwable](
-        identity
-        ,
-        _ => fail("It should not be completed successfully")
-      )
-    }
-
-  }
-
-  private def withPublisher(timeout: FiniteDuration = 1.second, channel: StubChannel = new StubChannel)(f: TestPublisher => Unit): Unit = {
-
-    val client = TaskAmqpClient(channel)
-
-    val publish = client.publisher(timeout)
-    f(TestPublisher(channel, publish))
-  }
 
 }
