@@ -139,8 +139,8 @@ lazy val example = project
   .settings(name := "itv")
   .settings(moduleName := "bucky-example")
   .settings(kernelSettings: _*)
-  .aggregate(core, rabbitmq, argonaut, circe)
-  .dependsOn(core, rabbitmq, argonaut, circe)
+  .aggregate(core, rabbitmq, scalaz, argonaut, circe)
+  .dependsOn(core, rabbitmq, scalaz, argonaut, circe)
   .settings(
     libraryDependencies ++= Seq(
       "io.argonaut" %% "argonaut" % argonautVersion,
@@ -254,7 +254,6 @@ lazy val scalaz = project
   )
   .settings(
     libraryDependencies ++= Seq(
-      "com.rabbitmq" % "amqp-client" % amqpClientVersion,
       "org.scalaz.stream" %% "scalaz-stream" % "0.8.6a",
       "com.typesafe" % "config" % "1.2.1" % "it"
     )
