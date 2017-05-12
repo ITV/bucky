@@ -102,7 +102,8 @@ object IntegrationUtils extends StrictLogging {
           logger.debug(s"Create dlq handler")
           val dlqHandler = new StubConsumeHandler[Task, Delivery]
           val dlqQueueName = QueueName(s"${queueName.value}.dlq")
-          app.amqpClient.consumer(dlqQueueName, dlqHandler).run.unsafePerformAsync { result =>
+          val consumer = app.amqpClient.consumer(dlqQueueName, dlqHandler)
+          consumer.run.unsafePerformAsync { result =>
             logger.info(s"Closing dead letter consumer $dlqQueueName}: $result")
           }
 
