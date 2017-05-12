@@ -41,7 +41,6 @@ class ConsumerTest extends FunSuite {
     channel.transmittedCommands.last.asInstanceOf[Basic.Nack].getRequeue shouldBe true
 
     handler.receivedMessages should have size 3
-    1 shouldEqual 1
   }
 
 
@@ -74,7 +73,6 @@ class ConsumerTest extends FunSuite {
         channel.transmittedCommands.last.asInstanceOf[Basic.Nack].getRequeue shouldBe true
 
         handler.receivedMessages should have size 3
-        1 shouldEqual 1
     }
   }
 

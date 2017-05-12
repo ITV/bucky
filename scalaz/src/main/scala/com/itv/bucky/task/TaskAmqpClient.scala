@@ -13,9 +13,8 @@ import scalaz.{-\/, \/, \/-}
 import scalaz.concurrent.Task
 import scalaz.stream.Process
 
-
-case class TaskAmqpClient(channel: Id[RabbitChannel]) extends AmqpClient[Id, Task, Throwable, Process[Task, Unit]] with StrictLogging {
-
+case class TaskAmqpClient(channel: Id[RabbitChannel]) extends AmqpClient[Id, Task, Throwable, Process[Task, Unit]]
+  with StrictLogging {
   type Register = (\/[Throwable, Unit]) => Unit
 
   override def publisher(timeout: Duration): Id[Publisher[Task, PublishCommand]] = {
@@ -32,16 +31,18 @@ case class TaskAmqpClient(channel: Id[RabbitChannel]) extends AmqpClient[Id, Tas
   }
 
   override def consumer(queueName: QueueName, handler: Handler[Task, Delivery], actionOnFailure: ConsumeAction = DeadLetter, prefetchCount: Int = 0): Id[Process[Task, Unit]] = {
-
     import scalaz.stream.async
-
     val messages = async.unboundedQueue[Delivery]
 
     def createConsumer: Task[RabbitMqConsumer] = Task {
       val consumer: RabbitMqConsumer = new DefaultConsumer(channel) {
         override def handleDelivery(consumerTag: String, envelope: Envelope, properties: BasicProperties, body: Array[Byte]): Unit = {
-          messages.enqueueOne(Consumer.deliveryFrom(consumerTag, envelope, properties, body)).unsafePerformAsync { r =>
-//FIXME            logger.debug(s"$r")
+          val delivery = Consumer.deliveryFrom(consumerTag, envelope, properties, body)
+          messages.enqueueOne(delivery).unsafePerformAsync {
+            case \/-(_) =>
+            case -\/(exception) =>
+              logger.error(s"Not able to enqueue $delivery because ${exception.getMessage}", exception)
+              Consumer.requeueImmediately(channel, delivery)
           }
         }
       }
@@ -52,7 +53,6 @@ case class TaskAmqpClient(channel: Id[RabbitChannel]) extends AmqpClient[Id, Tas
     def processMessage(delivery: Delivery): Task[Unit] =
       Consumer.processDelivery(channel, queueName, handler, actionOnFailure, delivery)
 
-
     import scalaz.stream._
 
     val source: Process[Task, Delivery] = (Process eval createConsumer) flatMap (_ => messages.dequeue)
@@ -61,16 +61,12 @@ case class TaskAmqpClient(channel: Id[RabbitChannel]) extends AmqpClient[Id, Tas
     (source to sink)
   }
 
-
   override def performOps(thunk: (AmqpOps) => Try[Unit]): Try[Unit] = thunk(ChannelAmqpOps(channel))
 
   override def estimatedMessageCount(queueName: QueueName): Try[Int] = Channel.estimateMessageCount(channel, queueName)
-
 }
 
-
 object TaskAmqpClient extends StrictLogging {
-
   import Monad._
 
   def apply(config: AmqpClientConfig): TaskAmqpClient = Connection(config).flatMap(

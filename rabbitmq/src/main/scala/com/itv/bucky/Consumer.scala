@@ -44,9 +44,12 @@ object Consumer extends StrictLogging {
       action match {
         case Ack => channel.basicAck(delivery.envelope.deliveryTag, false)
         case DeadLetter => channel.basicNack(delivery.envelope.deliveryTag, false, false)
-        case RequeueImmediately => channel.basicNack(delivery.envelope.deliveryTag, false, true)
+        case RequeueImmediately => requeueImmediately(channel, delivery)
       }
     }
+
+  def requeueImmediately[F[_], E](channel: Channel, delivery: Delivery): Unit =
+    channel.basicNack(delivery.envelope.deliveryTag, false, true)
 
   def deliveryFrom(consumerTag: String, envelope: RabbitMQEnvelope, properties: BasicProperties, body: Array[Byte]) =
     Delivery(Payload(body), ConsumerTag(consumerTag), MessagePropertiesConverters(envelope), MessagePropertiesConverters(properties))
