@@ -1,4 +1,4 @@
-package com.itv.bucky.task
+package com.itv.bucky.taskz
 
 import java.util.concurrent.TimeoutException
 

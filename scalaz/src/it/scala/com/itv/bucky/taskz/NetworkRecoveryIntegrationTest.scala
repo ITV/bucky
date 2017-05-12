@@ -1,4 +1,4 @@
-package com.itv.bucky.task
+package com.itv.bucky.taskz
 
 import com.itv.bucky.PublishCommandBuilder._
 import com.itv.bucky._

@@ -29,9 +29,6 @@ case class AmqpChannelLifecycle(connection: RabbitConnection) extends VanillaLif
 }
 
 
-
-
-
 case class DeclarationLifecycle[F[_], E](declarations: Iterable[Declaration], client: AmqpClient[Lifecycle, F, E, Unit], timeout: FiniteDuration = 5.seconds) extends VanillaLifecycle[Unit] {
 
   def start(): Unit = DeclarationExecutor(declarations, client, timeout)

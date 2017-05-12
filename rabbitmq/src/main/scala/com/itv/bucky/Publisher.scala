@@ -8,7 +8,7 @@ import com.rabbitmq.client._
 
 object Publisher extends StrictLogging {
 
-  def publish[R](channel: Channel, cmd: PublishCommand, pendingConfirmation: R, pendingConfirmations: PendingConfirmations[R])(fail: (R, Exception) => Unit): Unit = {
+  def publish[T](channel: Channel, cmd: PublishCommand, pendingConfirmation: T, pendingConfirmations: PendingConfirmations[T])(fail: (T, Exception) => Unit): Unit = {
     logger.debug(s"Acquire the channel: $channel")
     channel.synchronized {
       val deliveryTag = channel.getNextPublishSeqNo

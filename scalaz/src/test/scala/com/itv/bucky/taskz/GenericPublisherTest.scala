@@ -1,17 +1,20 @@
-package com.itv.bucky.task
+package com.itv.bucky.taskz
 
 import com.itv.bucky._
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
-import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import PublishCommandBuilder._
 
 import scalaz.concurrent.Task
 import org.scalatest.concurrent.Eventually._
+import scala.concurrent.duration._
 
 class GenericPublisherTest extends FunSuite with ScalaFutures {
 
   import TaskExt._
+  implicit val publisherPatienceConfig: Eventually.PatienceConfig = Eventually.PatienceConfig(timeout = 90.seconds)
+
 
   test("Publishing only returns success once publication is acknowledged") {
     val client = createClient()
@@ -45,7 +48,8 @@ class GenericPublisherTest extends FunSuite with ScalaFutures {
     message.body shouldBe expectedBody
   }
 
-  test("publishing with a broken publish command serializer should fail the publish future") {
+
+  test("Publishing with a broken publish command serializer should fail the publish future") {
     object Banana
     val expectedException = new RuntimeException("What's a banana?")
 
@@ -64,6 +68,7 @@ class GenericPublisherTest extends FunSuite with ScalaFutures {
       result.failure shouldBe expectedException
     }
   }
+
 
   private def createClient(): StubPublisher[Task, PublishCommand] = {
     new StubPublisher[Task, PublishCommand]()

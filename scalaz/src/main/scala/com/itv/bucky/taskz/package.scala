@@ -2,7 +2,7 @@ package com.itv.bucky
 
 import scalaz.concurrent.Task
 
-package object task {
+package object taskz {
 
   implicit val taskMonadError = new MonadError[Task, Throwable] {
     override def raiseError[A](e: Throwable): Task[A] = Task.fail(e)

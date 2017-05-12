@@ -1,4 +1,4 @@
-package com.itv.bucky.task
+package com.itv.bucky.taskz
 
 import com.itv.bucky.Monad.Id
 import com.itv.bucky._

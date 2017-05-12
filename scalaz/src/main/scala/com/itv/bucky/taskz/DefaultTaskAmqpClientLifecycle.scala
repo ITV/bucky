@@ -1,4 +1,4 @@
-package com.itv.bucky.task
+package com.itv.bucky.taskz
 
 import com.itv.bucky.{AmqpClientConfig, Channel}
 import com.itv.lifecycle.VanillaLifecycle

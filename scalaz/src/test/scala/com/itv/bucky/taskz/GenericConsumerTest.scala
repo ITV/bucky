@@ -1,4 +1,4 @@
-package com.itv.bucky.task
+package com.itv.bucky.taskz
 
 import com.itv.bucky._
 import com.rabbitmq.client.impl.AMQImpl.Basic

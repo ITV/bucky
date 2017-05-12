@@ -1,9 +1,9 @@
-package com.itv.bucky.task
+package com.itv.bucky.taskz
 
 import java.io.IOException
 import java.util.concurrent.TimeoutException
 
-import com.itv.bucky.task.TaskExt._
+import com.itv.bucky.taskz.TaskExt._
 import com.itv.bucky._
 import com.rabbitmq.client.AMQP.Basic.Publish
 import com.rabbitmq.client.AMQP.Confirm.Select

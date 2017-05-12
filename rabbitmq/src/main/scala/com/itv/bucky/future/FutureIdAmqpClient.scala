@@ -8,7 +8,8 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 import scala.util.Try
 
-case class FutureIdAmqpClient(channel: Id[RabbitChannel])(implicit executionContext: ExecutionContext) extends FutureAmqpClient[Id](channel)(Monad.idMonad, executionContext) {
+case class FutureIdAmqpClient(channel: Id[RabbitChannel])(implicit executionContext: ExecutionContext)
+  extends FutureAmqpClient[Id](channel)(Monad.idMonad, executionContext) {
   override def performOps(thunk: (AmqpOps) => Try[Unit]): Try[Unit] = thunk(ChannelAmqpOps(channel))
 
   override def estimatedMessageCount(queueName: QueueName): Try[Int] =

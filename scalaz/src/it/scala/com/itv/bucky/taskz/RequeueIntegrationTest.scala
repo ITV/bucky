@@ -1,9 +1,9 @@
-package com.itv.bucky.task
+package com.itv.bucky.taskz
 
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
 import com.itv.bucky.pattern.requeue.RequeuePolicy
-import com.itv.bucky.task.IntegrationUtils._
+import com.itv.bucky.taskz.IntegrationUtils._
 import com.itv.bucky._
 import com.typesafe.scalalogging.StrictLogging
 import org.scalatest.FunSuite

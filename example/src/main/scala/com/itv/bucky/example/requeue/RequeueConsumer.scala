@@ -7,6 +7,7 @@ import com.itv.bucky.lifecycle._
 import com.itv.bucky.future._
 import com.itv.bucky.pattern.requeue._
 import com.itv.lifecycle.Lifecycle
+import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.StrictLogging
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -21,7 +22,8 @@ object RequeueConsumer extends App with StrictLogging {
     val all = List(queue) ++ basicRequeueDeclarations(queue.name)
   }
 
-  val amqpClientConfig: AmqpClientConfig = AmqpClientConfig("33.33.33.11", 5672, "guest", "guest")
+  val config = ConfigFactory.load("bucky")
+  val amqpClientConfig: AmqpClientConfig = AmqpClientConfig(config.getString("rmq.host"), 5672, "guest", "guest")
 
   val stringToLogRequeueHandler =
     RequeueHandler[Future, String] { message: String =>

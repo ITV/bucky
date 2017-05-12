@@ -11,6 +11,7 @@ import com.itv.lifecycle.Lifecycle
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.concurrent.ExecutionContext.Implicits.global
+import com.typesafe.config.ConfigFactory
 
 /*
   The only difference between this and itv.bucky.example.marshalling.MarshalledPublisher
@@ -26,7 +27,8 @@ object ArgonautMarshalledPublisher extends App {
     val all = List(queue, exchange)
   }
 
-  val amqpClientConfig: AmqpClientConfig = AmqpClientConfig("33.33.33.11", 5672, "guest", "guest")
+  val config = ConfigFactory.load("bucky")
+  val amqpClientConfig: AmqpClientConfig = AmqpClientConfig(config.getString("rmq.host"), 5672, "guest", "guest")
 
   /**
     * A publisher delivers a message of a fixed type to an exchange.

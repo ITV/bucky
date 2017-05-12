@@ -29,8 +29,6 @@ package object bucky {
       override def flatMap[A, B](m: Id[A])(f: (A) => Id[B]): Id[B] = f(m)
     }
 
-
-
     import scala.language.implicitConversions
     class MonadOps[F[_], A](fa: F[A])(implicit M: Monad[F]) {
       def flatMap[B](f: A => F[B]) = M.flatMap(fa)(f)
@@ -38,7 +36,6 @@ package object bucky {
     }
 
     implicit def toMonad[F[_], A](fa: F[A])(implicit M: Monad[F]) = new MonadOps(fa)
-
   }
 
   type Publisher[F[_], -T] = T => F[Unit]

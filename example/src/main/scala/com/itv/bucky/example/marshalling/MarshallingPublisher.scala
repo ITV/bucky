@@ -7,6 +7,7 @@ import com.itv.bucky._
 import com.itv.bucky.decl._
 import com.itv.bucky.future._
 import com.itv.bucky.example.marshalling.Shared.Person
+import com.typesafe.config.ConfigFactory
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent._
@@ -23,7 +24,9 @@ object MarshallingPublisher extends App {
     val all = List(queue, exchange)
   }
 
-  val amqpClientConfig: AmqpClientConfig = AmqpClientConfig("33.33.33.11", 5672, "guest", "guest")
+
+  val config = ConfigFactory.load("bucky")
+  val amqpClientConfig: AmqpClientConfig = AmqpClientConfig(config.getString("rmq.host"), 5672, "guest", "guest")
 
   /**
     * A publisher delivers a message of a fixed type to an exchange.

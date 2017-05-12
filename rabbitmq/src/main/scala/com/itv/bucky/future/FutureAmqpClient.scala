@@ -11,11 +11,12 @@ import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.language.higherKinds
 import scala.util.{Failure, Success, Try}
 
-abstract class FutureAmqpClient[M[_]](channelFactory: M[RabbitChannel])(implicit M: Monad[M], executionContext: ExecutionContext) extends AmqpClient[M, Future, Throwable, Unit] with StrictLogging {
+abstract class FutureAmqpClient[M[_]](channelFactory: M[RabbitChannel])(implicit M: Monad[M], executionContext: ExecutionContext)
+  extends AmqpClient[M, Future, Throwable, Unit] with StrictLogging {
 
   override def consumer(queueName: QueueName, handler: Handler[Future, Delivery], actionOnFailure: ConsumeAction = DeadLetter, prefetchCount: Int = 0): M[Unit] =
     M.flatMap(channelFactory) { (channel: RabbitChannel) =>
-      M.apply{
+      M.apply {
         val consumer = Consumer.defaultConsumer(channel, queueName, handler, actionOnFailure)
         Consumer[Future, Throwable](channel, queueName, consumer, prefetchCount)
       }

@@ -1,17 +1,11 @@
-package com.itv.bucky.example.basic
+package com.itv.bucky.example.scalaz
 
-import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
-import com.itv.bucky.PublishCommandBuilder._
-import com.itv.lifecycle.Lifecycle
 import com.itv.bucky._
 import com.itv.bucky.decl._
-import com.itv.bucky.lifecycle._
-import com.itv.bucky.future._
+import com.itv.bucky.taskz._
+import com.itv.bucky.PublishCommandBuilder._
+import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.typesafe.config.ConfigFactory
-
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
 
 /*
 This example aims to give a minimal structure to:
@@ -40,21 +34,14 @@ object StringPublisher extends App {
   val publisherConfig =
     publishCommandBuilder(StringPayloadMarshaller) using Declarations.routingKey using Declarations.exchange.name
 
-  /**
-    * A lifecycle is a monadic try/finally statement.
-    * More detailed information is available here https://github.com/ITV/lifecycle
-    */
-  val lifecycle: Lifecycle[Publisher[Future, String]] =
-    for {
-      amqpClient <- AmqpClientLifecycle(amqpClientConfig)
-      _ <- DeclarationLifecycle(Declarations.all, amqpClient)
-      publisher <- amqpClient.publisherOf(publisherConfig)
-    }
-      yield publisher
+  val amqpClient = TaskAmqpClient(amqpClientConfig)
+  DeclarationExecutor(Declarations.all, amqpClient)
 
-  Lifecycle.using(lifecycle) { publisher: Publisher[Future, String] =>
-    val result: Future[Unit] = publisher("Hello, world!")
-    Await.result(result, 1.second)
-  }
+  val publish = amqpClient.publisherOf(publisherConfig)
+  val task = publish(s"Hello, world!")
+
+  task.unsafePerformSync
+
+  Channel.closeAll(amqpClient.channel)
 
 }
