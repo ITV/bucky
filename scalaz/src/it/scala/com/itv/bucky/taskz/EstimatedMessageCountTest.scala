@@ -1,7 +1,7 @@
 package com.itv.bucky.taskz
 
 import com.itv.bucky.taskz.IntegrationUtils._
-import com.itv.bucky.{MessageProperties, PublishCommand}
+import com.itv.bucky.{Any, MessageProperties, PublishCommand}
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.Eventually
@@ -34,11 +34,11 @@ class EstimatedMessageCountTest extends FunSuite {
   implicit val patianceConfig: Eventually.PatienceConfig = Eventually.PatienceConfig(timeout = 5.seconds, 1.second)
 
   def estimatedMessageCountTest(messagesToPublish: Int, composingTask: Boolean = false): Unit = {
-    val queueName = randomQueue()
+    val queueName = Any.randomQueue()
 
     withPublisher(queueName) { app =>
       val tasks = (1 to messagesToPublish).map(_ =>
-        app.publisher(PublishCommand(app.exchangeName, app.routingKey, MessageProperties.persistentBasic, randomPayload()))
+        app.publisher(PublishCommand(app.exchangeName, app.routingKey, MessageProperties.persistentBasic, Any.randomPayload()))
       )
       if (composingTask)
         Task.gatherUnordered(tasks).unsafePerformSync

@@ -31,7 +31,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogg
     withPublisherAndConsumer(requeueStrategy = NoneRequeue(AmqpClient.deliveryHandlerOf(handler, toDeliveryUnmarshaller(messageUnmarshaller)))) { app =>
       handler.receivedMessages shouldBe 'empty
 
-      val expectedMessage = randomString()
+      val expectedMessage = Any.randomString()
       app.publisher(PublishCommand(app.exchangeName, app.routingKey, MessageProperties.persistentBasic, Payload.from(expectedMessage))).unsafePerformSyncAttempt should ===(success)
 
       eventually {

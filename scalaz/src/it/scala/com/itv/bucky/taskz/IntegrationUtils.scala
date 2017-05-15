@@ -11,7 +11,6 @@ import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.StrictLogging
 
 import scala.concurrent.duration._
-import scala.util.Random
 import scalaz.concurrent.{Strategy, Task}
 import scalaz.stream.Process
 
@@ -23,7 +22,6 @@ object IntegrationUtils extends StrictLogging {
 
   def config: AmqpClientConfig = {
     val config = ConfigFactory.load("bucky")
-
     AmqpClientConfig(config.getString("rmq.host"), config.getInt("rmq.port"), config.getString("rmq.username"), config.getString("rmq.password"))
   }
 
@@ -46,9 +44,7 @@ object IntegrationUtils extends StrictLogging {
             case ex: Exchange => ex.autoDelete.expires(1.minute)
             case q: Queue => q.autoDelete.expires(1.minute)
           }
-
       }
-
       if (shouldDeclare)
         DeclarationExecutor(declaration, client, 5.seconds)
 
@@ -60,27 +56,11 @@ object IntegrationUtils extends StrictLogging {
   }
 
 
-  def randomPayload() =
-    Payload.from(randomString())
+  def withPublisher(testQueueName: QueueName = Any.randomQueue(), requeueStrategy: RequeueStrategy[Task] = NoneHandler, shouldDeclare: Boolean = true)(f: TestFixture[Task] => Unit): Unit =
+    withPublihserAndAmqpClient(testQueueName, requeueStrategy, shouldDeclare) { (_, t) => f(t) }
 
 
-  def randomString() =
-    s"Hello World ${new Random().nextInt(10000)}! "
-
-
-  def randomQueue() =
-    QueueName(s"bucky-queue-${new Random().nextInt(10000)}")
-
-
-  def getHeader(header: String, properties: MessageProperties): Option[String] =
-    properties.headers.get(header).map(_.toString)
-
-
-  def withPublisher(testQueueName: QueueName = randomQueue(), requeueStrategy: RequeueStrategy[Task] = NoneHandler, shouldDeclare: Boolean = true)(f: TestFixture[Task] => Unit): Unit =
-    withPublihserAndAmqpClient(testQueueName, requeueStrategy, shouldDeclare) { case (_, t) => f(t) }
-
-
-  def withPublisherAndConsumer(queueName: QueueName = randomQueue(),
+  def withPublisherAndConsumer(queueName: QueueName = Any.randomQueue(),
                                requeueStrategy: RequeueStrategy[Task])(f: TestFixture[Task] => Unit): Unit =
     withPublihserAndAmqpClient(queueName, requeueStrategy) { case (amqpClient: AmqpClient[Id, Task, Throwable, Process[Task, Unit]],  t) =>
       withPublisher(queueName, requeueStrategy = requeueStrategy) { app =>
@@ -114,10 +94,7 @@ object IntegrationUtils extends StrictLogging {
         consumer.run.unsafePerformAsync { result =>
           logger.info(s"Closing consumer ${app.queueName}: $result")
         }
-
-
         f(app.copy(dlqHandler = dlqHandler))
-
         logger.info(s"Closing the the consumer")
       }
     }

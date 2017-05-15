@@ -17,11 +17,11 @@ object Any {
 
   def randomQueue() =
     QueueName(s"bucky-queue-${new Random().nextInt(10000)}")
+}
 
-
-  def getHeader(header: String, properties: MessageProperties): Option[String] =
+object HeaderExt {
+  def apply(header: String, properties: MessageProperties): Option[String] =
     properties.headers.get(header).map(_.toString)
-
 }
 
 
