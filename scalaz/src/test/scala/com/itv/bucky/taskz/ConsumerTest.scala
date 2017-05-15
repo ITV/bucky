@@ -1,5 +1,7 @@
 package com.itv.bucky.taskz
 
+import java.util.concurrent.Executors
+
 import com.itv.bucky._
 import com.rabbitmq.client.impl.AMQImpl.Basic
 import com.typesafe.scalalogging.StrictLogging
@@ -97,6 +99,7 @@ class ConsumerTest extends FunSuite with StrictLogging {
 
   private def withConsumer(f: TestConsumer => Unit): Unit = {
     val channel = new StubChannel()
+    implicit val pool = Executors.newSingleThreadExecutor()
     val client = new TaskAmqpClient(channel)
 
     val handler = new StubConsumeHandler[Task, Delivery]()

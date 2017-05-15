@@ -1,5 +1,6 @@
 package com.itv.bucky.taskz
 
+import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicReference
 
 import com.itv.bucky.AtomicRef.Ref
@@ -27,6 +28,7 @@ object TaskExt {
   case class TestPublisher(channel: StubChannel, publish: Publisher[Task, PublishCommand])
 
   def withPublisher(timeout: FiniteDuration = 1.second, channel: StubChannel = new StubChannel)(f: TestPublisher => Unit): Unit = {
+    implicit val pool = Executors.newSingleThreadExecutor()
     val client = TaskAmqpClient(channel)
     val publish = client.publisher(timeout)
     f(TestPublisher(channel, publish))
