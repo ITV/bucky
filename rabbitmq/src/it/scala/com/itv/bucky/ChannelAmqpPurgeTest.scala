@@ -1,6 +1,6 @@
 package com.itv.bucky
 
-import com.itv.bucky.decl.DeclarationLifecycle
+import com.itv.bucky.lifecycle._
 import com.itv.lifecycle.Lifecycle
 import com.typesafe.scalalogging.StrictLogging
 import org.scalatest.FunSuite
@@ -9,6 +9,7 @@ import org.scalatest.concurrent.{Eventually, ScalaFutures}
 
 import scala.concurrent.duration._
 import scala.util.{Random, Success}
+import SameThreadExecutionContext.implicitly
 
 class ChannelAmqpPurgeTest extends FunSuite with ScalaFutures with StrictLogging {
 

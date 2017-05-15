@@ -3,25 +3,56 @@ package com.itv
 import java.lang.management.ManagementFactory
 import java.util.Date
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.language.higherKinds
 
 package object bucky {
-  type Publisher[-T] = T => Future[Unit]
-  type Handler[-T] = T => Future[ConsumeAction]
-  type RequeueHandler[-T] = T => Future[RequeueConsumeAction]
+
+  trait Monad[F[_]] {
+    def apply[A](a: => A): F[A]
+    def map[A, B](m: F[A])(f: A => B): F[B]
+    def flatMap[A, B](m: F[A])(f: A => F[B]): F[B]
+  }
+
+  trait MonadError[F[_], E] extends Monad[F] {
+    def raiseError[A](e: E): F[A]
+    def handleError[A](fa: F[A])(f: E=> F[A]): F[A]
+  }
+
+  object Monad {
+    type Id[A] = A
+
+    implicit val idMonad = new Monad[Id] {
+      override def apply[A](a: => A): Id[A] = a
+
+      override def map[A, B](m: Id[A])(f: (A) => B): Id[B] = f(m)
+
+      override def flatMap[A, B](m: Id[A])(f: (A) => Id[B]): Id[B] = f(m)
+    }
+
+    import scala.language.implicitConversions
+    class MonadOps[F[_], A](fa: F[A])(implicit M: Monad[F]) {
+      def flatMap[B](f: A => F[B]) = M.flatMap(fa)(f)
+      def map[B]()(f: A => B) = M.map(fa)(f)
+    }
+
+    implicit def toMonad[F[_], A](fa: F[A])(implicit M: Monad[F]) = new MonadOps(fa)
+  }
+
+  type Publisher[F[_], -T] = T => F[Unit]
+  type Handler[F[_], -T] = T => F[ConsumeAction]
+  type RequeueHandler[F[_], -T] = T => F[RequeueConsumeAction]
 
   object Handler {
-    def apply[T](f: T => Future[ConsumeAction]): Handler[T] =
-      new Handler[T] {
-        override def apply(message: T): Future[ConsumeAction] =
+    def apply[F[_], T](f: T => F[ConsumeAction]): Handler[F, T] = new Handler[F, T] {
+        override def apply(message: T): F[ConsumeAction] =
           f(message)
       }
   }
 
   object RequeueHandler {
-    def apply[T](f: T => Future[RequeueConsumeAction]): RequeueHandler[T] =
-      new RequeueHandler[T] {
-        override def apply(message: T): Future[RequeueConsumeAction] =
+    def apply[F[_], T](f: T => F[RequeueConsumeAction]): RequeueHandler[F, T] =
+      new RequeueHandler[F, T] {
+        override def apply(message: T): F[RequeueConsumeAction] =
           f(message)
       }
   }
@@ -132,7 +163,5 @@ package object bucky {
       priority = Some(0)
     )
   }
-
-  def safePerform[T](future: => Future[T])(implicit executionContext: ExecutionContext): Future[T] = Future(future).flatMap(identity)
 
 }

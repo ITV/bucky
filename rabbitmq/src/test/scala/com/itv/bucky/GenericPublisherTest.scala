@@ -3,6 +3,9 @@ package com.itv.bucky
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.ScalaFutures
+import com.itv.bucky.future._
+
+import scala.concurrent.Future
 
 class GenericPublisherTest extends FunSuite with ScalaFutures {
 
@@ -37,29 +40,28 @@ class GenericPublisherTest extends FunSuite with ScalaFutures {
     message.routingKey shouldBe expectedRoutingKey
     message.basicProperties shouldBe expectedProperties
     message.body shouldBe expectedBody
-
   }
 
   test("publishing with a broken publish command serializer should fail the publish future") {
-    object Banana
-    val expectedException = new RuntimeException("What's a banana?")
+      object Banana
+      val expectedException = new RuntimeException("What's a banana?")
 
 
-    implicit val serializer = new PublishCommandBuilder[Banana.type] {
-      def toPublishCommand(t: Banana.type): PublishCommand =
-        throw expectedException
+      implicit val serializer = new PublishCommandBuilder[Banana.type] {
+        def toPublishCommand(t: Banana.type): PublishCommand =
+          throw expectedException
+      }
+
+      val client = createClient()
+
+      val publish = AmqpClient.publisherOf[Future, Banana.type](serializer)(client)
+      val result = publish(Banana).failed.futureValue
+
+      result shouldBe expectedException
     }
 
-    val client = createClient()
 
-    val publish = AmqpClient.publisherOf[Banana.type](serializer)(client)
-    val result = publish(Banana).failed.futureValue
-
-    result shouldBe expectedException
-  }
-
-
-  private def createClient(): StubPublisher[PublishCommand] = {
-    new StubPublisher[PublishCommand]()
+  private def createClient(): StubPublisher[Future, PublishCommand] = {
+    new StubPublisher[Future, PublishCommand]()
   }
 }

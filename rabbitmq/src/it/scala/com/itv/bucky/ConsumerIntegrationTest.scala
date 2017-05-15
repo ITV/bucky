@@ -4,6 +4,8 @@ import com.itv.bucky.SameThreadExecutionContext.implicitly
 import com.itv.bucky.UnmarshalResult.Success
 import com.itv.bucky.Unmarshaller._
 import com.itv.bucky.decl._
+import com.itv.bucky.lifecycle._
+import com.itv.bucky.future._
 import com.itv.bucky.pattern.requeue._
 import com.itv.lifecycle.Lifecycle
 import com.typesafe.scalalogging.StrictLogging
@@ -13,6 +15,7 @@ import org.scalatest.Matchers._
 import org.scalatest.concurrent.Eventually.eventually
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 
+import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.Random
 
@@ -29,7 +32,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogg
 
   test(s"Can consume messages from a (pre-existing) queue") {
 
-    val handler = new StubConsumeHandler[Message]()
+    val handler = new StubConsumeHandler[Future, Message]()
 
     Lifecycle.using(messageConsumer(QueueName("bucky-consumer-test"), handler, toDeliveryUnmarshaller(messageUnmarshaller))) { publisher =>
       handler.receivedMessages shouldBe 'empty
@@ -68,7 +71,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogg
     val fooUnmarshaller: Unmarshaller[Delivery, Foo] =
       (barUnmarshaller zip bazUnmarshaller) map { case (bar, baz) => Foo(bar, baz) }
 
-    val handler = new StubConsumeHandler[Foo]
+    val handler = new StubConsumeHandler[Future, Foo]
 
     Lifecycle.using(messageConsumer(QueueName("bucky-consumer-header-test"), handler, fooUnmarshaller)) { publisher =>
       handler.receivedMessages shouldBe 'empty
@@ -91,7 +94,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogg
 
   test("DeadLetter upon exception from handler") {
     val queueName = QueueName("exception-from-handler" + Random.nextInt())
-    val handler = new StubConsumeHandler[Delivery]()
+    val handler = new StubConsumeHandler[Future, Delivery]()
     val dlqHandler = new QueueWatcher[Delivery]
     val config: AmqpClientConfig = IntegrationUtils.config.copy(networkRecoveryInterval = None)
     for {
@@ -103,7 +106,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogg
       _ <- DeclarationLifecycle(declarations, amqpClient)
       publisher <- amqpClient.publisher()
 
-      consumer <- amqpClient.consumer(queueName, handler)
+      _ <- amqpClient.consumer(queueName, handler)
 
       _ <- amqpClient.consumer(QueueName(s"${queueName.value}.dlq"), dlqHandler)
     } {
@@ -123,7 +126,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogg
 
 
   test("Can consume messages from a (pre-existing) queue with the raw consumer") {
-    val handler = new StubConsumeHandler[Delivery]()
+    val handler = new StubConsumeHandler[Future, Delivery]()
     Lifecycle.using(rawConsumer(QueueName("bucky-consumer-raw-test"), handler)) {
       publisher =>
         handler.receivedMessages shouldBe 'empty
@@ -141,7 +144,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogg
   }
 
   test("Message headers are exposed to (raw) consumers") {
-    val handler = new StubConsumeHandler[Delivery]()
+    val handler = new StubConsumeHandler[Future, Delivery]()
     Lifecycle.using(rawConsumer(QueueName("bucky-consumer-headers-test"), handler)) {
       publisher =>
         handler.receivedMessages shouldBe 'empty
@@ -162,7 +165,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogg
     }
   }
 
-  def messageConsumer[T](queueName: QueueName, handler: Handler[T], unmarshaller: DeliveryUnmarshaller[T]) = for {
+  def messageConsumer[T](queueName: QueueName, handler: Handler[Future, T], unmarshaller: DeliveryUnmarshaller[T]) = for {
     result <- base(defaultDeclaration(queueName))
     (amqClient, publisher) = result
     consumer <- amqClient.consumer(queueName, AmqpClient.deliveryHandlerOf(handler, unmarshaller))

@@ -8,6 +8,7 @@ import com.rabbitmq.client.{AMQP, Method, MessageProperties => RMessagePropertie
 
 import scala.collection.mutable.ListBuffer
 
+
 class StubChannel extends ChannelN(null, 0, new ConsumerWorkService(MoreExecutors.newDirectExecutorService(), null, 1)) {
 
   val transmittedCommands: ListBuffer[Method] = ListBuffer.empty

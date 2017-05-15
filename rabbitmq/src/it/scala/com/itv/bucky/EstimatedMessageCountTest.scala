@@ -1,6 +1,6 @@
 package com.itv.bucky
 
-import com.itv.bucky.decl.DeclarationLifecycle
+import com.itv.bucky.lifecycle._
 import com.itv.lifecycle.Lifecycle
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._

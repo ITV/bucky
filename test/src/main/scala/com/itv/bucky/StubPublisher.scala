@@ -1,17 +1,19 @@
 package com.itv.bucky
 
 import scala.collection.mutable.ListBuffer
-import scala.concurrent.Future
+import scala.language.higherKinds
 
-class StubPublisher[A] extends Publisher[A] {
+class StubPublisher[F[_], A](implicit F: Monad[F])
+  extends Publisher[F, A] {
 
   val publishedEvents = ListBuffer[A]()
 
-  private var nextResponse: Future[Unit] = Future.successful(())
+  private var nextResponse: F[Unit] = F.apply{()}
 
-  def respondToNextPublishWith(expectedResult: Future[Unit]) = nextResponse = expectedResult
+  def respondToNextPublishWith(expectedResult: F[Unit]) =
+    nextResponse = expectedResult
 
-  override def apply(event: A): Future[Unit] = {
+  override def apply(event: A): F[Unit] = {
     publishedEvents += event
     nextResponse
   }

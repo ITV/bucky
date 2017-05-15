@@ -2,7 +2,7 @@ package com.itv.bucky
 
 import com.itv.bucky.PublishCommandBuilder._
 import com.itv.bucky.SameThreadExecutionContext.implicitly
-import com.itv.bucky.decl.{DeclarationLifecycle, Queue}
+import com.itv.bucky.decl.Queue
 import com.itv.lifecycle.Lifecycle
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
@@ -11,13 +11,17 @@ import org.scalatest.concurrent.{Eventually, ScalaFutures}
 
 import scala.concurrent.duration._
 import scala.util.Random
+import com.itv.bucky.lifecycle._
+import com.itv.bucky.future._
+
+import scala.concurrent.Future
 
 
 class NetworkRecoveryIntegrationTest extends FunSuite with ScalaFutures {
 
-  import com.itv.bucky.TestUtils._
+  import com.itv.bucky.BuckyUtils._
 
-  def testLifecycle: Lifecycle[(Proxy, StubConsumeHandler[Unit], StubConsumeHandler[Unit], Publisher[Unit], Publisher[Unit])] = {
+  def testLifecycle: Lifecycle[(Proxy, StubConsumeHandler[Future, Unit], StubConsumeHandler[Future, Unit], Publisher[Future, Unit], Publisher[Future, Unit])] = {
     val queueA = QueueName("proxy" + Random.nextInt())
     val queueB = QueueName("proxy" + Random.nextInt())
     val amqpClientConfig = IntegrationUtils.config
@@ -25,8 +29,8 @@ class NetworkRecoveryIntegrationTest extends FunSuite with ScalaFutures {
     val marshaller: PayloadMarshaller[Unit] = PayloadMarshaller.lift(_ => Payload.from("hello"))
     val pcbA = publishCommandBuilder[Unit](marshaller) using ExchangeName("") using RoutingKey(queueA.value)
     val pcbB = publishCommandBuilder[Unit](marshaller) using ExchangeName("") using RoutingKey(queueB.value)
-    val handlerA = new StubConsumeHandler[Unit]
-    val handlerB = new StubConsumeHandler[Unit]
+    val handlerA = new StubConsumeHandler[Future, Unit]
+    val handlerB = new StubConsumeHandler[Future, Unit]
     val unmarshaller = Unmarshaller.liftResult[Payload, Unit] {
       _.unmarshal[String] match {
         case UnmarshalResult.Success(s) if s == "hello" => UnmarshalResult.Success(())
@@ -35,9 +39,11 @@ class NetworkRecoveryIntegrationTest extends FunSuite with ScalaFutures {
       }
     }
 
-    val proxyConfig = amqpClientConfig.copy(host = "localhost", port = 9999, networkRecoveryInterval = Some(1.second))
+    val freePort = Port.randomPort()
+
+    val proxyConfig = amqpClientConfig.copy(host = "localhost", port = freePort, networkRecoveryInterval = Some(1.second))
     for {
-      proxy <- ProxyLifecycle(local = HostPort("localhost", 9999), remote = HostPort(amqpClientConfig.host, amqpClientConfig.port))
+      proxy <- ProxyLifecycle(local = HostPort("localhost", freePort), remote = HostPort(amqpClientConfig.host, amqpClientConfig.port))
       client <- AmqpClientLifecycle(proxyConfig)
       _ <- DeclarationLifecycle(List(Queue(queueA).notDurable.expires(1.minute)), client)
       _ <- DeclarationLifecycle(List(Queue(queueB).notDurable.expires(1.minute)), client)

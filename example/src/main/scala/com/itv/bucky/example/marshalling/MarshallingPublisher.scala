@@ -1,15 +1,18 @@
 package com.itv.bucky.example.marshalling
 
 import com.itv.bucky.PublishCommandBuilder.publishCommandBuilder
-import com.itv.bucky.decl.DeclarationLifecycle
+import com.itv.bucky.lifecycle._
 import com.itv.lifecycle.Lifecycle
 import com.itv.bucky._
 import com.itv.bucky.decl._
+import com.itv.bucky.future._
 import com.itv.bucky.example.marshalling.Shared.Person
+import com.typesafe.config.ConfigFactory
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent._
 import scala.concurrent.duration._
+
 
 object MarshallingPublisher extends App {
 
@@ -21,7 +24,9 @@ object MarshallingPublisher extends App {
     val all = List(queue, exchange)
   }
 
-  val amqpClientConfig: AmqpClientConfig = AmqpClientConfig("33.33.33.11", 5672, "guest", "guest")
+
+  val config = ConfigFactory.load("bucky")
+  val amqpClientConfig: AmqpClientConfig = AmqpClientConfig(config.getString("rmq.host"), 5672, "guest", "guest")
 
   /**
     * A publisher delivers a message of a fixed type to an exchange.
@@ -34,7 +39,7 @@ object MarshallingPublisher extends App {
     * A lifecycle is a monadic try/finally statement.
     * More detailed information is available here https://github.com/ITV/lifecycle
     */
-  val lifecycle: Lifecycle[Publisher[Person]] =
+  val lifecycle: Lifecycle[Publisher[Future, Person]] =
     for {
       amqpClient <- AmqpClientLifecycle(amqpClientConfig)
       _ <- DeclarationLifecycle(Declarations.all, amqpClient)
@@ -42,7 +47,7 @@ object MarshallingPublisher extends App {
     }
       yield publisher
 
-  Lifecycle.using(lifecycle) { publisher: Publisher[Person] =>
+  Lifecycle.using(lifecycle) { publisher: Publisher[Future, Person] =>
     val result: Future[Unit] = publisher(Person("Bob", 21))
     Await.result(result, 1.second)
   }

@@ -3,7 +3,7 @@ package com.itv.bucky
 import scala.concurrent.{Future, Promise}
 import scala.util.{Random, Try}
 
-object TestUtils {
+object BuckyUtils {
 
   def anyPublishCommand() = PublishCommand(ExchangeName("exchange"), RoutingKey("routing.key"), MessageProperties.persistentBasic, Payload.from("msg" + Random.nextInt()))
 

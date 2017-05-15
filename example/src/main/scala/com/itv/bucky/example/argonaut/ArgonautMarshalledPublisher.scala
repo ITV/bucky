@@ -3,13 +3,15 @@ package com.itv.bucky.example.argonaut
 import com.itv.bucky.PublishCommandBuilder.publishCommandBuilder
 import com.itv.bucky._
 import com.itv.bucky.decl._
+import com.itv.bucky.lifecycle._
+import com.itv.bucky.future._
 import com.itv.bucky.example.argonaut.Shared.Person
 import com.itv.lifecycle.Lifecycle
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
-
 import scala.concurrent.ExecutionContext.Implicits.global
+import com.typesafe.config.ConfigFactory
 
 /*
   The only difference between this and itv.bucky.example.marshalling.MarshalledPublisher
@@ -25,7 +27,8 @@ object ArgonautMarshalledPublisher extends App {
     val all = List(queue, exchange)
   }
 
-  val amqpClientConfig: AmqpClientConfig = AmqpClientConfig("33.33.33.11", 5672, "guest", "guest")
+  val config = ConfigFactory.load("bucky")
+  val amqpClientConfig: AmqpClientConfig = AmqpClientConfig(config.getString("rmq.host"), 5672, "guest", "guest")
 
   /**
     * A publisher delivers a message of a fixed type to an exchange.
@@ -38,7 +41,7 @@ object ArgonautMarshalledPublisher extends App {
     * A lifecycle is a monadic try/finally statement.
     * More detailed information is available here https://github.com/ITV/lifecycle
     */
-  val lifecycle: Lifecycle[Publisher[Person]] =
+  val lifecycle: Lifecycle[Publisher[Future, Person]] =
     for {
       amqpClient <- AmqpClientLifecycle(amqpClientConfig)
       _ <- DeclarationLifecycle(Declarations.all, amqpClient)
@@ -46,7 +49,7 @@ object ArgonautMarshalledPublisher extends App {
     }
       yield publisher
 
-  Lifecycle.using(lifecycle) { publisher: Publisher[Person] =>
+  Lifecycle.using(lifecycle) { publisher: Publisher[Future, Person] =>
     val result: Future[Unit] = publisher(Person("Bob", 21))
     Await.result(result, 1.second)
   }

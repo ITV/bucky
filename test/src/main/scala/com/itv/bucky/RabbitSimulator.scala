@@ -4,7 +4,6 @@ import java.util.UUID
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicLong
 
-import com.itv.lifecycle.{Lifecycle, NoOpLifecycle}
 import com.typesafe.scalalogging.StrictLogging
 import PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.decl.{Binding, Exchange, Queue}
@@ -14,12 +13,14 @@ import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.Try
+import scala.language.higherKinds
 
 case object IdentityBindings extends Bindings {
   def apply(routingQueue: RoutingKey): QueueName = QueueName(routingQueue.value)
 
   override def isDefinedAt(key: RoutingKey): Boolean = true
 }
+
 
 /**
   * Provides an AmqpClient implementation that simulates RabbitMQ server with one main difference:
@@ -29,19 +30,20 @@ case object IdentityBindings extends Bindings {
   *
   * @param bindings A mapping from routing key to queue name, defaults to identity.
   */
-class RabbitSimulator(bindings: Bindings = IdentityBindings)(implicit executionContext: ExecutionContext) extends AmqpClient with StrictLogging {
+class RabbitSimulator[M[_]](bindings: Bindings = IdentityBindings)(implicit M: Monad[M],
+                                                                   executionContext: ExecutionContext) extends AmqpClient[M, Future, Throwable, Unit] with StrictLogging {
 
   case class Publication(queueName: QueueName, message: Payload, consumeActionValue: Future[ConsumeAction])
 
   private val declarations = scala.collection.mutable.HashMap.empty[(ExchangeName, RoutingKey), QueueName]
 
-  private val consumers = new scala.collection.mutable.HashMap[QueueName, List[Handler[Delivery]]]()
+  private val consumers = new scala.collection.mutable.HashMap[QueueName, List[Handler[Future, Delivery]]]()
   private val messagesBeingProcessed: TrieMap[UUID, Publication] = TrieMap.empty
   private val deliveryTag = new AtomicLong()
 
 
-  def consumer(queueName: QueueName, handler: Handler[Delivery], exceptionalAction: ConsumeAction = DeadLetter, prefetchCount: Int = 0)(implicit executionContext: ExecutionContext): Lifecycle[Unit] = NoOpLifecycle {
-    val monitorHandler: Handler[Delivery] = delivery => {
+  def consumer(queueName: QueueName, handler: Handler[Future, Delivery], exceptionalAction: ConsumeAction = DeadLetter, prefetchCount: Int = 0): M[Unit] = M.apply {
+    val monitorHandler: Handler[Future, Delivery] = delivery => {
       val key = UUID.randomUUID()
       val consumeActionValue = handler(delivery)
       messagesBeingProcessed += key -> Publication(queueName, delivery.body, consumeActionValue)
@@ -56,8 +58,8 @@ class RabbitSimulator(bindings: Bindings = IdentityBindings)(implicit executionC
     consumers += (queueName -> handlers)
   }
 
-  def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): Lifecycle[Publisher[PublishCommand]] =
-    NoOpLifecycle[Publisher[PublishCommand]] {
+  def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): M[Publisher[Future, PublishCommand]] =
+    M.apply {
       (command: PublishCommand) => {
         publish(command).map(_ => ())
       }
@@ -68,7 +70,7 @@ class RabbitSimulator(bindings: Bindings = IdentityBindings)(implicit executionC
     if (isDefinedAt(publishCommand)) {
       val queueName = queueNameFor(publishCommand)
       consumers.get(queueName).fold(Future.failed[ConsumeAction](new RuntimeException(s"No consumers found for $queueName!"))) { handlers =>
-        val responses = handlers.map (h => h(Delivery(publishCommand.body, ConsumerTag("ctag"), Envelope(deliveryTag.getAndIncrement(), false, publishCommand.exchange, publishCommand.routingKey), publishCommand.basicProperties)))
+        val responses = handlers.map(h => h(Delivery(publishCommand.body, ConsumerTag("ctag"), Envelope(deliveryTag.getAndIncrement(), false, publishCommand.exchange, publishCommand.routingKey), publishCommand.basicProperties)))
         Future.sequence(responses).map(actions => actions.find(_ != Ack).getOrElse(Ack))
       }
     } else

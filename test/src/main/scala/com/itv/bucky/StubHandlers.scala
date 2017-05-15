@@ -1,19 +1,19 @@
 package com.itv.bucky
 
 import scala.collection.mutable.ListBuffer
-import scala.concurrent.Future
+import scala.language.higherKinds
 
-class StubHandler[T, S](var nextResponse: Future[S], var nextException: Option[Throwable] = None) extends (T => Future[S]) {
+class StubHandler[F[_], T, S](var nextResponse: F[S], var nextException: Option[Throwable] = None) extends (T => F[S]) {
 
   val receivedMessages = ListBuffer[T]()
 
-  override def apply(message: T): Future[S] = {
+  override def apply(message: T): F[S] = {
     receivedMessages += message
-    nextException.fold[Future[S]](nextResponse)(throw _)
+    nextException.fold[F[S]](nextResponse)(throw _)
   }
 
 }
 
-class StubConsumeHandler[T] extends StubHandler[T, ConsumeAction](Future.successful(Ack))
+class StubConsumeHandler[F[_], T](implicit F: Monad[F]) extends StubHandler[F, T, ConsumeAction](F.apply(Ack))
 
-class StubRequeueHandler[T] extends StubHandler[T, RequeueConsumeAction](Future.successful(Ack) )
+class StubRequeueHandler[F[_], T](implicit F: Monad[F]) extends StubHandler[F, T, RequeueConsumeAction](F.apply(Ack) )

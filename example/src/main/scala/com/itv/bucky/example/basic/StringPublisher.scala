@@ -2,9 +2,12 @@ package com.itv.bucky.example.basic
 
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.PublishCommandBuilder._
-import com.itv.bucky.decl._
 import com.itv.lifecycle.Lifecycle
 import com.itv.bucky._
+import com.itv.bucky.decl._
+import com.itv.bucky.lifecycle._
+import com.itv.bucky.future._
+import com.typesafe.config.ConfigFactory
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -27,7 +30,8 @@ object StringPublisher extends App {
     val all = List(queue, exchange)
   }
 
-  val amqpClientConfig: AmqpClientConfig = AmqpClientConfig("33.33.33.11", 5672, "guest", "guest")
+  val config = ConfigFactory.load("bucky")
+  val amqpClientConfig: AmqpClientConfig = AmqpClientConfig(config.getString("rmq.host"), 5672, "guest", "guest")
 
   /**
     * A publisher delivers a message of a fixed type to an exchange.
@@ -40,7 +44,7 @@ object StringPublisher extends App {
     * A lifecycle is a monadic try/finally statement.
     * More detailed information is available here https://github.com/ITV/lifecycle
     */
-  val lifecycle: Lifecycle[Publisher[String]] =
+  val lifecycle: Lifecycle[Publisher[Future, String]] =
     for {
       amqpClient <- AmqpClientLifecycle(amqpClientConfig)
       _ <- DeclarationLifecycle(Declarations.all, amqpClient)
@@ -48,7 +52,7 @@ object StringPublisher extends App {
     }
       yield publisher
 
-  Lifecycle.using(lifecycle) { publisher: Publisher[String] =>
+  Lifecycle.using(lifecycle) { publisher: Publisher[Future, String] =>
     val result: Future[Unit] = publisher("Hello, world!")
     Await.result(result, 1.second)
   }

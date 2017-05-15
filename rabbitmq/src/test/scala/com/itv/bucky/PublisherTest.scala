@@ -4,6 +4,7 @@ import java.io.IOException
 import java.util.concurrent.TimeoutException
 
 import com.itv.lifecycle.{Lifecycle, NoOpLifecycle}
+import com.itv.bucky.lifecycle._
 import com.rabbitmq.client._
 import com.rabbitmq.client.impl.AMQImpl
 import org.scalatest.FunSuite
@@ -11,10 +12,34 @@ import org.scalatest.Matchers._
 import org.scalatest.concurrent.ScalaFutures
 
 import scala.concurrent.duration._
+import SameThreadExecutionContext.implicitly
+import com.itv.bucky.future.{FutureAmqpClient, FutureIdAmqpClient}
 
 class PublisherTest extends FunSuite with ScalaFutures {
 
-  import TestUtils._
+  import BuckyUtils._
+
+  test("Publishing only returns success once publication is acknowledged with Id") {
+    val channel = new StubChannel()
+    val client = new FutureIdAmqpClient(channel)
+
+    val publish = client.publisher(timeout = Duration.Inf)
+
+    channel.transmittedCommands should have size 1
+    channel.transmittedCommands.last shouldBe an[AMQP.Confirm.Select]
+
+    val result = publish(anyPublishCommand())
+
+    channel.transmittedCommands should have size 2
+    channel.transmittedCommands.last shouldBe an[AMQP.Basic.Publish]
+
+    result should not be 'completed
+
+    channel.replyWith(new AMQImpl.Basic.Ack(1L, false))
+
+    result shouldBe 'completed
+    result.futureValue.shouldBe(())
+  }
 
   test("Publishing only returns success once publication is acknowledged") {
     val channel = new StubChannel()
@@ -128,7 +153,7 @@ class PublisherTest extends FunSuite with ScalaFutures {
 
       val result = publish(anyPublishCommand()).failed
 
-      whenReady(result) { case exception =>
+      whenReady(result) { exception =>
         exception.getMessage shouldBe expectedMsg
       }
     }
@@ -146,7 +171,7 @@ class PublisherTest extends FunSuite with ScalaFutures {
     }
   }
 
-  private def createClient(channel: StubChannel): RawAmqpClient = {
-    new RawAmqpClient(NoOpLifecycle(channel))
+  private def createClient(channel: StubChannel): FutureAmqpClient[Lifecycle] = {
+    new LifecycleRawAmqpClient(NoOpLifecycle(channel))
   }
 }

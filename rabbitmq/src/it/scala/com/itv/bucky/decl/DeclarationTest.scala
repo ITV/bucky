@@ -4,12 +4,15 @@ import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.PublishCommandBuilder._
 import com.itv.bucky.SameThreadExecutionContext.implicitly
 import com.itv.bucky._
+import com.itv.bucky.lifecycle._
+import com.itv.bucky.future._
 import com.itv.lifecycle.Lifecycle
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.Eventually.eventually
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 
+import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.Random
 
@@ -28,7 +31,7 @@ class DeclarationTest extends FunSuite with ScalaFutures {
         shouldAutoDelete = false,
         Map.empty).run) shouldBe 'success
 
-      val handler = new StubConsumeHandler[Delivery]()
+      val handler = new StubConsumeHandler[Future, Delivery]()
       val lifecycle =
         for {
           _ <- amqpClient.consumer(QueueName(queueName), handler)
@@ -72,7 +75,7 @@ class DeclarationTest extends FunSuite with ScalaFutures {
 
       amqpClient.performOps(Declaration.runAll(declarations)) shouldBe 'success
 
-      val handler = new StubConsumeHandler[Delivery]()
+      val handler = new StubConsumeHandler[Future, Delivery]()
       val lifecycle =
         for {
           _ <- amqpClient.consumer(queueName, handler)

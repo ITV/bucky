@@ -12,9 +12,11 @@ import org.jboss.netty.channel.socket.ClientSocketChannelFactory
 import org.jboss.netty.channel.socket.nio.{NioClientSocketChannelFactory, NioServerSocketChannelFactory}
 import org.jboss.netty.channel.{Channels, _}
 
-/***
-Inspired by aaronriekenberg/Scala-Netty-Proxy
-***/
+import scala.util.Random
+
+/** *
+  * Inspired by aaronriekenberg/Scala-Netty-Proxy
+  * **/
 
 case class HostPort(hostname: String, port: Int) {
   def toJava: InetSocketAddress = new InetSocketAddress(hostname, port)
@@ -22,9 +24,22 @@ case class HostPort(hostname: String, port: Int) {
 
 trait Proxy {
   def stopAcceptingNewConnections()
+
   def startAcceptingNewConnections()
+
   def closeAllOpenConnections(): Unit
+
   def shutdown(): Unit
+}
+
+
+object Port {
+  val ports = 49152 to 65535
+  val random = new Random()
+
+  def randomPort(): Int =
+    ports(random.nextInt(ports.size - 1))
+
 }
 
 private trait AcceptNewConnection {
@@ -68,9 +83,9 @@ private class DoNotAcceptConnections extends SimpleChannelUpstreamHandler with S
 }
 
 private class ClientChannelHandler(remoteAddress: InetSocketAddress,
-                           allChannels: ChannelGroup,
-                           acceptNewConnection: AcceptNewConnection,
-                           clientSocketChannelFactory: ClientSocketChannelFactory) extends SimpleChannelUpstreamHandler with StrictLogging {
+                                   allChannels: ChannelGroup,
+                                   acceptNewConnection: AcceptNewConnection,
+                                   clientSocketChannelFactory: ClientSocketChannelFactory) extends SimpleChannelUpstreamHandler with StrictLogging {
 
   @volatile
   private var remoteChannel: Option[Channel] = None
@@ -128,10 +143,9 @@ private class ClientChannelHandler(remoteAddress: InetSocketAddress,
   }
 }
 
-case class ProxyLifecycle(local: HostPort, remote: HostPort) extends VanillaLifecycle[Proxy] with StrictLogging {
 
-  override def start: Proxy = {
-
+object Proxy extends StrictLogging {
+  def apply(local: HostPort, remote: HostPort): Proxy = {
     val allChannels: ChannelGroup = new DefaultChannelGroup()
 
     val executor = Executors.newCachedThreadPool
@@ -181,6 +195,11 @@ case class ProxyLifecycle(local: HostPort, remote: HostPort) extends VanillaLife
       }
     }
   }
+}
+
+case class ProxyLifecycle(local: HostPort, remote: HostPort) extends VanillaLifecycle[Proxy] with StrictLogging {
+
+  override def start: Proxy = Proxy(local, remote)
 
   override def shutdown(instance: Proxy): Unit = instance.shutdown()
 }

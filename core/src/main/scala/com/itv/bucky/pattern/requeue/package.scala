@@ -1,13 +1,12 @@
 package com.itv.bucky.pattern
 
 import com.itv.bucky.{AmqpClient, DeliveryUnmarshalHandler}
-import com.itv.lifecycle.Lifecycle
 import com.itv.bucky.Unmarshaller._
 import com.itv.bucky._
 import com.itv.bucky.decl._
 
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.{FiniteDuration, _}
+import scala.language.higherKinds
 
 package object requeue {
 
@@ -41,43 +40,43 @@ package object requeue {
     )
   }
 
-  implicit class RequeueOps(val amqpClient: AmqpClient) {
+  implicit class RequeueOps[B[_], F[_], E, C](val amqpClient: AmqpClient[B, F, E, C]) {
 
     def requeueHandlerOf[T](queueName: QueueName,
-                            handler: RequeueHandler[T],
+                            handler: RequeueHandler[F, T],
                             requeuePolicy: RequeuePolicy,
                             unmarshaller: PayloadUnmarshaller[T],
                             onFailure: RequeueConsumeAction = Requeue,
                             unmarshalFailureAction: RequeueConsumeAction = DeadLetter,
                             prefetchCount: Int = 0)
-                           (implicit ec: ExecutionContext): Lifecycle[Unit] = {
+                           (implicit M: Monad[B], F: MonadError[F, E]): B[C] = {
       requeueDeliveryHandlerOf(queueName, handler, requeuePolicy, toDeliveryUnmarshaller(unmarshaller), onFailure, unmarshalFailureAction, prefetchCount)
     }
 
     def requeueDeliveryHandlerOf[T](
                                      queueName: QueueName,
-                                     handler: RequeueHandler[T],
+                                     handler: RequeueHandler[F, T],
                                      requeuePolicy: RequeuePolicy,
                                      unmarshaller: DeliveryUnmarshaller[T],
                                      onFailure: RequeueConsumeAction = Requeue,
                                      unmarshalFailureAction: RequeueConsumeAction = DeadLetter,
                                      prefetchCount: Int = 0)
-                                   (implicit ec: ExecutionContext): Lifecycle[Unit] = {
-      val deserializeHandler = new DeliveryUnmarshalHandler[T, RequeueConsumeAction](unmarshaller)(handler, unmarshalFailureAction)
+                                   (implicit M: Monad[B], F: MonadError[F, E]): B[C] = {
+      val deserializeHandler = new DeliveryUnmarshalHandler[F, T, RequeueConsumeAction](unmarshaller)(handler, unmarshalFailureAction)
       requeueOf(queueName, deserializeHandler, requeuePolicy, prefetchCount = prefetchCount)
     }
 
+
     def requeueOf(queueName: QueueName,
-                  handler: RequeueHandler[Delivery],
+                  handler: RequeueHandler[F, Delivery],
                   requeuePolicy: RequeuePolicy,
                   onFailure: RequeueConsumeAction = Requeue,
                   prefetchCount: Int = 0)
-                 (implicit ec: ExecutionContext): Lifecycle[Unit] = {
+                 (implicit M: Monad[B], F: MonadError[F, E]): B[C] = {
       val requeueExchange = ExchangeName(s"${queueName.value}.requeue")
-      for {
-        requeuePublish <- amqpClient.publisher()
-        consumer <- amqpClient.consumer(queueName, RequeueTransformer(requeuePublish, requeueExchange, requeuePolicy, onFailure)(handler), prefetchCount = prefetchCount)
-      } yield consumer
+      M.flatMap(amqpClient.publisher()) {requeuePublish =>
+        amqpClient.consumer(queueName, RequeueTransformer(requeuePublish, requeueExchange, requeuePolicy, onFailure)(handler), prefetchCount = prefetchCount)
+      }
     }
 
   }

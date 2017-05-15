@@ -1,8 +1,9 @@
 package com.itv.bucky
 
 import scala.concurrent.{Future, Promise}
+import scala.language.higherKinds
 
-class QueueWatcher[T] extends Handler[T] {
+class QueueWatcher[T] extends Handler[Future, T] {
 
   private val messages = Stream.continually(Promise[T]())
 

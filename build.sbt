@@ -44,7 +44,7 @@ lazy val kernelSettings = Seq(
     if (isSnapshot.value)
       Some("snapshots" at nexus + "content/repositories/snapshots")
     else
-      Some("releases"  at nexus + "service/local/staging/deploy/maven2")
+      Some("releases" at nexus + "service/local/staging/deploy/maven2")
   },
   pomExtra := (
     <url>https://github.com/ITV/bucky</url>
@@ -112,10 +112,8 @@ lazy val core = project
   .settings(kernelSettings: _*)
   .settings(
     libraryDependencies ++= Seq(
-      "com.itv" %% "lifecycle" % itvLifecycleVersion,
       "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
-      "org.scalatest" %% "scalatest" % scalaTestVersion % "test",
-      "org.mockito" % "mockito-core" % mockitoVersion % "test"
+      "org.scalatest" %% "scalatest" % scalaTestVersion % "test"
     )
   )
   .configs(IntegrationTest)
@@ -131,7 +129,9 @@ lazy val test = project
       "com.itv" %% "lifecycle" % itvLifecycleVersion,
       "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
       "org.apache.qpid" % "qpid-broker" % "6.0.4",
-      "org.scalatest" %% "scalatest" % scalaTestVersion
+      "io.netty" % "netty" % "3.4.2.Final",
+      "org.scalatest" %% "scalatest" % scalaTestVersion,
+      "com.rabbitmq" % "amqp-client" % amqpClientVersion
     )
   )
 
@@ -139,15 +139,16 @@ lazy val example = project
   .settings(name := "itv")
   .settings(moduleName := "bucky-example")
   .settings(kernelSettings: _*)
-  .aggregate(core, rabbitmq, argonaut, circe)
-  .dependsOn(core, rabbitmq, argonaut, circe)
+  .aggregate(core, rabbitmq, scalaz, argonaut, circe)
+  .dependsOn(core, rabbitmq, scalaz, argonaut, circe)
   .settings(
     libraryDependencies ++= Seq(
       "io.argonaut" %% "argonaut" % argonautVersion,
       "com.itv" %% "lifecycle" % itvLifecycleVersion,
       "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
       "org.apache.qpid" % "qpid-broker" % "6.0.4",
-      "org.scalatest" %% "scalatest" % scalaTestVersion
+      "org.scalatest" %% "scalatest" % scalaTestVersion,
+      "com.typesafe" % "config" % "1.2.1"
     )
   )
 
@@ -234,11 +235,31 @@ lazy val rabbitmq = project
       "com.rabbitmq" % "amqp-client" % amqpClientVersion,
       "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
       "org.scalatest" %% "scalatest" % scalaTestVersion % "test, it",
-      "io.netty" % "netty" % "3.4.2.Final" % "test,it",
+      "com.typesafe" % "config" % "1.2.1" % "it",
+      "org.mockito" % "mockito-core" % mockitoVersion % "test"
+    )
+  )
+
+
+lazy val scalaz = project
+  .settings(name := "itv")
+  .settings(moduleName := "bucky-scalaz")
+  .settings(kernelSettings: _*)
+  .aggregate(core, test, rabbitmq)
+  .dependsOn(core, rabbitmq, test % "test,it")
+  .configs(IntegrationTest)
+  .settings(Defaults.itSettings)
+  .settings(
+    internalDependencyClasspath in IntegrationTest += Attributed.blank((classDirectory in Test).value),
+    parallelExecution in IntegrationTest := false
+  )
+  .settings(
+    libraryDependencies ++= Seq(
+      "org.scalaz.stream" %% "scalaz-stream" % "0.8.6a",
       "com.typesafe" % "config" % "1.2.1" % "it"
     )
   )
 
 lazy val root = (project in file("."))
-  .aggregate(rabbitmq, xml, circe, argonaut, example, test, core)
+  .aggregate(rabbitmq, scalaz, xml, circe, argonaut, example, test, core)
   .settings(publishArtifact := false)
