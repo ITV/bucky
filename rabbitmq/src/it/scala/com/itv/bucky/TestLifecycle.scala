@@ -9,7 +9,7 @@ import scala.concurrent.{ExecutionContext, Future}
 object TestLifecycle {
   import IntegrationUtils._
 
-  val defaultConfig = AmqpClientConfig("33.33.33.11", 5672, "guest", "guest", networkRecoveryInterval = None)
+  val defaultConfig = AmqpClientConfig("localhost", 5672, "guest", "guest", networkRecoveryInterval = None)
 
   def base(declarations: List[Declaration], config: AmqpClientConfig = defaultConfig)
           (implicit executionContext: ExecutionContext): Lifecycle[(AmqpClient[Lifecycle, Future, Throwable, Unit], Publisher[Future, PublishCommand])] = {
