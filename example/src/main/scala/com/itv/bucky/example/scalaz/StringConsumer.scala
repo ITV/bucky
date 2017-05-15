@@ -7,9 +7,7 @@ import com.itv.bucky.taskz._
 import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.StrictLogging
 
-
 import scalaz.concurrent.Task
-import scalaz.stream._
 
 /*
 This example aims to give a minimal structure to:
@@ -36,27 +34,14 @@ object StringConsumer extends App with StrictLogging {
       }
     }
 
-  def shutdown(client: TaskAmqpClient) = Task.delay {
-    Channel.closeAll(client.channel)
-  }
 
-  private val amqpClient = Task {
-    val amqpClient = TaskAmqpClient(amqpClientConfig)
-    sys addShutdownHook {
-      shutdown(amqpClient).unsafePerformSync
-    }
+  /***
+    * Create the process amqpClient to consume messages from a queue
+    */
+  val consumerProcess = ProcessAmqpClient.fromConfig(amqpClientConfig) { amqpClient =>
     DeclarationExecutor(Declarations.all, amqpClient)
-    amqpClient
+    amqpClient.consumer(Declarations.queue.name, AmqpClient.handlerOf(stringToLogHandler, StringPayloadUnmarshaller))
   }
 
-  val consumerProcess = Process.bracket(amqpClient) {
-    amqpClient =>
-      Process eval_ shutdown(amqpClient)
-  } {
-    _.consumer(Declarations.queue.name, AmqpClient.handlerOf(stringToLogHandler, StringPayloadUnmarshaller))
-  }
-
-  consumerProcess.run.unsafePerformAsync { _ => () }
-
-  Thread.currentThread.join()
+  consumerProcess.run.unsafePerformSync
 }

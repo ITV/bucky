@@ -1,5 +1,7 @@
 package com.itv.bucky.example.scalaz
 
+import java.util.Date
+
 import com.itv.bucky._
 import com.itv.bucky.decl._
 import com.itv.bucky.taskz._
@@ -8,7 +10,7 @@ import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.typesafe.config.ConfigFactory
 
 /*
-This example aims to give a minimal structure to:
+This example aims to give a minimal structure, using TaskAmqpClient, to:
 * Declare a queue, exchange and binding
 * Publish a raw String to a routing key
 It is not very useful by itself, but hopefully reveals the structure of how Bucky components fit together
@@ -34,14 +36,19 @@ object StringPublisher extends App {
   val publisherConfig =
     publishCommandBuilder(StringPayloadMarshaller) using Declarations.routingKey using Declarations.exchange.name
 
-  val amqpClient = TaskAmqpClient(amqpClientConfig)
+
+  /** *
+    * Create the task amqpClient with id and create a task to shutdown the client
+    */
+
+  val amqpClient = TaskAmqpClient.fromConfig(amqpClientConfig)
+  val shutdown = TaskAmqpClient.closeAll(amqpClient)
+
   DeclarationExecutor(Declarations.all, amqpClient)
-
   val publish = amqpClient.publisherOf(publisherConfig)
-  val task = publish(s"Hello, world!")
+  val task = publish(s"Hello, world at ${new Date()}!")
 
-  task.unsafePerformSync
+  val foo = task.unsafePerformSync
 
-  Channel.closeAll(amqpClient.channel)
-
+  shutdown.unsafePerformSync
 }

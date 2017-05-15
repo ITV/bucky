@@ -1,11 +1,13 @@
 package com.itv.bucky.taskz
 
-import com.itv.bucky.{AmqpClientConfig, Channel}
+import java.util.concurrent.ExecutorService
+
+import com.itv.bucky.AmqpClientConfig
 import com.itv.lifecycle.VanillaLifecycle
 
 
-case class DefaultTaskAmqpClientLifecycle(config: AmqpClientConfig) extends VanillaLifecycle[TaskAmqpClient]{
-  override def start(): TaskAmqpClient = TaskAmqpClient(config)
+case class DefaultTaskAmqpClientLifecycle(config: AmqpClientConfig)(implicit pool: ExecutorService) extends VanillaLifecycle[TaskAmqpClient]{
+  override def start(): TaskAmqpClient = TaskAmqpClient.fromConfig(config)
 
-  override def shutdown(instance: TaskAmqpClient): Unit = Channel.closeAll(instance.channel)
+  override def shutdown(instance: TaskAmqpClient): Unit = TaskAmqpClient.closeAll(instance).unsafePerformSync
 }

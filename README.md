@@ -108,3 +108,26 @@ The behaviour of the project is not very dissimilar to the "Basic Publisher" pro
 * Declares an exchange
 * Adds a binding to the exchange
 * Publishes a message with a `Person` payload to the exchange/binding
+
+
+Scalaz Consumer
+----
+
+[source code here](https://github.com/ITV/bucky/blob/master/example/src/main/scala/com/itv/bucky/example/scalaz/StringConsumer.scala)
+
+A very simple project using scalaz that:
+* Declares an AMQP queue
+* Starts a consumer on the queue:
+    * Messages are deseriailized to a `String`
+    * The handle prints out the `String` and acknowledges the message
+
+
+Scalaz Publisher
+----
+
+[source code here](https://github.com/ITV/bucky/blob/master/example/src/main/scala/com/itv/bucky/example/scalaz/StringPublisher.scala)
+
+A very simple project using scalaz that:
+* Declares an exchange
+* Adds a binding to the exchange
+* Publishes a message with a `String` payload to the exchange/binding

@@ -2,12 +2,11 @@ package com.itv.bucky
 
 import com.itv.bucky.Monad.Id
 import com.itv.bucky.decl.{Binding, Exchange, Queue}
+import com.rabbitmq.client.{Channel => RabbitChannel, Connection => RabbitConnection, _}
 import com.typesafe.scalalogging.StrictLogging
 
 import scala.language.higherKinds
 import scala.util.{Failure, Success, Try}
-import com.rabbitmq.client.{Connection => RabbitConnection, Channel => RabbitChannel,_}
-
 
 object Connection extends StrictLogging {
   def apply(config: AmqpClientConfig): Id[RabbitConnection] =
@@ -31,9 +30,9 @@ object Connection extends StrictLogging {
         throw exception
     }
 
-
   def close(connection: RabbitConnection): Unit =
     if (connection.isOpen) {
+      logger.info(s"Closing connection: $connection")
       connection.close()
     }
 }
@@ -47,7 +46,6 @@ object Channel extends StrictLogging {
     * @param channel the channel
     */
   def closeAll(channel: RabbitChannel): Unit = {
-    logger.info(s"Closing channel and conection for $channel")
     val connection = channel.getConnection
     Channel.close(channel)
     Connection.close(connection)
@@ -55,12 +53,12 @@ object Channel extends StrictLogging {
 
   def close(channel: RabbitChannel): Unit =
     if (channel.getConnection.isOpen) {
+      logger.info(s"Closing channel: $channel")
       channel.close()
     }
 
   def estimateMessageCount(channel: RabbitChannel, queueName: QueueName) =
     Try(Option(channel.basicGet(queueName.value, false)).fold(0)(_.getMessageCount + 1))
-
 
   def apply(connection: RabbitConnection): Id[RabbitChannel] =
     Try {
@@ -74,8 +72,6 @@ object Channel extends StrictLogging {
         logger.error(s"Failure when starting Channel because ${exception.getMessage}", exception)
         throw exception
     }
-
-
 }
 
 case class ChannelAmqpOps(channel: RabbitChannel) extends AmqpOps {

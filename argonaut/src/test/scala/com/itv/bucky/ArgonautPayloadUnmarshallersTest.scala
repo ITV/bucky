@@ -33,7 +33,7 @@ class ArgonautPayloadUnmarshallersTest  extends FunSuite {
   }
 
   test("it should convert to a type") {
-    val expectedValue = new Random().nextString(100)
+    val expectedValue = s"Test-${new Random().nextInt().toString.take(10)}"
     val payload = validJson(expectedValue)
 
     val someResult = unmarshallerFromDecodeJson[Some].unmarshal(payload).success

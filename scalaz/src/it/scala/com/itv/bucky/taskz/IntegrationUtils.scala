@@ -1,5 +1,7 @@
 package com.itv.bucky.taskz
 
+import java.util.concurrent.ExecutorService
+
 import com.itv.bucky._
 import com.itv.bucky.decl._
 import com.itv.bucky.pattern.requeue._
@@ -9,7 +11,7 @@ import com.typesafe.scalalogging.StrictLogging
 
 import scala.concurrent.duration._
 import scala.util.Random
-import scalaz.concurrent.Task
+import scalaz.concurrent.{Strategy, Task}
 
 
 object IntegrationUtils extends StrictLogging {
@@ -47,6 +49,8 @@ object IntegrationUtils extends StrictLogging {
 
     val exchange = ExchangeName("")
 
+
+    implicit val pool: ExecutorService = Strategy.DefaultExecutorService
     Lifecycle.using(DefaultTaskAmqpClientLifecycle(IntegrationUtils.config)) { client =>
 
       val declaration = requeueStrategy match {

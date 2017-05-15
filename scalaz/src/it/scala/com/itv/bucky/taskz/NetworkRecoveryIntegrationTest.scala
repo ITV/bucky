@@ -1,5 +1,7 @@
 package com.itv.bucky.taskz
 
+import java.util.concurrent.ExecutorService
+
 import com.itv.bucky.PublishCommandBuilder._
 import com.itv.bucky._
 import com.itv.bucky.decl.{DeclarationExecutor, Queue}
@@ -10,7 +12,7 @@ import org.scalatest.concurrent.{Eventually, ScalaFutures}
 
 import scala.concurrent.duration._
 import scala.util.Random
-import scalaz.concurrent.Task
+import scalaz.concurrent.{Strategy, Task}
 import org.scalatest.Matchers._
 
 import scalaz.\/-
@@ -80,6 +82,7 @@ class NetworkRecoveryIntegrationTest extends FunSuite with ScalaFutures with Str
 
 
   def withProxyConfigured(f: (Proxy, StubConsumeHandler[Task, Unit], StubConsumeHandler[Task, Unit], Publisher[Task, Unit], Publisher[Task, Unit]) => Unit) = {
+    implicit val pool: ExecutorService = Strategy.DefaultExecutorService
 
     val freePort = Port.randomPort()
     val amqpClientConfig = IntegrationUtils.config
