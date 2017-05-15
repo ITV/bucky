@@ -16,7 +16,7 @@ class GenericConsumerTest extends FunSuite with StrictLogging {
 
   import com.itv.bucky.UnmarshalResult._
 
-  test("Runs callback with delivered messages") {
+  test(s" Runs callback with delivered messages") {
     val unmarshaller: Unmarshaller[Payload, Payload] = Unmarshaller.liftResult(_.unmarshalSuccess)
 
     wihConsumer(unmarshaller) { consumer =>

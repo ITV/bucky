@@ -25,15 +25,3 @@ object HeaderExt {
 }
 
 
-sealed trait RequeueStrategy[+F[_]]
-
-case object NoneHandler extends RequeueStrategy[Nothing]
-
-case class NoneRequeue[F[_]](handler: Handler[F, Delivery]) extends RequeueStrategy[F]
-
-case class SimpleRequeue[F[_]](handler: Handler[F, Delivery]) extends RequeueStrategy[F]
-
-case class RawRequeue[F[_]](handler: RequeueHandler[F, Delivery], requeuePolicy: RequeuePolicy) extends RequeueStrategy[F]
-
-case class TypeRequeue[F[_], T](handler: RequeueHandler[F, T], requeuePolicy: RequeuePolicy, unmarshaller: PayloadUnmarshaller[T])
-  extends RequeueStrategy[F]
