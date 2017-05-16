@@ -15,6 +15,7 @@ import scalaz.concurrent.Task
 class GenericConsumerTest extends FunSuite with StrictLogging {
 
   import com.itv.bucky.UnmarshalResult._
+  import TaskExt._
 
   test(s"Runs callback with delivered messages") {
     val unmarshaller: Unmarshaller[Payload, Payload] = Unmarshaller.liftResult(_.unmarshalSuccess)
@@ -103,7 +104,6 @@ class GenericConsumerTest extends FunSuite with StrictLogging {
   def wihConsumer(unmarshaller: Unmarshaller[Payload, Payload], unmarshalFailureAction: ConsumeAction = DeadLetter, actionOnFailure: ConsumeAction = DeadLetter)
                  (f: TestConsumer => Unit): Unit = {
     val channel = new StubChannel()
-    implicit val pool = Executors.newSingleThreadExecutor()
     val client = new TaskAmqpClient(channel)
     val handler = new StubConsumeHandler[Task, Payload]()
 

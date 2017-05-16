@@ -8,7 +8,6 @@ import scala.concurrent.Future
 import FutureExt._
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.Matchers._
-import com.itv.bucky.future.SameThreadExecutionContext.implicitly
 
 
 trait FuturePublisherTest extends PublisherBaseTest[Future] with ScalaFutures {

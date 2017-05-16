@@ -17,6 +17,7 @@ import org.scalatest.Inside._
 import scalaz.\/-
 
 class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogging with Eventually {
+  import TaskExt._
 
   implicit val consumerPatienceConfig: Eventually.PatienceConfig = Eventually.PatienceConfig(timeout = 90.seconds)
 

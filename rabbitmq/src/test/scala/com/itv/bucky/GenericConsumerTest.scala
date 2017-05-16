@@ -14,8 +14,8 @@ import scala.concurrent.Future
 
 class GenericConsumerTest extends FunSuite with ScalaFutures {
 
-  import SameThreadExecutionContext.implicitly
   import com.itv.bucky.UnmarshalResult._
+  import FutureExt._
 
   test("Runs callback with delivered messages with Id") {
     val unmarshaller: Unmarshaller[Payload, Payload] = Unmarshaller.liftResult(_.unmarshalSuccess)

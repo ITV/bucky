@@ -80,6 +80,7 @@ object IntegrationUtils extends StrictLogging {
                                requeueStrategy: RequeueStrategy[Task])(f: TestFixture[Task] => Unit): Unit =
     withPublihserAndAmqpClient(queueName, requeueStrategy) { case (amqpClient: AmqpClient[Id, Task, Throwable, Process[Task, Unit]],  t) =>
       withPublisher(queueName, requeueStrategy = requeueStrategy) { app =>
+        import TaskExt._
 
         val dlqHandler = requeueStrategy match {
           case NoneHandler => None

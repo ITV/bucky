@@ -1,11 +1,15 @@
 package com.itv.bucky
 
-import com.itv.bucky.future.SameThreadExecutionContext
+import com.itv.bucky.future.{SameThreadExecutionContext, futureMonad}
 
 import scala.concurrent.{Future, Promise}
 import scala.util.Try
 
 object FutureExt {
+
+  implicit val executionContext = SameThreadExecutionContext.implicitly
+
+  implicit val theFutureMonad = futureMonad(executionContext)
 
   implicit class FutureOps[T](f: Future[T]) {
     def asTry: Future[Try[T]] = {

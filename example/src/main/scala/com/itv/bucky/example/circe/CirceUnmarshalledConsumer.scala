@@ -6,7 +6,6 @@ import com.typesafe.scalalogging.StrictLogging
 import com.itv.bucky._
 import com.itv.bucky.decl._
 import com.itv.bucky.lifecycle._
-import com.itv.bucky.future._
 import com.itv.bucky.example.circe.Shared.Person
 import com.typesafe.config.ConfigFactory
 
@@ -43,7 +42,7 @@ object CirceUnmarshalledConsumer extends App with StrictLogging {
     for {
       amqpClient <- AmqpClientLifecycle(amqpClientConfig)
       _ <- DeclarationLifecycle(Declarations.all, amqpClient)
-      _ <- amqpClient.consumer(Declarations.queue.name, AmqpClient.handlerOf(personHandler, Shared.personUnmarshaller))
+      _ <- amqpClient.consumer(Declarations.queue.name, AmqpClient.handlerOf(personHandler, Shared.personUnmarshaller)(amqpClient.F))
     }
       yield ()
 

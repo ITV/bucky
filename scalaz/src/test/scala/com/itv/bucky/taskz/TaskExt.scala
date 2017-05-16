@@ -11,8 +11,11 @@ import scalaz.\/
 import scalaz.concurrent.Task
 import scala.concurrent.duration._
 
-
 object TaskExt {
+
+  implicit val executionService = Executors.newSingleThreadExecutor()
+
+  implicit val taskMonad = taskMonadError(executionService)
 
   type TaskResult = \/[Throwable, Unit]
 
@@ -28,7 +31,6 @@ object TaskExt {
   case class TestPublisher(channel: StubChannel, publish: Publisher[Task, PublishCommand])
 
   def withPublisher(timeout: FiniteDuration = 1.second, channel: StubChannel = new StubChannel)(f: TestPublisher => Unit): Unit = {
-    implicit val pool = Executors.newSingleThreadExecutor()
     val client = TaskAmqpClient(channel)
     val publish = client.publisher(timeout)
     f(TestPublisher(channel, publish))

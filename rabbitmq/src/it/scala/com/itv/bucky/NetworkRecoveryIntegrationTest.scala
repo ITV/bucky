@@ -1,7 +1,6 @@
 package com.itv.bucky
 
 import com.itv.bucky.PublishCommandBuilder._
-import com.itv.bucky.future.SameThreadExecutionContext.implicitly
 import com.itv.bucky.decl.Queue
 import com.itv.lifecycle.Lifecycle
 import org.scalatest.FunSuite
@@ -12,7 +11,6 @@ import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import scala.concurrent.duration._
 import scala.util.Random
 import com.itv.bucky.lifecycle._
-import com.itv.bucky.future._
 
 import scala.concurrent.Future
 
@@ -20,6 +18,7 @@ import scala.concurrent.Future
 class NetworkRecoveryIntegrationTest extends FunSuite with ScalaFutures {
 
   import com.itv.bucky.FutureExt._
+
 
   def testLifecycle: Lifecycle[(Proxy, StubConsumeHandler[Future, Unit], StubConsumeHandler[Future, Unit], Publisher[Future, Unit], Publisher[Future, Unit])] = {
     val queueA = QueueName("proxy" + Random.nextInt())

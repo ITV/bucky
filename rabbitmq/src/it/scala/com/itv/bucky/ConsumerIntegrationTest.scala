@@ -1,11 +1,9 @@
 package com.itv.bucky
 
-import com.itv.bucky.future.SameThreadExecutionContext.implicitly
 import com.itv.bucky.UnmarshalResult.Success
 import com.itv.bucky.Unmarshaller._
 import com.itv.bucky.decl._
 import com.itv.bucky.lifecycle._
-import com.itv.bucky.future._
 import com.itv.bucky.pattern.requeue._
 import com.itv.lifecycle.Lifecycle
 import com.typesafe.scalalogging.StrictLogging
@@ -22,6 +20,7 @@ import scala.util.Random
 class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogging {
   import IntegrationUtils._
   import TestLifecycle._
+  import FutureExt._
 
   implicit val consumerPatienceConfig: Eventually.PatienceConfig = Eventually.PatienceConfig(timeout = 90.seconds)
 

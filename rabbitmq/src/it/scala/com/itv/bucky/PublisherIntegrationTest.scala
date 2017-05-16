@@ -1,7 +1,6 @@
 package com.itv.bucky
 
 import com.itv.bucky.IntegrationUtils.defaultDeclaration
-import com.itv.bucky.future.SameThreadExecutionContext.implicitly
 import com.itv.bucky.decl.DeclarationExecutor
 import com.itv.bucky.future._
 import com.itv.lifecycle.Lifecycle
@@ -34,7 +33,6 @@ class PublisherIntegrationTest extends FunSuite with ScalaFutures with StrictLog
   }
 
   test("Can publish messages to a (pre-existing) queue with Id") {
-    import SameThreadExecutionContext.implicitly
     val testQueueName = "bucky-publisher-test-2"
     val routingKey = RoutingKey(testQueueName)
     val exchange = ExchangeName("")

@@ -3,7 +3,7 @@ package com.itv.bucky.example.scalaz
 import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
 import com.itv.bucky._
 import com.itv.bucky.decl._
-import com.itv.bucky.taskz._
+import com.itv.bucky.taskz.ProcessAmqpClient
 import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.StrictLogging
 
@@ -40,7 +40,7 @@ object StringConsumer extends App with StrictLogging {
     */
   val consumerProcess = ProcessAmqpClient.fromConfig(amqpClientConfig) { amqpClient =>
     DeclarationExecutor(Declarations.all, amqpClient)
-    amqpClient.consumer(Declarations.queue.name, AmqpClient.handlerOf(stringToLogHandler, StringPayloadUnmarshaller))
+    amqpClient.consumer(Declarations.queue.name, AmqpClient.handlerOf(stringToLogHandler, StringPayloadUnmarshaller)(amqpClient.F))
   }
 
   consumerProcess.run.unsafePerformSync

@@ -30,6 +30,8 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures with StrictLoggi
 
   val requeuePolicy = RequeuePolicy(3, 1.second)
 
+  import TaskExt._
+
   test(s"Should retain any custom headers when republishing") {
     val handler = new StubRequeueHandler[Task, Delivery]()
     withPublisherAndConsumer(requeueStrategy = RawRequeue(handler, requeuePolicy)) { app =>

@@ -16,5 +16,5 @@ class TaskPublisherIntegrationTest extends PublisherIntegrationTest[Task, Throwa
                                        (f: (TestFixture[Task]) => Unit): Unit =
     IntegrationUtils.withPublisherAndConsumer(queueName, requeueStrategy)(f)
 
-  override implicit def effectMonad: MonadError[Task, Throwable] = taskMonadError
+  override implicit def effectMonad: MonadError[Task, Throwable] = TaskExt.taskMonad
 }

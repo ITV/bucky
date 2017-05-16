@@ -17,6 +17,8 @@ import scalaz.concurrent.Task
 
 class ConsumerTest extends FunSuite with StrictLogging {
 
+  import TaskExt._
+
   test(s"Runs callback with delivered messages with Id") {
     withConsumer { consumer =>
       import consumer._

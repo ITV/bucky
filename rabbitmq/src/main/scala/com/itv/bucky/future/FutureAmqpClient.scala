@@ -11,20 +11,22 @@ import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.language.higherKinds
 import scala.util.{Failure, Success, Try}
 
-abstract class FutureAmqpClient[M[_]](channelFactory: M[RabbitChannel])(implicit M: Monad[M], executionContext: ExecutionContext)
+abstract class FutureAmqpClient[M[_]](channelFactory: M[RabbitChannel])(implicit executionContext: ExecutionContext)
   extends AmqpClient[M, Future, Throwable, Unit] with StrictLogging {
 
+  override implicit def F = futureMonad(executionContext)
+
   override def consumer(queueName: QueueName, handler: Handler[Future, Delivery], actionOnFailure: ConsumeAction = DeadLetter, prefetchCount: Int = 0): M[Unit] =
-    M.flatMap(channelFactory) { (channel: RabbitChannel) =>
-      M.apply {
+    B.flatMap(channelFactory) { (channel: RabbitChannel) =>
+      B.apply {
         val consumer = Consumer.defaultConsumer(channel, queueName, handler, actionOnFailure)
         Consumer[Future, Throwable](channel, queueName, consumer, prefetchCount)
       }
     }
 
   def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): M[Publisher[Future, PublishCommand]] =
-    M.flatMap(channelFactory) { channel: RabbitChannel =>
-      M.apply(
+    B.flatMap(channelFactory) { channel: RabbitChannel =>
+      B.apply(
         Try {
           logger.info(s"Creating publisher")
 
