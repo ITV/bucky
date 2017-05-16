@@ -1,7 +1,7 @@
 package com.itv.bucky
 
 import com.itv.bucky.IntegrationUtils.defaultDeclaration
-import com.itv.bucky.SameThreadExecutionContext.implicitly
+import com.itv.bucky.future.SameThreadExecutionContext.implicitly
 import com.itv.bucky.decl.DeclarationExecutor
 import com.itv.bucky.future._
 import com.itv.lifecycle.Lifecycle
@@ -16,7 +16,7 @@ import scala.concurrent.duration._
 class PublisherIntegrationTest extends FunSuite with ScalaFutures with StrictLogging {
   implicit val consumerPatienceConfig: Eventually.PatienceConfig = Eventually.PatienceConfig(timeout = 90.seconds)
 
-  import BuckyUtils._
+  import FutureExt._
 
   import TestLifecycle._
 

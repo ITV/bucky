@@ -4,6 +4,7 @@ import java.util.Collections
 import java.util.concurrent.{AbstractExecutorService, TimeUnit}
 
 import com.itv.bucky._
+import com.itv.bucky.future.SameThreadExecutionContext
 import com.rabbitmq.client.impl.AMQImpl.Basic
 import com.typesafe.scalalogging.StrictLogging
 import org.scalatest.FunSuite

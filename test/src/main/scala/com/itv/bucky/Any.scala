@@ -1,21 +1,25 @@
 package com.itv.bucky
 
-import com.itv.bucky.pattern.requeue.RequeuePolicy
-
 import scala.language.higherKinds
 import scala.util.Random
 
 object Any {
 
-  def randomPayload() =
-    Payload.from(randomString())
+  def publishCommand(exchangeName: ExchangeName = ExchangeName("exchange"),
+                     routingKey: RoutingKey = RoutingKey("routing.key"),
+                     messageProperties: MessageProperties = MessageProperties.persistentBasic,
+                     payload: Payload = Any.payload()) =
+    PublishCommand(exchangeName, routingKey, messageProperties, payload)
+
+  def payload() =
+    Payload.from(string())
 
 
-  def randomString() =
+  def string() =
     s"Hello World ${new Random().nextInt(10000)}! "
 
 
-  def randomQueue() =
+  def queue() =
     QueueName(s"bucky-queue-${new Random().nextInt(10000)}")
 }
 

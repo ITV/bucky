@@ -36,7 +36,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures with StrictLoggi
       handler.nextResponse = Task.now(Requeue)
       val properties = MessageProperties.persistentTextPlain.withHeader("foo" -> "bar")
 
-      app.publish(Any.randomPayload(), properties).unsafePerformSyncAttempt shouldBe published
+      app.publish(Any.payload(), properties).unsafePerformSyncAttempt shouldBe published
 
       eventually {
         val headersOfReceived = handler.receivedMessages.map(d => HeaderExt("foo", d.properties))

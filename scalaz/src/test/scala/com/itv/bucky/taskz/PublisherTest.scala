@@ -18,7 +18,6 @@ import scala.concurrent.duration._
 
 class PublisherTest extends FunSuite with ScalaFutures {
 
-  import BuckyUtils._
   import Eventually._
 
   test("Publishing only returns success once publication is acknowledged with Id") {
@@ -28,7 +27,7 @@ class PublisherTest extends FunSuite with ScalaFutures {
       channel.transmittedCommands should have size 1
       channel.transmittedCommands.last shouldBe an[AMQP.Confirm.Select]
 
-      val task = resultFrom(publish(anyPublishCommand()))
+      val task = resultFrom(publish(Any.publishCommand()))
 
       channel.transmittedCommands should have size 2
       channel.transmittedCommands.last shouldBe an[AMQP.Basic.Publish]
@@ -48,7 +47,7 @@ class PublisherTest extends FunSuite with ScalaFutures {
       channel.transmittedCommands should have size 1
       channel.transmittedCommands.last shouldBe an[Select]
 
-      val task = resultFrom(publish(anyPublishCommand()))
+      val task = resultFrom(publish(Any.publishCommand()))
 
       channel.transmittedCommands should have size 2
       channel.transmittedCommands.last shouldBe an[Publish]
@@ -66,7 +65,7 @@ class PublisherTest extends FunSuite with ScalaFutures {
     withPublisher(timeout = 100.hours) { publisher =>
       import publisher._
 
-      val task = resultFrom(publish(anyPublishCommand()))
+      val task = resultFrom(publish(Any.publishCommand()))
 
       task shouldBe 'running
 
@@ -81,9 +80,9 @@ class PublisherTest extends FunSuite with ScalaFutures {
     withPublisher(timeout = 100.hours) { publisher =>
       import publisher._
 
-      val task1 = resultFrom(publish(anyPublishCommand()))
-      val task2 = resultFrom(publish(anyPublishCommand()))
-      val task3 = resultFrom(publish(anyPublishCommand()))
+      val task1 = resultFrom(publish(Any.publishCommand()))
+      val task2 = resultFrom(publish(Any.publishCommand()))
+      val task3 = resultFrom(publish(Any.publishCommand()))
 
       task1 shouldBe 'running
       task2 shouldBe 'running
@@ -108,9 +107,9 @@ class PublisherTest extends FunSuite with ScalaFutures {
       withPublisher(timeout = 100.hours) { publisher =>
         import publisher._
 
-        val task1 = resultFrom(publish(anyPublishCommand()))
-        val task2 = resultFrom(publish(anyPublishCommand()))
-        val task3 = resultFrom(publish(anyPublishCommand()))
+        val task1 = resultFrom(publish(Any.publishCommand()))
+        val task2 = resultFrom(publish(Any.publishCommand()))
+        val task3 = resultFrom(publish(Any.publishCommand()))
 
         task1 should not be 'completed
         task2 should not be 'completed
@@ -143,7 +142,7 @@ class PublisherTest extends FunSuite with ScalaFutures {
         channel.transmittedCommands should have size 1
         channel.transmittedCommands.last shouldBe an[AMQP.Confirm.Select]
 
-        val task = resultFrom(publish(anyPublishCommand()))
+        val task = resultFrom(publish(Any.publishCommand()))
 
         eventually {
           task.failure.getMessage should ===(expectedMsg)
@@ -156,7 +155,7 @@ class PublisherTest extends FunSuite with ScalaFutures {
       withPublisher(timeout = 10.millis) { publisher =>
         import publisher._
 
-        val result = resultFrom(publish(anyPublishCommand()))
+        val result = resultFrom(publish(Any.publishCommand()))
 
         eventually {
           result.failure shouldBe a[TimeoutException]

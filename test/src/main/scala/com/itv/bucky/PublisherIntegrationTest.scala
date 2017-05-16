@@ -20,7 +20,7 @@ trait PublisherIntegrationTest[F[_], E] extends FunSuite with PublisherConsumerB
     val handler = new StubConsumeHandler[F, Delivery]
 
     withPublisherAndConsumer(requeueStrategy = NoneRequeue(handler)) { app =>
-      val body = Any.randomPayload()
+      val body = Any.payload()
 
       verifySuccess(app.publisher(PublishCommand(app.exchangeName, app.routingKey, MessageProperties.textPlain, body)))
 

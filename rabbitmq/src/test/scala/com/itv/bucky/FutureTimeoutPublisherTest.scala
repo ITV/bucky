@@ -4,6 +4,7 @@ import java.util.concurrent.{ScheduledExecutorService, TimeoutException}
 
 import com.itv.bucky.future.FutureTimeoutPublisher
 import com.itv.lifecycle.{ExecutorLifecycles, Lifecycle}
+import com.typesafe.scalalogging.StrictLogging
 import org.mockito.invocation.InvocationOnMock
 import org.mockito.stubbing.Answer
 import org.scalatest.FunSuite
@@ -17,12 +18,12 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future, Promise}
 import scala.util.{Failure, Success}
 
-class FutureTimeoutPublisherTest extends FunSuite with ScalaFutures {
-  import BuckyUtils._
+class FutureTimeoutPublisherTest extends FunSuite with ScalaFutures with StrictLogging {
+  import FutureExt._
 
   test("Returns result of delegate publisher if result occurs before timeout") {
-    val command1 = anyPublishCommand()
-    val command2 = anyPublishCommand()
+    val command1 = Any.publishCommand()
+    val command2 = Any.publishCommand()
     val expectedOutcome1 = Success(())
     val expectedOutcome2 = Failure(new RuntimeException("Bang!"))
     val delegate: Publisher[Future, PublishCommand] = {
@@ -47,7 +48,7 @@ class FutureTimeoutPublisherTest extends FunSuite with ScalaFutures {
 
       val publisher = new FutureTimeoutPublisher(delegate, 250.millis)(scheduledExecutor)
 
-      val future = publisher(anyPublishCommand()).asTry
+      val future = publisher(Any.publishCommand()).asTry
 
       future.value shouldBe None
 

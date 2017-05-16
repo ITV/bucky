@@ -1,4 +1,4 @@
-package com.itv.bucky
+package com.itv.bucky.future
 
 import scala.concurrent.ExecutionContextExecutor
 

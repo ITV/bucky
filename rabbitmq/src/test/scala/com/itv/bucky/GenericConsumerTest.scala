@@ -14,7 +14,7 @@ import scala.concurrent.Future
 
 class GenericConsumerTest extends FunSuite with ScalaFutures {
 
-  import com.itv.bucky.SameThreadExecutionContext.implicitly
+  import SameThreadExecutionContext.implicitly
   import com.itv.bucky.UnmarshalResult._
 
   test("Runs callback with delivered messages with Id") {

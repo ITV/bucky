@@ -5,10 +5,10 @@ import com.itv.lifecycle.Lifecycle
 import org.scalatest.Assertion
 
 import scala.concurrent.Future
-import BuckyUtils._
+import FutureExt._
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.Matchers._
-import SameThreadExecutionContext.implicitly
+import com.itv.bucky.future.SameThreadExecutionContext.implicitly
 
 
 trait FuturePublisherTest extends PublisherBaseTest[Future] with ScalaFutures {

@@ -1,6 +1,6 @@
 package com.itv.bucky
 
-import com.itv.bucky.SameThreadExecutionContext.implicitly
+import com.itv.bucky.future.SameThreadExecutionContext.implicitly
 import com.itv.bucky.future.{FutureAmqpClient, FutureIdAmqpClient}
 import com.itv.bucky.lifecycle._
 import com.itv.bucky.future._

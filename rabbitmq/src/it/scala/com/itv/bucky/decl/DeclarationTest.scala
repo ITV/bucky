@@ -2,7 +2,7 @@ package com.itv.bucky.decl
 
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.PublishCommandBuilder._
-import com.itv.bucky.SameThreadExecutionContext.implicitly
+import com.itv.bucky.future.SameThreadExecutionContext.implicitly
 import com.itv.bucky._
 import com.itv.bucky.lifecycle._
 import com.itv.bucky.future._

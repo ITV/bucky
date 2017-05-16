@@ -1,7 +1,7 @@
 package com.itv.bucky
 
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
-import com.itv.bucky.SameThreadExecutionContext.implicitly
+import com.itv.bucky.future.SameThreadExecutionContext.implicitly
 import com.itv.bucky.Unmarshaller._
 import com.itv.bucky.decl.{Exchange, Queue}
 import com.itv.bucky.pattern.requeue._

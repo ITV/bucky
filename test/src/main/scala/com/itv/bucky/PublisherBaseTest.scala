@@ -20,7 +20,7 @@ trait EffectVerification[F[_]] {
 }
 
 trait PublisherBaseTest[F[_]] extends EffectVerification[F] {
-  def withPublisher(testQueueName: QueueName = Any.randomQueue(),
+  def withPublisher(testQueueName: QueueName = Any.queue(),
                     requeueStrategy: RequeueStrategy[F] = NoneHandler,
                     shouldDeclare: Boolean = true)(f: TestFixture[F] => Unit): Unit
 
@@ -28,7 +28,7 @@ trait PublisherBaseTest[F[_]] extends EffectVerification[F] {
 
 
 trait PublisherConsumerBaseTest[F[_]] extends EffectVerification[F] {
-  def withPublisherAndConsumer(queueName: QueueName = Any.randomQueue(),
+  def withPublisherAndConsumer(queueName: QueueName = Any.queue(),
                                requeueStrategy: RequeueStrategy[F])(f: TestFixture[F] => Unit): Unit
 }
 

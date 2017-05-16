@@ -42,7 +42,7 @@ object IntegrationUtils extends StrictLogging {
   }
 
 
-  protected def withPublihserAndAmqpClient(testQueueName: QueueName = Any.randomQueue(), requeueStrategy: RequeueStrategy[Task] = NoneHandler, shouldDeclare: Boolean = true)(f: (TaskAmqpClient, TestFixture[Task]) => Unit): Unit = {
+  protected def withPublihserAndAmqpClient(testQueueName: QueueName = Any.queue(), requeueStrategy: RequeueStrategy[Task] = NoneHandler, shouldDeclare: Boolean = true)(f: (TaskAmqpClient, TestFixture[Task]) => Unit): Unit = {
     val routingKey = RoutingKey(testQueueName.value)
     val exchange = ExchangeName("")
     implicit val pool: ExecutorService = Strategy.DefaultExecutorService
@@ -72,11 +72,11 @@ object IntegrationUtils extends StrictLogging {
   }
 
 
-  def withPublisher(testQueueName: QueueName = Any.randomQueue(), requeueStrategy: RequeueStrategy[Task] = NoneHandler, shouldDeclare: Boolean = true)(f: TestFixture[Task] => Unit): Unit =
+  def withPublisher(testQueueName: QueueName = Any.queue(), requeueStrategy: RequeueStrategy[Task] = NoneHandler, shouldDeclare: Boolean = true)(f: TestFixture[Task] => Unit): Unit =
     withPublihserAndAmqpClient(testQueueName, requeueStrategy, shouldDeclare) { (_, t) => f(t) }
 
 
-  def withPublisherAndConsumer(queueName: QueueName = Any.randomQueue(),
+  def withPublisherAndConsumer(queueName: QueueName = Any.queue(),
                                requeueStrategy: RequeueStrategy[Task])(f: TestFixture[Task] => Unit): Unit =
     withPublihserAndAmqpClient(queueName, requeueStrategy) { case (amqpClient: AmqpClient[Id, Task, Throwable, Process[Task, Unit]],  t) =>
       withPublisher(queueName, requeueStrategy = requeueStrategy) { app =>

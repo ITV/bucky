@@ -6,9 +6,8 @@ import com.itv.bucky.decl._
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.ScalaFutures
-import SameThreadExecutionContext.implicitly
 import com.itv.bucky.Monad._
-
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
 class RabbitSimulatorTest extends FunSuite with ScalaFutures {

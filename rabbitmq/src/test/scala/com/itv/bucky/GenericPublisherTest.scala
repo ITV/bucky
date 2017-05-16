@@ -9,7 +9,7 @@ import scala.concurrent.Future
 
 class GenericPublisherTest extends FunSuite with ScalaFutures {
 
-  import com.itv.bucky.SameThreadExecutionContext.implicitly
+  import SameThreadExecutionContext.implicitly
 
   test("Publishing only returns success once publication is acknowledged") {
     val client = createClient()
