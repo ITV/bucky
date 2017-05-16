@@ -1,6 +1,8 @@
 *.class
 *.log
 
+ci/private.asc
+
 # sbt specific
 dist/*
 target/
