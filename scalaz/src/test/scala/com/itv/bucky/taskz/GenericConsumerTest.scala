@@ -16,21 +16,26 @@ class GenericConsumerTest extends FunSuite with StrictLogging {
 
   import com.itv.bucky.UnmarshalResult._
 
-  test(s" Runs callback with delivered messages") {
+  test(s"Runs callback with delivered messages") {
     val unmarshaller: Unmarshaller[Payload, Payload] = Unmarshaller.liftResult(_.unmarshalSuccess)
 
     wihConsumer(unmarshaller) { consumer =>
       import consumer._
 
       eventually {
+        logger.info(s"Wait for consumer to be ready!")
         channel.consumers should have size 1
       }
       val msg = Payload.from("Hello World!")
 
-      channel.deliver(new Basic.Deliver(channel.consumers.head.getConsumerTag, 1L, false, "exchange", "routingKey"), msg)
-      channel.deliver(new Basic.Deliver(channel.consumers.head.getConsumerTag, 1L, false, "exchange", "routingKey"), msg)
+      val consumerTag = channel.consumers.headOption.fold(fail(s"No consumer present!"))(_.getConsumerTag)
+      logger.info(s"Deliver the first message")
+      channel.deliver(new Basic.Deliver(consumerTag, 1L, false, "exchange", "routingKey"), msg)
+      logger.info(s"Deliver the second message")
+      channel.deliver(new Basic.Deliver(consumerTag, 1L, false, "exchange", "routingKey"), msg)
 
       eventually {
+        logger.info(s"Wait until messages has been recieved")
         handler.receivedMessages should have size 2
       }
     }
