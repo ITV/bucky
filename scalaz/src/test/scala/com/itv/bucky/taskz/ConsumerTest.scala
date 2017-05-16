@@ -1,6 +1,7 @@
 package com.itv.bucky.taskz
 
-import java.util.concurrent.Executors
+import java.util.Collections
+import java.util.concurrent.{AbstractExecutorService, TimeUnit}
 
 import com.itv.bucky._
 import com.rabbitmq.client.impl.AMQImpl.Basic
@@ -9,14 +10,17 @@ import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.Eventually._
 
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutorService}
 import scalaz.concurrent.Task
+
 
 class ConsumerTest extends FunSuite with StrictLogging {
 
-  test("Runs callback with delivered messages with Id") {
+  test(s"Runs callback with delivered messages with Id") {
     withConsumer { consumer =>
       import consumer._
       eventually {
+        logger.info("Waiting for the consumer to be ready")
         channel.consumers should have size 1
         channel.setPrefetchCount shouldBe 12
       }
@@ -25,17 +29,20 @@ class ConsumerTest extends FunSuite with StrictLogging {
       handler.nextResponse = Task.now(Ack)
       channel.deliver(new Basic.Deliver(channel.consumers.head.getConsumerTag, 1L, false, "exchange", "routingKey"), msg)
       eventually {
+        logger.info("Waiting for ack")
         channel.transmittedCommands.last shouldBe a[Basic.Ack]
       }
       handler.nextResponse = Task.now(DeadLetter)
       channel.deliver(new Basic.Deliver(channel.consumers.head.getConsumerTag, 1L, false, "exchange", "routingKey"), msg)
       eventually {
+        logger.info("Waiting for nack")
         channel.transmittedCommands.last shouldBe a[Basic.Nack]
         channel.transmittedCommands.last.asInstanceOf[Basic.Nack].getRequeue shouldBe false
       }
       handler.nextResponse = Task.now(RequeueImmediately)
       channel.deliver(new Basic.Deliver(channel.consumers.head.getConsumerTag, 1L, false, "exchange", "routingKey"), msg)
       eventually {
+        logger.info("Waiting for nack")
         channel.transmittedCommands.last shouldBe a[Basic.Nack]
         channel.transmittedCommands.last.asInstanceOf[Basic.Nack].getRequeue shouldBe true
       }
@@ -99,8 +106,8 @@ class ConsumerTest extends FunSuite with StrictLogging {
 
   private def withConsumer(f: TestConsumer => Unit): Unit = {
     val channel = new StubChannel()
-    implicit val pool = Executors.newSingleThreadExecutor()
-    val client = new TaskAmqpClient(channel)
+    implicit val pool = ExecutionContextExecutorServiceBridge(SameThreadExecutionContext)
+    val client = new TaskAmqpClient(channel)(pool)
 
     val handler = new StubConsumeHandler[Task, Delivery]()
 
@@ -110,4 +117,30 @@ class ConsumerTest extends FunSuite with StrictLogging {
     }
     f(TestConsumer(channel, handler))
   }
+
+
+  object ExecutionContextExecutorServiceBridge {
+    def apply(ec: ExecutionContext): ExecutionContextExecutorService = ec match {
+      case null => throw null
+      case eces: ExecutionContextExecutorService => eces
+      case other => new AbstractExecutorService with ExecutionContextExecutorService {
+        override def prepare(): ExecutionContext = other
+
+        override def isShutdown = false
+
+        override def isTerminated = false
+
+        override def shutdown() = ()
+
+        override def shutdownNow() = Collections.emptyList[Runnable]
+
+        override def execute(runnable: Runnable): Unit = other execute runnable
+
+        override def reportFailure(t: Throwable): Unit = other reportFailure t
+
+        override def awaitTermination(length: Long, unit: TimeUnit): Boolean = false
+      }
+    }
+  }
+
 }
