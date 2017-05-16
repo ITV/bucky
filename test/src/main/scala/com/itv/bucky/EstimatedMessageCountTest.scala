@@ -1,16 +1,17 @@
-package com.itv.bucky.taskz
+package com.itv.bucky
 
-import com.itv.bucky.taskz.IntegrationUtils._
-import com.itv.bucky.{MessageProperties, PublishCommand}
+import com.typesafe.scalalogging.StrictLogging
 import org.scalatest.FunSuite
-import org.scalatest.Matchers._
 import org.scalatest.concurrent.Eventually
 
 import scala.concurrent.duration._
+import scala.language.higherKinds
 import scala.util.{Random, Success}
-import scalaz.concurrent.Task
+import org.scalatest.Matchers._
 
-class EstimatedMessageCountTest extends FunSuite {
+trait EstimatedMessageCountTest[F[_]] extends FunSuite with PublisherBaseTest[F] with StrictLogging {
+
+  def runAll(list: Seq[F[Unit]]): Unit
 
   test("A new queue with no messages published should have an estimated count of 0") {
     estimatedMessageCountTest(0)
@@ -25,28 +26,22 @@ class EstimatedMessageCountTest extends FunSuite {
     estimatedMessageCountTest(Random.nextInt(10))
   }
 
-  test(s"A new queue with n messages published should have an estimated count of n when composing multiple tasks into one") {
-    //In this case, RabbitMQ selects the same delivery tag for multiple messages
-    estimatedMessageCountTest(Random.nextInt(10), composingTask = true)
-  }
-
 
   implicit val patianceConfig: Eventually.PatienceConfig = Eventually.PatienceConfig(timeout = 5.seconds, 1.second)
 
   def estimatedMessageCountTest(messagesToPublish: Int, composingTask: Boolean = false): Unit = {
-    val queueName = randomQueue()
+    val queueName = Any.randomQueue()
 
     withPublisher(queueName) { app =>
-      val tasks = (1 to messagesToPublish).map(_ =>
-        app.publisher(PublishCommand(app.exchangeName, app.routingKey, MessageProperties.persistentBasic, randomPayload()))
-      )
-      if (composingTask)
-        Task.gatherUnordered(tasks).unsafePerformSync
-      else
-        tasks.foreach(_.unsafePerformSyncAttempt)
+      val tasks: Seq[F[Unit]] = (1 to messagesToPublish).map { i =>
+        logger.info(s"Publish message: $i")
+        app.publisher(PublishCommand(app.exchangeName, app.routingKey, MessageProperties.persistentBasic, Any.randomPayload()))
+      }
+      runAll(tasks)
     }
     withPublisher(queueName, shouldDeclare = false) { app =>
       Eventually.eventually {
+        logger.info(s"Estimate message count on $queueName")
         app.amqpClient.estimatedMessageCount(queueName) shouldBe Success(messagesToPublish)
       }
     }
