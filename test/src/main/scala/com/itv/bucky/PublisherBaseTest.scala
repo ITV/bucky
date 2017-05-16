@@ -14,13 +14,22 @@ case class TestFixture[F[_]](publisher: Publisher[F, PublishCommand], routingKey
     PublishCommand(exchangeName, RoutingKey(queueName.value), properties, body))
 }
 
-trait PublisherBaseTest[F[_]] {
+
+trait EffectVerification[F[_]] {
+  def verifySuccess(f: F[Unit]): Assertion
+}
+
+trait PublisherBaseTest[F[_]] extends EffectVerification[F] {
   def withPublisher(testQueueName: QueueName = Any.randomQueue(),
                     requeueStrategy: RequeueStrategy[F] = NoneHandler,
                     shouldDeclare: Boolean = true)(f: TestFixture[F] => Unit): Unit
 
-  def verifySuccess(f: F[Unit]): Assertion
+}
 
+
+trait PublisherConsumerBaseTest[F[_]] extends EffectVerification[F] {
+  def withPublisherAndConsumer(queueName: QueueName = Any.randomQueue(),
+                               requeueStrategy: RequeueStrategy[F])(f: TestFixture[F] => Unit): Unit
 }
 
 

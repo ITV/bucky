@@ -9,11 +9,27 @@ import com.itv.bucky.pattern.requeue._
 import com.itv.lifecycle.Lifecycle
 import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.StrictLogging
+import org.scalatest.Assertion
 
 import scala.concurrent.duration._
+import scalaz.\/-
 import scalaz.concurrent.{Strategy, Task}
 import scalaz.stream.Process
 
+import org.scalatest.Matchers._
+
+trait TaskEffectVerification extends EffectVerification[Task] {
+
+  def verifySuccess(f: Task[Unit]): Assertion = f.unsafePerformSyncAttempt should ===(\/-(()))
+
+}
+
+trait TaskPublisherConsumerBaseTest extends PublisherConsumerBaseTest[Task] with TaskEffectVerification {
+
+  override def withPublisherAndConsumer(queueName: QueueName, requeueStrategy: RequeueStrategy[Task])
+                                       (f: (TestFixture[Task]) => Unit): Unit =
+    IntegrationUtils.withPublisherAndConsumer(queueName, requeueStrategy)(f)
+}
 
 object IntegrationUtils extends StrictLogging {
 
