@@ -1,6 +1,6 @@
-package com.itv.bucky
+package com.itv.bucky.future
 
-import com.itv.bucky.future.{FutureAmqpClient, FutureIdAmqpClient}
+import com.itv.bucky._
 import com.itv.bucky.lifecycle._
 import com.itv.lifecycle.{Lifecycle, NoOpLifecycle}
 import com.rabbitmq.client.impl.AMQImpl.Basic

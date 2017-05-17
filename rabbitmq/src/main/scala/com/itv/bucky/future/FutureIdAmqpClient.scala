@@ -17,13 +17,10 @@ case class FutureIdAmqpClient(channel: Id[RabbitChannel])(implicit executionCont
 
   override def estimatedMessageCount(queueName: QueueName): Try[Int] =
     Channel.estimateMessageCount(channel, queueName)
-
-
 }
 
 
 object FutureIdAmqpClient {
-
   import Monad.toMonad
 
   def apply(config: AmqpClientConfig)(implicit executionContext: ExecutionContext): Id[FutureIdAmqpClient] = {

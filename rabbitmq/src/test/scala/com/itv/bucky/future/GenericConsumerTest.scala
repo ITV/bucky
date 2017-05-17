@@ -1,21 +1,20 @@
-package com.itv.bucky
+package com.itv.bucky.future
 
 import com.itv.bucky.Monad.Id
-import com.itv.bucky.future.{FutureAmqpClient, FutureIdAmqpClient}
+import com.itv.bucky._
+import com.itv.bucky.lifecycle._
 import com.itv.lifecycle.{Lifecycle, NoOpLifecycle}
 import com.rabbitmq.client.impl.AMQImpl.Basic
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.ScalaFutures
-import com.itv.bucky.lifecycle._
-import com.itv.bucky.future._
 
 import scala.concurrent.Future
 
 class GenericConsumerTest extends FunSuite with ScalaFutures {
 
-  import com.itv.bucky.UnmarshalResult._
   import FutureExt._
+  import com.itv.bucky.UnmarshalResult._
 
   test("Runs callback with delivered messages with Id") {
     val unmarshaller: Unmarshaller[Payload, Payload] = Unmarshaller.liftResult(_.unmarshalSuccess)

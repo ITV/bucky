@@ -1,5 +1,6 @@
-package com.itv.bucky
+package com.itv.bucky.future
 
+import com.itv.bucky._
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.ScalaFutures

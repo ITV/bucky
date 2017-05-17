@@ -1,10 +1,11 @@
-package com.itv.bucky
+package com.itv.bucky.future
 
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.Unmarshaller._
+import com.itv.bucky._
 import com.itv.bucky.decl.{Exchange, Queue}
-import com.itv.bucky.pattern.requeue._
 import com.itv.bucky.lifecycle._
+import com.itv.bucky.pattern.requeue._
 import com.itv.lifecycle.Lifecycle
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._

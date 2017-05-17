@@ -6,10 +6,9 @@ import java.util.concurrent.atomic.AtomicReference
 import com.itv.bucky.AtomicRef.Ref
 import com.itv.bucky.{PublishCommand, Publisher, StubChannel}
 
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration.{FiniteDuration, _}
 import scalaz.\/
 import scalaz.concurrent.Task
-import scala.concurrent.duration._
 
 object TaskExt {
 

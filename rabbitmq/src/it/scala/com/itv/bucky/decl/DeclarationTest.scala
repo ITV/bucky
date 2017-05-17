@@ -3,6 +3,7 @@ package com.itv.bucky.decl
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.PublishCommandBuilder._
 import com.itv.bucky._
+import com.itv.bucky.future.IntegrationUtils
 import com.itv.bucky.lifecycle._
 import com.itv.lifecycle.Lifecycle
 import org.scalatest.FunSuite
@@ -15,7 +16,7 @@ import scala.concurrent.duration._
 import scala.util.Random
 
 class DeclarationTest extends FunSuite with ScalaFutures {
-  import FutureExt._
+  import com.itv.bucky.future.FutureExt._
 
   implicit val declarationPatienceConfig: Eventually.PatienceConfig =
     Eventually.PatienceConfig(timeout = 5.second, interval = 100.millis)

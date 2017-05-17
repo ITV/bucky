@@ -32,7 +32,6 @@ trait TaskPublisherConsumerBaseTest extends PublisherConsumerBaseTest[Task] with
 }
 
 object IntegrationUtils extends StrictLogging {
-
   def defaultDeclaration(queueName: QueueName): List[Queue] =
     List(queueName).map(Queue(_).autoDelete.expires(2.minutes))
 

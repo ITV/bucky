@@ -1,10 +1,11 @@
-package com.itv.bucky
+package com.itv.bucky.future
 
 import java.io.IOException
 import java.util.concurrent.TimeoutException
 
-import com.itv.lifecycle.{Lifecycle, NoOpLifecycle}
 import com.itv.bucky.lifecycle._
+import com.itv.bucky.{Any, StubChannel}
+import com.itv.lifecycle.{Lifecycle, NoOpLifecycle}
 import com.rabbitmq.client._
 import com.rabbitmq.client.impl.AMQImpl
 import org.scalatest.FunSuite
@@ -12,7 +13,6 @@ import org.scalatest.Matchers._
 import org.scalatest.concurrent.ScalaFutures
 
 import scala.concurrent.duration._
-import com.itv.bucky.future.{FutureAmqpClient, FutureIdAmqpClient}
 
 class PublisherTest extends FunSuite with ScalaFutures {
 

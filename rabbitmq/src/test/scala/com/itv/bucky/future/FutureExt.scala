@@ -1,6 +1,4 @@
-package com.itv.bucky
-
-import com.itv.bucky.future.{SameThreadExecutionContext, futureMonad}
+package com.itv.bucky.future
 
 import scala.concurrent.{Future, Promise}
 import scala.util.Try

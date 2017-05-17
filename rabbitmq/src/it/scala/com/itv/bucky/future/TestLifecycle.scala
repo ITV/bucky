@@ -1,5 +1,6 @@
-package com.itv.bucky
+package com.itv.bucky.future
 
+import com.itv.bucky._
 import com.itv.bucky.decl.Declaration
 import com.itv.bucky.lifecycle._
 import com.itv.lifecycle.Lifecycle

@@ -1,16 +1,16 @@
-package com.itv.bucky
+package com.itv.bucky.future
 
 import java.util.concurrent.{ScheduledExecutorService, TimeoutException}
 
-import com.itv.bucky.future.FutureTimeoutPublisher
+import com.itv.bucky.{Any, PublishCommand, Publisher}
 import com.itv.lifecycle.{ExecutorLifecycles, Lifecycle}
 import com.typesafe.scalalogging.StrictLogging
+import org.mockito.Matchers.any
+import org.mockito.Mockito.when
 import org.mockito.invocation.InvocationOnMock
 import org.mockito.stubbing.Answer
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
-import org.mockito.Matchers.any
-import org.mockito.Mockito.when
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.mockito.MockitoSugar._
 
