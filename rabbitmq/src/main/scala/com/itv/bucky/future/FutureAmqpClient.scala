@@ -11,20 +11,22 @@ import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.language.higherKinds
 import scala.util.{Failure, Success, Try}
 
-abstract class FutureAmqpClient[M[_]](channelFactory: M[RabbitChannel])(implicit M: Monad[M], executionContext: ExecutionContext)
-  extends AmqpClient[M, Future, Throwable, Unit] with StrictLogging {
+abstract class FutureAmqpClient[B[_]](channelFactory: B[RabbitChannel])(implicit executionContext: ExecutionContext)
+  extends AmqpClient[B, Future, Throwable, Unit] with StrictLogging {
 
-  override def consumer(queueName: QueueName, handler: Handler[Future, Delivery], actionOnFailure: ConsumeAction = DeadLetter, prefetchCount: Int = 0): M[Unit] =
-    M.flatMap(channelFactory) { (channel: RabbitChannel) =>
-      M.apply {
+  override implicit def effectMonad = futureMonad(executionContext)
+
+  override def consumer(queueName: QueueName, handler: Handler[Future, Delivery], actionOnFailure: ConsumeAction = DeadLetter, prefetchCount: Int = 0): B[Unit] =
+    monad.flatMap(channelFactory) { (channel: RabbitChannel) =>
+      monad.apply {
         val consumer = Consumer.defaultConsumer(channel, queueName, handler, actionOnFailure)
         Consumer[Future, Throwable](channel, queueName, consumer, prefetchCount)
       }
     }
 
-  def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): M[Publisher[Future, PublishCommand]] =
-    M.flatMap(channelFactory) { channel: RabbitChannel =>
-      M.apply(
+  def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): B[Publisher[Future, PublishCommand]] =
+    monad.flatMap(channelFactory) { channel: RabbitChannel =>
+      monad.apply(
         Try {
           logger.info(s"Creating publisher")
 

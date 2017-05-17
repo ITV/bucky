@@ -30,12 +30,12 @@ trait EstimatedMessageCountTest[F[_]] extends FunSuite with PublisherBaseTest[F]
   implicit val patianceConfig: Eventually.PatienceConfig = Eventually.PatienceConfig(timeout = 5.seconds, 1.second)
 
   def estimatedMessageCountTest(messagesToPublish: Int, composingTask: Boolean = false): Unit = {
-    val queueName = Any.randomQueue()
+    val queueName = Any.queue()
 
     withPublisher(queueName) { app =>
       val tasks: Seq[F[Unit]] = (1 to messagesToPublish).map { i =>
         logger.info(s"Publish message: $i")
-        app.publisher(PublishCommand(app.exchangeName, app.routingKey, MessageProperties.persistentBasic, Any.randomPayload()))
+        app.publisher(PublishCommand(app.exchangeName, app.routingKey, MessageProperties.persistentBasic, Any.payload()))
       }
       runAll(tasks)
     }

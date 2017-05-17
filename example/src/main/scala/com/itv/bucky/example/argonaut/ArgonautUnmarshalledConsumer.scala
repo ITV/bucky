@@ -4,9 +4,8 @@ import com.itv.lifecycle.Lifecycle
 import com.typesafe.scalalogging.StrictLogging
 import com.itv.bucky._
 import com.itv.bucky.decl._
-import com.itv.bucky.lifecycle._
-import com.itv.bucky.future._
 import com.itv.bucky.example.argonaut.Shared.Person
+import com.itv.bucky.lifecycle.{AmqpClientLifecycle, DeclarationLifecycle}
 import com.typesafe.config.ConfigFactory
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -42,7 +41,7 @@ object ArgonautUnmarshalledConsumer extends App with StrictLogging {
     for {
       amqpClient <- AmqpClientLifecycle(amqpClientConfig)
       _ <- DeclarationLifecycle(Declarations.all, amqpClient)
-      _ <- amqpClient.consumer(Declarations.queue.name, AmqpClient.handlerOf(personHandler, Shared.personUnmarshaller))
+      _ <- amqpClient.consumer(Declarations.queue.name, AmqpClient.handlerOf(personHandler, Shared.personUnmarshaller)(amqpClient.effectMonad))
     }
       yield ()
 

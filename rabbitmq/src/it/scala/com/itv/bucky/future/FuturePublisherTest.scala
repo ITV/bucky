@@ -1,17 +1,18 @@
-package com.itv.bucky
+package com.itv.bucky.future
 
+import com.itv.bucky._
 import com.itv.bucky.lifecycle.{AmqpClientLifecycle, DeclarationLifecycle}
 import com.itv.lifecycle.Lifecycle
 import org.scalatest.Assertion
+import org.scalatest.concurrent.ScalaFutures
 
 import scala.concurrent.Future
-import BuckyUtils._
-import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.Matchers._
-import SameThreadExecutionContext.implicitly
 
+import org.scalatest.Matchers._
 
 trait FuturePublisherTest extends PublisherBaseTest[Future] with ScalaFutures {
+  import FutureExt._
+
 
   override def withPublisher(testQueueName: QueueName, requeueStrategy: RequeueStrategy[Future], shouldDeclare: Boolean)
                             (f: (TestFixture[Future]) => Unit): Unit = {

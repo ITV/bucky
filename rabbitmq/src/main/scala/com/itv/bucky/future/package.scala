@@ -5,7 +5,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 package object future {
 
-  implicit def futureMonad(implicit executionContext: ExecutionContext) = new MonadError[Future, Throwable] {
+  def futureMonad(implicit executionContext: ExecutionContext) = new MonadError[Future, Throwable] {
     override def apply[A](a: => A): Future[A] = Future(a)
 
     override def map[A, B](m: Future[A])(f: (A) => B): Future[B] = m.map(f)
@@ -16,6 +16,5 @@ package object future {
 
     override def handleError[A](fa: Future[A])(f: (Throwable) => Future[A]): Future[A] = fa.recoverWith { case t: Throwable => f(t) }
   }
-
 
 }

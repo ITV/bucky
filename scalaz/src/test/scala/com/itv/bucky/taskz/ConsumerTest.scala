@@ -1,8 +1,5 @@
 package com.itv.bucky.taskz
 
-import java.util.Collections
-import java.util.concurrent.{AbstractExecutorService, TimeUnit}
-
 import com.itv.bucky._
 import com.rabbitmq.client.impl.AMQImpl.Basic
 import com.typesafe.scalalogging.StrictLogging
@@ -10,7 +7,6 @@ import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.Eventually._
 
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutorService}
 import scalaz.concurrent.Task
 
 
@@ -104,10 +100,10 @@ class ConsumerTest extends FunSuite with StrictLogging {
 
   case class TestConsumer(channel: StubChannel, handler: StubConsumeHandler[Task, Delivery])
 
+  import TaskExt._
   private def withConsumer(f: TestConsumer => Unit): Unit = {
     val channel = new StubChannel()
-    implicit val pool = ExecutionContextExecutorServiceBridge(SameThreadExecutionContext)
-    val client = new TaskAmqpClient(channel)(pool)
+    val client = new TaskAmqpClient(channel)
 
     val handler = new StubConsumeHandler[Task, Delivery]()
 
@@ -119,28 +115,6 @@ class ConsumerTest extends FunSuite with StrictLogging {
   }
 
 
-  object ExecutionContextExecutorServiceBridge {
-    def apply(ec: ExecutionContext): ExecutionContextExecutorService = ec match {
-      case null => throw null
-      case eces: ExecutionContextExecutorService => eces
-      case other => new AbstractExecutorService with ExecutionContextExecutorService {
-        override def prepare(): ExecutionContext = other
 
-        override def isShutdown = false
-
-        override def isTerminated = false
-
-        override def shutdown() = ()
-
-        override def shutdownNow() = Collections.emptyList[Runnable]
-
-        override def execute(runnable: Runnable): Unit = other execute runnable
-
-        override def reportFailure(t: Throwable): Unit = other reportFailure t
-
-        override def awaitTermination(length: Long, unit: TimeUnit): Boolean = false
-      }
-    }
-  }
 
 }

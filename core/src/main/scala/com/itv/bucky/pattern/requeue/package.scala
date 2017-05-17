@@ -48,8 +48,7 @@ package object requeue {
                             unmarshaller: PayloadUnmarshaller[T],
                             onFailure: RequeueConsumeAction = Requeue,
                             unmarshalFailureAction: RequeueConsumeAction = DeadLetter,
-                            prefetchCount: Int = 0)
-                           (implicit M: Monad[B], F: MonadError[F, E]): B[C] = {
+                            prefetchCount: Int = 0): B[C] = {
       requeueDeliveryHandlerOf(queueName, handler, requeuePolicy, toDeliveryUnmarshaller(unmarshaller), onFailure, unmarshalFailureAction, prefetchCount)
     }
 
@@ -60,9 +59,8 @@ package object requeue {
                                      unmarshaller: DeliveryUnmarshaller[T],
                                      onFailure: RequeueConsumeAction = Requeue,
                                      unmarshalFailureAction: RequeueConsumeAction = DeadLetter,
-                                     prefetchCount: Int = 0)
-                                   (implicit M: Monad[B], F: MonadError[F, E]): B[C] = {
-      val deserializeHandler = new DeliveryUnmarshalHandler[F, T, RequeueConsumeAction](unmarshaller)(handler, unmarshalFailureAction)
+                                     prefetchCount: Int = 0): B[C] = {
+      val deserializeHandler = new DeliveryUnmarshalHandler[F, T, RequeueConsumeAction](unmarshaller)(handler, unmarshalFailureAction)(amqpClient.effectMonad)
       requeueOf(queueName, deserializeHandler, requeuePolicy, prefetchCount = prefetchCount)
     }
 
@@ -71,11 +69,10 @@ package object requeue {
                   handler: RequeueHandler[F, Delivery],
                   requeuePolicy: RequeuePolicy,
                   onFailure: RequeueConsumeAction = Requeue,
-                  prefetchCount: Int = 0)
-                 (implicit M: Monad[B], F: MonadError[F, E]): B[C] = {
+                  prefetchCount: Int = 0): B[C] = {
       val requeueExchange = ExchangeName(s"${queueName.value}.requeue")
-      M.flatMap(amqpClient.publisher()) {requeuePublish =>
-        amqpClient.consumer(queueName, RequeueTransformer(requeuePublish, requeueExchange, requeuePolicy, onFailure)(handler), prefetchCount = prefetchCount)
+      amqpClient.monad.flatMap(amqpClient.publisher()) { requeuePublish =>
+        amqpClient.consumer(queueName, RequeueTransformer(requeuePublish, requeueExchange, requeuePolicy, onFailure)(handler)(amqpClient.effectMonad), prefetchCount = prefetchCount)
       }
     }
 

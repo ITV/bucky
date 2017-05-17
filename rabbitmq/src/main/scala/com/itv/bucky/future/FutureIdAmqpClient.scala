@@ -9,7 +9,10 @@ import scala.language.higherKinds
 import scala.util.Try
 
 case class FutureIdAmqpClient(channel: Id[RabbitChannel])(implicit executionContext: ExecutionContext)
-  extends FutureAmqpClient[Id](channel)(Monad.idMonad, executionContext) {
+  extends FutureAmqpClient[Id](channel)(executionContext) {
+
+  override implicit def monad: Monad[Id] = Monad.idMonad
+
   override def performOps(thunk: (AmqpOps) => Try[Unit]): Try[Unit] = thunk(ChannelAmqpOps(channel))
 
   override def estimatedMessageCount(queueName: QueueName): Try[Int] =
@@ -18,7 +21,6 @@ case class FutureIdAmqpClient(channel: Id[RabbitChannel])(implicit executionCont
 
 
 object FutureIdAmqpClient {
-
   import Monad.toMonad
 
   def apply(config: AmqpClientConfig)(implicit executionContext: ExecutionContext): Id[FutureIdAmqpClient] = {

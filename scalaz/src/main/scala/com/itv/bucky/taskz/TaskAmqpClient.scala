@@ -2,7 +2,7 @@ package com.itv.bucky.taskz
 
 import java.util.concurrent.ExecutorService
 
-import com.itv.bucky.Monad.Id
+import com.itv.bucky.Monad._
 import com.itv.bucky.{Channel, _}
 import com.rabbitmq.client.AMQP.BasicProperties
 import com.rabbitmq.client.{DefaultConsumer, Envelope, Channel => RabbitChannel, Connection => RabbitConnection, Consumer => RabbitMqConsumer}
@@ -18,6 +18,10 @@ import scalaz.stream.Process
 case class TaskAmqpClient(channel: Id[RabbitChannel])(implicit pool: ExecutorService = Strategy.DefaultExecutorService)  extends AmqpClient[Id, Task, Throwable, Process[Task, Unit]]
   with StrictLogging {
   type Register = (\/[Throwable, Unit]) => Unit
+
+  override implicit def monad: Monad[Id] = idMonad
+
+  override implicit def effectMonad: MonadError[Task, Throwable] = taskMonadError(pool)
 
   override def publisher(timeout: Duration): Id[Publisher[Task, PublishCommand]] = {
     logger.info(s"Creating publisher")
@@ -66,6 +70,7 @@ case class TaskAmqpClient(channel: Id[RabbitChannel])(implicit pool: ExecutorSer
   override def performOps(thunk: (AmqpOps) => Try[Unit]): Try[Unit] = thunk(ChannelAmqpOps(channel))
 
   override def estimatedMessageCount(queueName: QueueName): Try[Int] = Channel.estimateMessageCount(channel, queueName)
+
 
 }
 

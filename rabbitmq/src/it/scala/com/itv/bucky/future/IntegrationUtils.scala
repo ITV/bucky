@@ -1,7 +1,8 @@
-package com.itv.bucky
+package com.itv.bucky.future
 
-import com.typesafe.config.ConfigFactory
 import com.itv.bucky.decl._
+import com.itv.bucky.{AmqpClientConfig, QueueName}
+import com.typesafe.config.ConfigFactory
 
 import scala.concurrent.duration._
 

@@ -1,5 +1,6 @@
-package com.itv.bucky
+package com.itv.bucky.future
 
+import com.itv.bucky._
 import com.itv.bucky.decl.Declaration
 import com.itv.bucky.lifecycle._
 import com.itv.lifecycle.Lifecycle
@@ -9,7 +10,7 @@ import scala.concurrent.{ExecutionContext, Future}
 object TestLifecycle {
   import IntegrationUtils._
 
-  val defaultConfig = AmqpClientConfig("33.33.33.11", 5672, "guest", "guest", networkRecoveryInterval = None)
+  val defaultConfig = AmqpClientConfig("localhost", 5672, "guest", "guest", networkRecoveryInterval = None)
 
   def base(declarations: List[Declaration], config: AmqpClientConfig = defaultConfig)
           (implicit executionContext: ExecutionContext): Lifecycle[(AmqpClient[Lifecycle, Future, Throwable, Unit], Publisher[Future, PublishCommand])] = {

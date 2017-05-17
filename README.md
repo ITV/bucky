@@ -9,7 +9,7 @@ Provides constructs for:
 * Declaring AMQP resources
 * Applying common patterns 
 
-#Getting Started
+# Getting Started
 Bucky is cross built for Scala 2.11 and Scala 2.12
 
 ```scala
@@ -24,8 +24,35 @@ libraryDependencies ++= Seq(
 ```
 
 
+# Run integration test
+You require to install to run on Mac OS:
+ - docker
+ - docker-machine
+ - virtualbox
+ 
+ Look at [Mac official documentation](https://docs.docker.com/docker-for-mac/install/) or use **brew** to install it.
+ 
+ 
+ 
+You need to create the RabbitMq server:
 
-#Example projects
+```$bash
+docker-machine create default --driver virtualbox
+eval "$(docker-machine env default)"
+vboxmanage controlvm default natpf1 "5672,tcp,127.0.0.1,5672,,5672"
+docker run -d -p 5672:5672 --hostname my-rabbit --name some-rabbit rabbitmq:3
+```
+
+
+
+Make sure the instance is running:
+```$bash
+docker ps
+CONTAINER ID        IMAGE               COMMAND                  CREATED             STATUS              PORTS                                                   NAMES
+4cb536661989        rabbitmq:3          "docker-entrypoint..."   X days ago          Up XX hours         4369/tcp, 5671/tcp, 25672/tcp, 0.0.0.0:5672->5672/tcp   some-rabbit 
+ ```
+
+# Example projects
 
 Basic Consumer
 ---
@@ -131,3 +158,6 @@ A very simple project using scalaz that:
 * Declares an exchange
 * Adds a binding to the exchange
 * Publishes a message with a `String` payload to the exchange/binding
+
+
+

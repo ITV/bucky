@@ -13,11 +13,11 @@ trait ChannelAmqpPurgeTest[F[_]] extends FunSuite with PublisherBaseTest[F] with
   implicit val eventuallyPatienceConfig = Eventually.PatienceConfig(5.seconds, 1.second)
 
   test(s"Can purge messages from a queue") {
-    val queueName = Any.randomQueue()
+    val queueName = Any.queue()
 
     withPublisher(queueName) { app =>
       logger.info(s"Publish message on $queueName")
-      verifySuccess(app.publisher(PublishCommand(app.exchangeName, app.routingKey, MessageProperties.persistentBasic, Any.randomPayload())))
+      verifySuccess(app.publisher(PublishCommand(app.exchangeName, app.routingKey, MessageProperties.persistentBasic, Any.payload())))
     }
     withPublisher(queueName, shouldDeclare = false) { app =>
       Eventually.eventually {

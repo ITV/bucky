@@ -1,10 +1,12 @@
 package com.itv.bucky
 
+import java.util.concurrent.ExecutorService
+
 import scalaz.concurrent.Task
 
 package object taskz {
 
-  implicit val taskMonadError = new MonadError[Task, Throwable] {
+  def taskMonadError(implicit pool: ExecutorService) = new MonadError[Task, Throwable] {
     override def raiseError[A](e: Throwable): Task[A] = Task.fail(e)
 
     override def handleError[A](fa: Task[A])(f: (Throwable) => Task[A]): Task[A] = fa.handleWith { case e => f(e) }

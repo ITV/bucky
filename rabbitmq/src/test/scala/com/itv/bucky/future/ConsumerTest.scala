@@ -1,9 +1,7 @@
-package com.itv.bucky
+package com.itv.bucky.future
 
-import com.itv.bucky.SameThreadExecutionContext.implicitly
-import com.itv.bucky.future.{FutureAmqpClient, FutureIdAmqpClient}
+import com.itv.bucky._
 import com.itv.bucky.lifecycle._
-import com.itv.bucky.future._
 import com.itv.lifecycle.{Lifecycle, NoOpLifecycle}
 import com.rabbitmq.client.impl.AMQImpl.Basic
 import org.scalatest.FunSuite
@@ -12,6 +10,7 @@ import org.scalatest.Matchers._
 import scala.concurrent.Future
 
 class ConsumerTest extends FunSuite {
+  import FutureExt._
 
   test("Runs callback with delivered messages with Id") {
     val channel = new StubChannel()

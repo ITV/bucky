@@ -4,9 +4,9 @@ import java.util.Date
 
 import com.itv.bucky._
 import com.itv.bucky.decl._
-import com.itv.bucky.taskz._
 import com.itv.bucky.PublishCommandBuilder._
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
+import com.itv.bucky.taskz.TaskAmqpClient
 import com.typesafe.config.ConfigFactory
 
 /*

@@ -1,11 +1,10 @@
-package com.itv.bucky
+package com.itv.bucky.future
 
-import com.itv.bucky.SameThreadExecutionContext.implicitly
 import com.itv.bucky.UnmarshalResult.Success
 import com.itv.bucky.Unmarshaller._
+import com.itv.bucky._
 import com.itv.bucky.decl._
 import com.itv.bucky.lifecycle._
-import com.itv.bucky.future._
 import com.itv.bucky.pattern.requeue._
 import com.itv.lifecycle.Lifecycle
 import com.typesafe.scalalogging.StrictLogging
@@ -20,7 +19,7 @@ import scala.concurrent.duration._
 import scala.util.Random
 
 class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogging {
-
+  import FutureExt._
   import IntegrationUtils._
   import TestLifecycle._
 

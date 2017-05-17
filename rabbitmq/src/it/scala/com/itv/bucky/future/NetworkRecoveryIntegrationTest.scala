@@ -1,25 +1,24 @@
-package com.itv.bucky
+package com.itv.bucky.future
 
 import com.itv.bucky.PublishCommandBuilder._
-import com.itv.bucky.SameThreadExecutionContext.implicitly
 import com.itv.bucky.decl.Queue
+import com.itv.bucky.lifecycle._
+import com.itv.bucky.{AmqpClient, ExchangeName, HostPort, Payload, PayloadMarshaller, Port, Proxy, ProxyLifecycle, Publisher, QueueName, RoutingKey, StubConsumeHandler, UnmarshalResult, Unmarshaller}
 import com.itv.lifecycle.Lifecycle
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.Eventually.eventually
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 
+import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.Random
-import com.itv.bucky.lifecycle._
-import com.itv.bucky.future._
-
-import scala.concurrent.Future
 
 
 class NetworkRecoveryIntegrationTest extends FunSuite with ScalaFutures {
 
-  import com.itv.bucky.BuckyUtils._
+  import FutureExt._
+
 
   def testLifecycle: Lifecycle[(Proxy, StubConsumeHandler[Future, Unit], StubConsumeHandler[Future, Unit], Publisher[Future, Unit], Publisher[Future, Unit])] = {
     val queueA = QueueName("proxy" + Random.nextInt())

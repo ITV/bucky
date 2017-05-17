@@ -82,7 +82,7 @@ class NetworkRecoveryIntegrationTest extends FunSuite with ScalaFutures with Str
 
 
   def withProxyConfigured(f: (Proxy, StubConsumeHandler[Task, Unit], StubConsumeHandler[Task, Unit], Publisher[Task, Unit], Publisher[Task, Unit]) => Unit) = {
-    implicit val pool: ExecutorService = Strategy.DefaultExecutorService
+    import TaskExt._
 
     val freePort = Port.randomPort()
     val amqpClientConfig = IntegrationUtils.config

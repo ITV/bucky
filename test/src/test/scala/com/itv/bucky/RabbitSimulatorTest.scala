@@ -6,14 +6,32 @@ import com.itv.bucky.decl._
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.ScalaFutures
-import SameThreadExecutionContext.implicitly
 import com.itv.bucky.Monad._
 
+import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.concurrent.duration._
 
 class RabbitSimulatorTest extends FunSuite with ScalaFutures {
 
   import RabbitSimulator._
+
+  implicit val executionContextExecutor = new ExecutionContextExecutor {
+    override def execute(runnable: Runnable): Unit = runnable.run()
+
+    override def reportFailure(cause: Throwable): Unit = throw cause
+
+  }
+  implicit val futureMonad = new MonadError[Future, Throwable] {
+    override def apply[A](a: => A): Future[A] = Future(a)
+
+    override def map[A, B](m: Future[A])(f: (A) => B): Future[B] = m.map(f)
+
+    override def flatMap[A, B](m: Future[A])(f: (A) => Future[B]): Future[B] = m.flatMap(f)
+
+    override def raiseError[A](e: Throwable): Future[A] = Future.failed(e)
+
+    override def handleError[A](fa: Future[A])(f: (Throwable) => Future[A]): Future[A] = fa.recoverWith { case t: Throwable => f(t) }
+  }
 
   test("Can publish and consume via simulator") {
     val rabbit = new RabbitSimulator[Id]()
@@ -201,5 +219,6 @@ class RabbitSimulatorTest extends FunSuite with ScalaFutures {
     cMessages should have size 1
     cMessages.head.body.unmarshal[String] shouldBe "c to c".unmarshalSuccess
   }
+
 
 }

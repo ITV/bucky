@@ -3,8 +3,7 @@ package com.itv.bucky.example.requeue
 import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
 import com.itv.bucky.decl._
 import com.itv.bucky._
-import com.itv.bucky.lifecycle._
-import com.itv.bucky.future._
+import com.itv.bucky.lifecycle.{AmqpClientLifecycle, DeclarationLifecycle}
 import com.itv.bucky.pattern.requeue._
 import com.itv.lifecycle.Lifecycle
 import com.typesafe.config.ConfigFactory
@@ -18,8 +17,11 @@ import scala.concurrent.duration._
 object RequeueConsumer extends App with StrictLogging {
 
   object Declarations {
-    val queue = Queue(QueueName("requeue.string"))
-    val all = List(queue) ++ basicRequeueDeclarations(queue.name)
+    val queue = Queue(QueueName(s"requeue_string-1"))
+    val all = basicRequeueDeclarations(queue.name, retryAfter = 1.second) collect {
+      case ex: Exchange => ex.autoDelete.expires(1.minute)
+      case q: Queue => q.autoDelete.expires(1.minute)
+    }
   }
 
   val config = ConfigFactory.load("bucky")

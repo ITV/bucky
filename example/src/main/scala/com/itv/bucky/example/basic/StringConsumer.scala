@@ -1,13 +1,11 @@
 package com.itv.bucky.example.basic
 
-import com.itv.bucky.AmqpClient
-import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
-import com.itv.bucky.lifecycle._
 import com.itv.lifecycle.Lifecycle
 import com.typesafe.scalalogging.StrictLogging
 import com.itv.bucky._
-import com.itv.bucky.future._
 import com.itv.bucky.decl._
+import com.itv.bucky.lifecycle.{AmqpClientLifecycle, DeclarationLifecycle}
+import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
 import com.typesafe.config.ConfigFactory
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -46,7 +44,7 @@ object StringConsumer extends App with StrictLogging {
     for {
       amqpClient <- AmqpClientLifecycle(amqpClientConfig)
       _ <- DeclarationLifecycle(Declarations.all, amqpClient)
-      _ <- amqpClient.consumer(Declarations.queue.name, AmqpClient.handlerOf(stringToLogHandler, StringPayloadUnmarshaller))
+      _ <- amqpClient.consumer(Declarations.queue.name, AmqpClient.handlerOf(stringToLogHandler, StringPayloadUnmarshaller)(amqpClient.effectMonad))
     }
       yield ()
 

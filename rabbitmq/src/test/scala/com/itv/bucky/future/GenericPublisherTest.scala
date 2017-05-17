@@ -1,15 +1,15 @@
-package com.itv.bucky
+package com.itv.bucky.future
 
+import com.itv.bucky._
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.ScalaFutures
-import com.itv.bucky.future._
 
 import scala.concurrent.Future
 
 class GenericPublisherTest extends FunSuite with ScalaFutures {
 
-  import com.itv.bucky.SameThreadExecutionContext.implicitly
+  import FutureExt._
 
   test("Publishing only returns success once publication is acknowledged") {
     val client = createClient()

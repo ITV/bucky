@@ -1,7 +1,8 @@
-package com.itv.bucky
+package com.itv.bucky.future
 
 import java.util.Date
 
+import com.itv.bucky._
 import com.rabbitmq.client.{MessageProperties => RMessageProperties}
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._

@@ -1,14 +1,11 @@
-package com.itv.bucky
+package com.itv.bucky.future
 
-import com.itv.bucky.IntegrationUtils.defaultDeclaration
-import com.itv.bucky.SameThreadExecutionContext.implicitly
+import com.itv.bucky._
 import com.itv.bucky.decl.DeclarationExecutor
-import com.itv.bucky.future._
 import com.itv.lifecycle.Lifecycle
 import com.typesafe.scalalogging.StrictLogging
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
-
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
 
 import scala.concurrent.duration._
@@ -16,9 +13,9 @@ import scala.concurrent.duration._
 class PublisherIntegrationTest extends FunSuite with ScalaFutures with StrictLogging {
   implicit val consumerPatienceConfig: Eventually.PatienceConfig = Eventually.PatienceConfig(timeout = 90.seconds)
 
-  import BuckyUtils._
-
+  import FutureExt._
   import TestLifecycle._
+  import IntegrationUtils._
 
   test("Can publish messages to a (pre-existing) queue") {
     val testQueueName = "bucky-publisher-test"
@@ -34,7 +31,6 @@ class PublisherIntegrationTest extends FunSuite with ScalaFutures with StrictLog
   }
 
   test("Can publish messages to a (pre-existing) queue with Id") {
-    import SameThreadExecutionContext.implicitly
     val testQueueName = "bucky-publisher-test-2"
     val routingKey = RoutingKey(testQueueName)
     val exchange = ExchangeName("")

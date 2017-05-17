@@ -30,13 +30,15 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures with StrictLoggi
 
   val requeuePolicy = RequeuePolicy(3, 1.second)
 
+  import TaskExt._
+
   test(s"Should retain any custom headers when republishing") {
     val handler = new StubRequeueHandler[Task, Delivery]()
     withPublisherAndConsumer(requeueStrategy = RawRequeue(handler, requeuePolicy)) { app =>
       handler.nextResponse = Task.now(Requeue)
       val properties = MessageProperties.persistentTextPlain.withHeader("foo" -> "bar")
 
-      app.publish(Any.randomPayload(), properties).unsafePerformSyncAttempt shouldBe published
+      app.publish(Any.payload(), properties).unsafePerformSyncAttempt shouldBe published
 
       eventually {
         val headersOfReceived = handler.receivedMessages.map(d => HeaderExt("foo", d.properties))

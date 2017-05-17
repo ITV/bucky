@@ -1,10 +1,11 @@
-package com.itv.bucky
+package com.itv.bucky.future
 
 import java.io.IOException
 import java.util.concurrent.TimeoutException
 
-import com.itv.lifecycle.{Lifecycle, NoOpLifecycle}
 import com.itv.bucky.lifecycle._
+import com.itv.bucky.{Any, StubChannel}
+import com.itv.lifecycle.{Lifecycle, NoOpLifecycle}
 import com.rabbitmq.client._
 import com.rabbitmq.client.impl.AMQImpl
 import org.scalatest.FunSuite
@@ -12,12 +13,10 @@ import org.scalatest.Matchers._
 import org.scalatest.concurrent.ScalaFutures
 
 import scala.concurrent.duration._
-import SameThreadExecutionContext.implicitly
-import com.itv.bucky.future.{FutureAmqpClient, FutureIdAmqpClient}
 
 class PublisherTest extends FunSuite with ScalaFutures {
 
-  import BuckyUtils._
+  import FutureExt._
 
   test("Publishing only returns success once publication is acknowledged with Id") {
     val channel = new StubChannel()
@@ -28,7 +27,7 @@ class PublisherTest extends FunSuite with ScalaFutures {
     channel.transmittedCommands should have size 1
     channel.transmittedCommands.last shouldBe an[AMQP.Confirm.Select]
 
-    val result = publish(anyPublishCommand())
+    val result = publish(Any.publishCommand())
 
     channel.transmittedCommands should have size 2
     channel.transmittedCommands.last shouldBe an[AMQP.Basic.Publish]
@@ -50,7 +49,7 @@ class PublisherTest extends FunSuite with ScalaFutures {
       channel.transmittedCommands should have size 1
       channel.transmittedCommands.last shouldBe an[AMQP.Confirm.Select]
 
-      val result = publish(anyPublishCommand())
+      val result = publish(Any.publishCommand())
 
       channel.transmittedCommands should have size 2
       channel.transmittedCommands.last shouldBe an[AMQP.Basic.Publish]
@@ -70,7 +69,7 @@ class PublisherTest extends FunSuite with ScalaFutures {
 
     Lifecycle.using(client.publisher(timeout = Duration.Inf)) { publish =>
 
-      val result = publish(anyPublishCommand())
+      val result = publish(Any.publishCommand())
 
       result should not be 'completed
 
@@ -87,9 +86,9 @@ class PublisherTest extends FunSuite with ScalaFutures {
 
     Lifecycle.using(client.publisher(timeout = Duration.Inf)) { publish =>
 
-      val pub1 = publish(anyPublishCommand())
-      val pub2 = publish(anyPublishCommand())
-      val pub3 = publish(anyPublishCommand())
+      val pub1 = publish(Any.publishCommand())
+      val pub2 = publish(Any.publishCommand())
+      val pub3 = publish(Any.publishCommand())
 
       pub1 should not be 'completed
       pub2 should not be 'completed
@@ -115,9 +114,9 @@ class PublisherTest extends FunSuite with ScalaFutures {
 
     Lifecycle.using(client.publisher(timeout = Duration.Inf)) { publish =>
 
-      val pub1 = publish(anyPublishCommand())
-      val pub2 = publish(anyPublishCommand())
-      val pub3 = publish(anyPublishCommand())
+      val pub1 = publish(Any.publishCommand())
+      val pub2 = publish(Any.publishCommand())
+      val pub3 = publish(Any.publishCommand())
 
       pub1 should not be 'completed
       pub2 should not be 'completed
@@ -151,7 +150,7 @@ class PublisherTest extends FunSuite with ScalaFutures {
       channel.transmittedCommands should have size 1
       channel.transmittedCommands.last shouldBe an[AMQP.Confirm.Select]
 
-      val result = publish(anyPublishCommand()).failed
+      val result = publish(Any.publishCommand()).failed
 
       whenReady(result) { exception =>
         exception.getMessage shouldBe expectedMsg
@@ -165,7 +164,7 @@ class PublisherTest extends FunSuite with ScalaFutures {
 
     Lifecycle.using(client.publisher(timeout = 10.millis)) { publish =>
 
-      val result = publish(anyPublishCommand())
+      val result = publish(Any.publishCommand())
 
       result.asTry.futureValue.failed.get shouldBe a[TimeoutException]
     }
