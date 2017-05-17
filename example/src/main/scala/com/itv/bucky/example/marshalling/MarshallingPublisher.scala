@@ -1,12 +1,11 @@
 package com.itv.bucky.example.marshalling
 
 import com.itv.bucky.PublishCommandBuilder.publishCommandBuilder
-import com.itv.bucky.lifecycle._
 import com.itv.lifecycle.Lifecycle
 import com.itv.bucky._
 import com.itv.bucky.decl._
-import com.itv.bucky.future._
 import com.itv.bucky.example.marshalling.Shared.Person
+import com.itv.bucky.lifecycle.{AmqpClientLifecycle, DeclarationLifecycle}
 import com.typesafe.config.ConfigFactory
 
 import scala.concurrent.ExecutionContext.Implicits.global

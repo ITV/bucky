@@ -1,6 +1,6 @@
 package com.itv.bucky
 
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
+import scala.concurrent.{ExecutionContext, Future}
 
 
 package object future {

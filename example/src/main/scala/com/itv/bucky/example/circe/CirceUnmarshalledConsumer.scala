@@ -5,8 +5,8 @@ import com.itv.lifecycle.Lifecycle
 import com.typesafe.scalalogging.StrictLogging
 import com.itv.bucky._
 import com.itv.bucky.decl._
-import com.itv.bucky.lifecycle._
 import com.itv.bucky.example.circe.Shared.Person
+import com.itv.bucky.lifecycle.{AmqpClientLifecycle, DeclarationLifecycle}
 import com.typesafe.config.ConfigFactory
 
 import scala.concurrent.ExecutionContext.Implicits.global
