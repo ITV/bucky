@@ -30,6 +30,10 @@ You require to install to run on Mac OS:
  - docker-machine
  - virtualbox
  
+ Look at [Mac official documentation](https://docs.docker.com/docker-for-mac/install/) or use **brew** to install it.
+ 
+ 
+ 
 You need to create the RabbitMq server:
 
 ```$bash
