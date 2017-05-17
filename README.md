@@ -24,6 +24,29 @@ libraryDependencies ++= Seq(
 ```
 
 
+#Run integration test
+You require to install to run on Mac OS:
+ - docker
+ - docker-machine
+ - virtualbox
+ 
+You need to create the RabbitMq server:
+
+```$bash
+docker-machine create default --driver virtualbox
+eval "$(docker-machine env default)"
+vboxmanage controlvm default natpf1 "5672,tcp,127.0.0.1,5672,,5672"
+docker run -d -p 5672:5672 --hostname my-rabbit --name some-rabbit rabbitmq:3
+```
+
+
+
+Make sure the instance is running:
+```$bash
+docker ps
+CONTAINER ID        IMAGE               COMMAND                  CREATED             STATUS              PORTS                                                   NAMES
+4cb536661989        rabbitmq:3          "docker-entrypoint..."   X days ago          Up XX hours         4369/tcp, 5671/tcp, 25672/tcp, 0.0.0.0:5672->5672/tcp   some-rabbit 
+ ```
 
 #Example projects
 
@@ -131,3 +154,6 @@ A very simple project using scalaz that:
 * Declares an exchange
 * Adds a binding to the exchange
 * Publishes a message with a `String` payload to the exchange/binding
+
+
+
