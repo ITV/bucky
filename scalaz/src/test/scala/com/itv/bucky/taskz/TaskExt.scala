@@ -1,20 +1,23 @@
 package com.itv.bucky.taskz
-
-import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicReference
 
 import com.itv.bucky.AtomicRef.Ref
 import com.itv.bucky.{PublishCommand, Publisher, StubChannel}
 
+import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration.{FiniteDuration, _}
 import scalaz.\/
 import scalaz.concurrent.Task
 
 object TaskExt {
 
-  implicit val executionService = Executors.newSingleThreadExecutor()
+  implicit val executorService = ExecutionContextExecutorServiceBridge(new ExecutionContextExecutor {
+    override def execute(runnable: Runnable): Unit = runnable.run()
 
-  implicit val taskMonad = taskMonadError(executionService)
+    override def reportFailure(cause: Throwable): Unit = throw cause
+  })
+
+  implicit val taskMonad = taskMonadError(executorService)
 
   type TaskResult = \/[Throwable, Unit]
 
@@ -64,3 +67,5 @@ object TaskExt {
   }
 
 }
+
+
