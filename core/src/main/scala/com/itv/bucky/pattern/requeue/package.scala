@@ -60,7 +60,7 @@ package object requeue {
                                      onFailure: RequeueConsumeAction = Requeue,
                                      unmarshalFailureAction: RequeueConsumeAction = DeadLetter,
                                      prefetchCount: Int = 0): B[C] = {
-      val deserializeHandler = new DeliveryUnmarshalHandler[F, T, RequeueConsumeAction](unmarshaller)(handler, unmarshalFailureAction)(amqpClient.F)
+      val deserializeHandler = new DeliveryUnmarshalHandler[F, T, RequeueConsumeAction](unmarshaller)(handler, unmarshalFailureAction)(amqpClient.effectMonad)
       requeueOf(queueName, deserializeHandler, requeuePolicy, prefetchCount = prefetchCount)
     }
 
@@ -71,8 +71,8 @@ package object requeue {
                   onFailure: RequeueConsumeAction = Requeue,
                   prefetchCount: Int = 0): B[C] = {
       val requeueExchange = ExchangeName(s"${queueName.value}.requeue")
-      amqpClient.B.flatMap(amqpClient.publisher()) {requeuePublish =>
-        amqpClient.consumer(queueName, RequeueTransformer(requeuePublish, requeueExchange, requeuePolicy, onFailure)(handler)(amqpClient.F), prefetchCount = prefetchCount)
+      amqpClient.monad.flatMap(amqpClient.publisher()) { requeuePublish =>
+        amqpClient.consumer(queueName, RequeueTransformer(requeuePublish, requeueExchange, requeuePolicy, onFailure)(handler)(amqpClient.effectMonad), prefetchCount = prefetchCount)
       }
     }
 

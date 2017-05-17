@@ -11,7 +11,7 @@ import scala.util.Try
 case class FutureIdAmqpClient(channel: Id[RabbitChannel])(implicit executionContext: ExecutionContext)
   extends FutureAmqpClient[Id](channel)(executionContext) {
 
-  override implicit def B: Monad[Id] = Monad.idMonad
+  override implicit def monad: Monad[Id] = Monad.idMonad
 
   override def performOps(thunk: (AmqpOps) => Try[Unit]): Try[Unit] = thunk(ChannelAmqpOps(channel))
 

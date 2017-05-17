@@ -10,7 +10,7 @@ import scala.util.Try
 
 class LifecycleRawAmqpClient(channelFactory: Lifecycle[RabbitChannel])(implicit executionContext: ExecutionContext) extends FutureAmqpClient[Lifecycle](channelFactory) {
 
-  override implicit def B: Monad[Lifecycle] = lifecycleMonad
+  override implicit def monad: Monad[Lifecycle] = lifecycleMonad
 
   override def performOps(thunk: (AmqpOps) => Try[Unit]): Try[Unit] = Lifecycle.using(channelFactory)(channel => thunk(ChannelAmqpOps(channel)))
 

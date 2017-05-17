@@ -17,11 +17,11 @@ trait BaseAmqpClient {
 
 trait AmqpClient[B[_], F[_], E, C] extends BaseAmqpClient {
 
-  implicit def B: Monad[B]
-  implicit def F: MonadError[F, E]
+  implicit def monad: Monad[B]
+  implicit def effectMonad: MonadError[F, E]
 
   def publisherOf[T](builder: PublishCommandBuilder[T], timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): B[Publisher[F, T]] =
-    B.map(publisher(timeout))(p => AmqpClient.publisherOf(builder)(p)(F))
+    monad.map(publisher(timeout))(p => AmqpClient.publisherOf(builder)(p)(effectMonad))
 
   def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): B[Publisher[F, PublishCommand]]
 
@@ -40,8 +40,8 @@ trait AmqpOps {
 object AmqpClient extends StrictLogging {
 
   def publisherOf[F[_], T](commandBuilder: PublishCommandBuilder[T])(publisher: Publisher[F, PublishCommand])
-                    (implicit M: Monad[F]): Publisher[F, T] = (message: T) =>
-       M.flatMap(M.apply {
+                    (implicit F: Monad[F]): Publisher[F, T] = (message: T) =>
+       F.flatMap(F.apply {
         commandBuilder.toPublishCommand(message)
       }){ publisher }
 

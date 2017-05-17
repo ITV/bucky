@@ -19,9 +19,9 @@ case class TaskAmqpClient(channel: Id[RabbitChannel])(implicit pool: ExecutorSer
   with StrictLogging {
   type Register = (\/[Throwable, Unit]) => Unit
 
-  override implicit def B: Monad[Id] = idMonad
+  override implicit def monad: Monad[Id] = idMonad
 
-  override implicit def F: MonadError[Task, Throwable] = taskMonadError(pool)
+  override implicit def effectMonad: MonadError[Task, Throwable] = taskMonadError(pool)
 
   override def publisher(timeout: Duration): Id[Publisher[Task, PublishCommand]] = {
     logger.info(s"Creating publisher")

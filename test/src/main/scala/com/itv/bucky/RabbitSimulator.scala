@@ -30,13 +30,13 @@ case object IdentityBindings extends Bindings {
   *
   * @param bindings A mapping from routing key to queue name, defaults to identity.
   */
-class RabbitSimulator[M[_]](bindings: Bindings = IdentityBindings)(implicit M: Monad[M],
+class RabbitSimulator[B[_]](bindings: Bindings = IdentityBindings)(implicit M: Monad[B],
                                                                     X: MonadError[Future, Throwable],
-                                                                   executionContext: ExecutionContext) extends AmqpClient[M, Future, Throwable, Unit] with StrictLogging {
+                                                                   executionContext: ExecutionContext) extends AmqpClient[B, Future, Throwable, Unit] with StrictLogging {
 
-  override implicit def B: Monad[M] = M
+  override implicit def monad: Monad[B] = M
 
-  override implicit def F: MonadError[Future, Throwable] = X
+  override implicit def effectMonad: MonadError[Future, Throwable] = X
 
   case class Publication(queueName: QueueName, message: Payload, consumeActionValue: Future[ConsumeAction])
 
@@ -47,7 +47,7 @@ class RabbitSimulator[M[_]](bindings: Bindings = IdentityBindings)(implicit M: M
   private val deliveryTag = new AtomicLong()
 
 
-  def consumer(queueName: QueueName, handler: Handler[Future, Delivery], exceptionalAction: ConsumeAction = DeadLetter, prefetchCount: Int = 0): M[Unit] = B.apply {
+  def consumer(queueName: QueueName, handler: Handler[Future, Delivery], exceptionalAction: ConsumeAction = DeadLetter, prefetchCount: Int = 0): B[Unit] = monad.apply {
     val monitorHandler: Handler[Future, Delivery] = delivery => {
       val key = UUID.randomUUID()
       val consumeActionValue = handler(delivery)
@@ -63,8 +63,8 @@ class RabbitSimulator[M[_]](bindings: Bindings = IdentityBindings)(implicit M: M
     consumers += (queueName -> handlers)
   }
 
-  def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): M[Publisher[Future, PublishCommand]] =
-    B.apply {
+  def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): B[Publisher[Future, PublishCommand]] =
+    monad.apply {
       (command: PublishCommand) => {
         publish(command).map(_ => ())
       }

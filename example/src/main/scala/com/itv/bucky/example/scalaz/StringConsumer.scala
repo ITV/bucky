@@ -40,7 +40,7 @@ object StringConsumer extends App with StrictLogging {
     */
   val consumerProcess = ProcessAmqpClient.fromConfig(amqpClientConfig) { amqpClient =>
     DeclarationExecutor(Declarations.all, amqpClient)
-    amqpClient.consumer(Declarations.queue.name, AmqpClient.handlerOf(stringToLogHandler, StringPayloadUnmarshaller)(amqpClient.F))
+    amqpClient.consumer(Declarations.queue.name, AmqpClient.handlerOf(stringToLogHandler, StringPayloadUnmarshaller)(amqpClient.effectMonad))
   }
 
   consumerProcess.run.unsafePerformSync

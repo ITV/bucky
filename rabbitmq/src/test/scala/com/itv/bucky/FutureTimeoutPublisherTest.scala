@@ -42,7 +42,7 @@ class FutureTimeoutPublisherTest extends FunSuite with ScalaFutures with StrictL
     publisher(command2).asTry.futureValue shouldBe expectedOutcome2
   }
 
-  test("Returns timeout of delegate publisher if result occurs after timeout") {
+  test(s"Returns timeout of delegate publisher if result occurs after timeout") {
     Lifecycle.using(ExecutorLifecycles.singleThreadScheduledExecutor) { scheduledExecutor =>
       val delegate: Publisher[Future, PublishCommand] = { _ => Promise[Nothing]().future }
 
@@ -52,7 +52,7 @@ class FutureTimeoutPublisherTest extends FunSuite with ScalaFutures with StrictL
 
       future.value shouldBe None
 
-      val result = Await.result(future, 500.millis)
+      val result = Await.result(future, 2.second)
       result shouldBe 'failure
       result.failed.get shouldBe a[TimeoutException]
       result.failed.get.getMessage should include("Timed out").and(include("250 millis"))
