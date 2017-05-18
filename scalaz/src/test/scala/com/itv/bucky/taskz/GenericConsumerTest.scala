@@ -93,7 +93,9 @@ class GenericConsumerTest extends FunSuite with StrictLogging {
       channel.deliver(new Basic.Deliver(channel.consumers.head.getConsumerTag, 1L, false, "exchange", "routingKey"), msg)
 
       eventually {
-        channel.transmittedCommands.last shouldBe a[Basic.Nack]
+        withClue("transmittedCommands are " + channel.transmittedCommands) {
+          channel.transmittedCommands.last shouldBe a[Basic.Nack]
+        }
         handler.receivedMessages should have size 0
       }
     }
