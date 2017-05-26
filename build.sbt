@@ -259,8 +259,7 @@ lazy val scalaz = project
   .settings(Defaults.itSettings)
   .settings(
     internalDependencyClasspath in IntegrationTest += Attributed.blank((classDirectory in Test).value),
-    parallelExecution in IntegrationTest := false,
-    parallelExecution in Test := false
+    parallelExecution in IntegrationTest := false
   )
   .settings(
     libraryDependencies ++= Seq(
