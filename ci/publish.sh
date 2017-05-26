@@ -11,4 +11,4 @@ echo "version = $version"
 
 sbt_cmd="sbt ++$TRAVIS_SCALA_VERSION"
 
-eval "$sbt_cmd clean compile test"
+eval "$sbt_cmd clean compile test it:test"
