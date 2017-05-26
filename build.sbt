@@ -14,12 +14,6 @@ val mockitoVersion = "1.9.0"
 val argonautVersion = "6.2-RC2"
 val circeVersion = "0.7.0"
 
-// For Travis CI - see http://www.cakesolutions.net/teamblogs/publishing-artefacts-to-oss-sonatype-nexus-using-sbt-and-travis-ci
-credentials ++= (for {
-  username <- Option(System.getenv().get("SONATYPE_USER"))
-  password <- Option(System.getenv().get("SONATYPE_PASS"))
-} yield Credentials("Sonatype Nexus Repository Manager", "oss.sonatype.org", username, password)).toSeq
-
 releaseProcess := Seq[ReleaseStep](
   checkSnapshotDependencies,
   inquireVersions,
@@ -58,6 +52,10 @@ lazy val kernelSettings = Seq(
     else
       Some("releases" at nexus + "service/local/staging/deploy/maven2")
   },
+  credentials ++= (for {
+    username <- Option(System.getenv().get("SONATYPE_USER"))
+    password <- Option(System.getenv().get("SONATYPE_PASS"))
+  } yield Credentials("Sonatype Nexus Repository Manager", "oss.sonatype.org", username, password)).toSeq,
   pomExtra := (
     <url>https://github.com/ITV/bucky</url>
       <licenses>
