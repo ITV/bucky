@@ -14,6 +14,12 @@ val mockitoVersion = "1.9.0"
 val argonautVersion = "6.2-RC2"
 val circeVersion = "0.7.0"
 
+// For Travis CI - see http://www.cakesolutions.net/teamblogs/publishing-artefacts-to-oss-sonatype-nexus-using-sbt-and-travis-ci
+credentials ++= (for {
+  username <- Option(System.getenv().get("SONATYPE_USER"))
+  password <- Option(System.getenv().get("SONATYPE_PASS"))
+} yield Credentials("Sonatype Nexus Repository Manager", "oss.sonatype.org", username, password)).toSeq
+
 releaseProcess := Seq[ReleaseStep](
   checkSnapshotDependencies,
   inquireVersions,
@@ -22,10 +28,8 @@ releaseProcess := Seq[ReleaseStep](
   setReleaseVersion,
   commitReleaseVersion,
   tagRelease,
-  ReleaseStep(action = Command.process("publishSigned", _), enableCrossBuild = true),
   setNextVersion,
   commitNextVersion,
-  ReleaseStep(action = Command.process("sonatypeReleaseAll", _), enableCrossBuild = true),
   pushChanges
 )
 
