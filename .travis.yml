@@ -3,5 +3,8 @@ scala:
 - 2.12.1
 jdk:
 - oraclejdk8
+sudo: required
+services:
+  - rabbitmq
 script:
   - ci/publish.sh
