@@ -1,4 +1,6 @@
 [![Build Status](https://travis-ci.org/ITV/bucky.svg?branch=master)](https://travis-ci.org/ITV/bucky)
+[![Join the chat at https://gitter.im/itv-bucky/Lobby](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/itv-bucky/Lobby)
+
 
 # Bucky
 
