@@ -41,6 +41,12 @@ pgpSigningKey := Some(-5373332187933973712L)
 
 pgpPassphrase := Option(System.getenv("GPG_KEY_PASSPHRASE")).map(_.toArray)
 
+lazy val noPublishSettings = Seq(
+  publish := (),
+  publishLocal := (),
+  publishArtifact := false
+)
+
 lazy val kernelSettings = Seq(
   organization := "com.itv",
   scalaVersion := "2.12.1",
@@ -280,4 +286,4 @@ lazy val readme = scalatex.ScalatexReadme(
     wd = file(""),
     url = "https://github.com/ITV/bucky/tree/master",
     source = "readme"
-  )
+  ).settings(noPublishSettings)
