@@ -1,6 +1,7 @@
 import sbt.Attributed
 import sbt.Keys.{publishArtifact, _}
 import ReleaseTransformations._
+import com.typesafe.sbt.pgp.PgpKeys.publishSigned
 
 name := "bucky"
 
@@ -281,6 +282,5 @@ lazy val readme = scalatex.ScalatexReadme(
     url = "https://github.com/ITV/bucky/tree/master",
     source = "readme"
   ).settings(
-    publishArtifact := false,
-    publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
+    publishSigned := ()
   )
