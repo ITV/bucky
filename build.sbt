@@ -44,7 +44,8 @@ pgpPassphrase := Option(System.getenv("GPG_KEY_PASSPHRASE")).map(_.toArray)
 lazy val noPublishSettings = Seq(
   publish := (),
   publishLocal := (),
-  publishArtifact := false
+  publishArtifact := false,
+  publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
 )
 
 lazy val kernelSettings = Seq(
