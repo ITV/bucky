@@ -1,0 +1,16 @@
+@import Main._
+
+@p
+  Bucky is a library which helps Scala programs interact with @lnk("AMQP", "https://www.amqp.org/about/what") message brokers such as @lnk("RabbitMQ", "https://www.rabbitmq.com/").
+
+@p
+  It gives an idiomatic Scala interface for:
+@ul
+  @li
+    Publishing to exchanges
+  @li
+    Consuming from queues
+  @li
+    Declaring resources
+  @li
+    Patterns combining all of the above
