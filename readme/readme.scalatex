@@ -1,9 +1,0 @@
-@import Main._
-
-@sect{Bucky}
-
-  @scalatex.intro()
-
-  @scalatex.gettingstarted()
-
-@scalatex.resourcemanagement()
