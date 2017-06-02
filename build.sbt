@@ -1,7 +1,7 @@
 import sbt.Attributed
 import sbt.Keys.{publishArtifact, _}
 import ReleaseTransformations._
-import com.typesafe.sbt.pgp.PgpKeys.publishSigned
+import com.typesafe.sbt.pgp.PgpKeys.{publishSigned, publishLocalSigned}
 
 name := "bucky"
 
@@ -282,5 +282,10 @@ lazy val readme = scalatex.ScalatexReadme(
     url = "https://github.com/ITV/bucky/tree/master",
     source = "readme"
   ).settings(
-    publishSigned := ()
+    publishArtifact in (Compile, packageDoc) := false,
+    publishSigned := (),
+    publishLocalSigned := (),
+    publish := (),
+    publishLocal := (),
+    publishArtifact := false
   )
