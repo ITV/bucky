@@ -1,6 +1,7 @@
 import sbt.Attributed
 import sbt.Keys.{publishArtifact, _}
 import ReleaseTransformations._
+import com.typesafe.sbt.pgp.PgpKeys.publishSigned
 
 name := "bucky"
 
@@ -274,3 +275,12 @@ lazy val scalaz = project
 lazy val root = (project in file("."))
   .aggregate(rabbitmq, scalaz, xml, circe, argonaut, example, test, core)
   .settings(publishArtifact := false)
+
+lazy val readme = scalatex.ScalatexReadme(
+    projectId = "readme",
+    wd = file(""),
+    url = "https://github.com/ITV/bucky/tree/master",
+    source = "readme"
+  ).settings(
+    publishSigned := ()
+  )
