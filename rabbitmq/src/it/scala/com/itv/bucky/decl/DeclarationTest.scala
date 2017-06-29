@@ -6,6 +6,7 @@ import com.itv.bucky._
 import com.itv.bucky.future.IntegrationUtils
 import com.itv.bucky.lifecycle._
 import com.itv.lifecycle.Lifecycle
+import com.typesafe.scalalogging.StrictLogging
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.Eventually.eventually
@@ -15,7 +16,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.Random
 
-class DeclarationTest extends FunSuite with ScalaFutures {
+class DeclarationTest extends FunSuite with ScalaFutures with StrictLogging {
   import com.itv.bucky.future.FutureExt._
 
   implicit val declarationPatienceConfig: Eventually.PatienceConfig =
@@ -102,6 +103,7 @@ class DeclarationTest extends FunSuite with ScalaFutures {
     val queueName = QueueName("bindingq" + Random.nextInt())
 
     Lifecycle.using(AmqpClientLifecycle(IntegrationUtils.config)) { amqpClient =>
+      logger.info(s"AMQP Client started using config: ${IntegrationUtils.config}")
       val declarations = List(Exchange(destinationExchangeName,
         isDurable = false,
         shouldAutoDelete = true,
@@ -130,25 +132,32 @@ class DeclarationTest extends FunSuite with ScalaFutures {
           exchangeBindingRoutingKey,
           Map.empty))
 
+      logger.info(s"Declarations set as follows: $declarations")
+
       amqpClient.performOps(Declaration.runAll(declarations)) shouldBe 'success
+
+      logger.info("Amqp run all declarations completed")
 
       val handler = new StubConsumeHandler[Future, Delivery]()
       val lifecycle =
         for {
           _ <- amqpClient.consumer(queueName, handler)
+          _ = logger.info(s"Consumer set up on $queueName")
           serializer = publishCommandBuilder(StringPayloadMarshaller) using exchangeBindingRoutingKey using sourceExchangeName
           publisher <- amqpClient.publisher().map(AmqpClient.publisherOf(serializer))
+          _ = logger.info(s"Publisher set up on $sourceExchangeName with $exchangeBindingRoutingKey")
         }
           yield publisher
 
       Lifecycle.using(lifecycle) { publisher =>
+        logger.info("lifecycle started")
         handler.receivedMessages.size shouldBe 0
         publisher("Hello")
+        logger.info("published hello message")
         eventually {
           handler.receivedMessages.size shouldBe 1
         }
       }
     }
   }
-
 }
