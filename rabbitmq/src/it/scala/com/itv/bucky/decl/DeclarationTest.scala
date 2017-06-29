@@ -95,7 +95,7 @@ class DeclarationTest extends FunSuite with ScalaFutures with StrictLogging {
     }
   }
 
-  test("Should be able to declare exchange and exchange bindings") {
+  ignore("Should be able to declare exchange and exchange bindings") {
     val destinationExchangeName = ExchangeName("bindingexdest-" + Random.nextInt())
     val sourceExchangeName = ExchangeName("bindingexsource-" + Random.nextInt())
     val exchangeBindingRoutingKey = RoutingKey("exbindingr" + Random.nextInt())

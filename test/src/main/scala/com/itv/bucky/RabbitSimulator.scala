@@ -6,7 +6,7 @@ import java.util.concurrent.atomic.AtomicLong
 
 import com.typesafe.scalalogging.StrictLogging
 import PayloadMarshaller.StringPayloadMarshaller
-import com.itv.bucky.decl.{Binding, Exchange, Queue}
+import com.itv.bucky.decl.{Binding, Exchange, ExchangeBinding, Queue}
 
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable.ListBuffer
@@ -114,7 +114,7 @@ class RabbitSimulator[B[_]](bindings: Bindings = IdentityBindings)(implicit M: M
 
       override def purgeQueue(name: QueueName): Try[Unit] = Try(())
 
-      override def bindExchange(binding: decl.ExchangeBinding): Try[Unit] = Try(())
+      override def bindExchange(binding: ExchangeBinding): Try[Unit] = Try(())
     }))
 
   override def estimatedMessageCount(queueName: QueueName): Try[Int] = {
