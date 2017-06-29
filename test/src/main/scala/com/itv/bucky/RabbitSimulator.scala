@@ -104,7 +104,7 @@ class RabbitSimulator[B[_]](bindings: Bindings = IdentityBindings)(implicit M: M
 
   override def performOps(thunk: (AmqpOps) => Try[Unit]): Try[Unit] =
     Try(thunk(new AmqpOps {
-      override def declareExchange(echange: Exchange): Try[Unit] = Try(())
+      override def declareExchange(exchange: Exchange): Try[Unit] = Try(())
 
       override def bindQueue(binding: Binding): Try[Unit] = Try {
         declarations += binding.exchangeName -> binding.routingKey -> binding.queueName
@@ -113,6 +113,8 @@ class RabbitSimulator[B[_]](bindings: Bindings = IdentityBindings)(implicit M: M
       override def declareQueue(queue: Queue): Try[Unit] = Try(())
 
       override def purgeQueue(name: QueueName): Try[Unit] = Try(())
+
+      override def bindExchange(binding: decl.ExchangeBinding): Try[Unit] = Try(())
     }))
 
   override def estimatedMessageCount(queueName: QueueName): Try[Int] = {

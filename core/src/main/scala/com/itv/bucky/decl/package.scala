@@ -85,6 +85,16 @@ package object decl {
     }
   }
 
+  case class ExchangeBinding(destinationExchangeName: ExchangeName,
+                             sourceExchangeName: ExchangeName,
+                             routingKey: RoutingKey,
+                             arguments: Map[String, AnyRef]) extends Declaration with StrictLogging {
+    override def run: (AmqpOps) => Try[Unit] = ops => {
+      logger.info(s"Declaring $this")
+      ops.bindExchange(this)
+    }
+  }
+
   case class Queue(name: QueueName,
                    isDurable: Boolean = true,
                    isExclusive: Boolean = false,

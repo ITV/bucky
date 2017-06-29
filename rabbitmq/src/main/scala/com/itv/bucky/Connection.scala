@@ -1,7 +1,7 @@
 package com.itv.bucky
 
 import com.itv.bucky.Monad.Id
-import com.itv.bucky.decl.{Binding, Exchange, Queue}
+import com.itv.bucky.decl.{Binding, Exchange, ExchangeBinding, Queue}
 import com.rabbitmq.client.{Channel => RabbitChannel, Connection => RabbitConnection, _}
 import com.typesafe.scalalogging.StrictLogging
 
@@ -94,6 +94,15 @@ case class ChannelAmqpOps(channel: RabbitChannel) extends AmqpOps {
       binding.exchangeName.value,
       binding.routingKey.value,
       binding.arguments.asJava)
+  }
+
+  override def bindExchange(binding: ExchangeBinding): Try[Unit] = Try {
+    channel.exchangeBind(
+      binding.destinationExchangeName.value,
+      binding.sourceExchangeName.value,
+      binding.routingKey.value,
+      binding.arguments.asJava
+    )
   }
 
   override def declareQueue(queue: Queue): Try[Unit] = Try {

@@ -31,8 +31,9 @@ trait AmqpClient[B[_], F[_], E, C] extends BaseAmqpClient {
 
 trait AmqpOps {
   def declareQueue(queue: Queue): Try[Unit]
-  def declareExchange(echange: Exchange): Try[Unit]
+  def declareExchange(exchange: Exchange): Try[Unit]
   def bindQueue(binding: Binding): Try[Unit]
+  def bindExchange(binding: ExchangeBinding): Try[Unit]
   def purgeQueue(name: QueueName): Try[Unit]
 }
 
