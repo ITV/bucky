@@ -9,6 +9,7 @@ import scala.concurrent.duration._
 import IntegrationUtils._
 import com.itv.bucky.UnmarshalResult.Success
 import com.itv.bucky._
+import org.scalactic.source.Position
 
 import scalaz.concurrent.Task
 import org.scalatest.Matchers._
@@ -19,7 +20,7 @@ import scalaz.\/-
 class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogging with Eventually {
   import TaskExt._
 
-  implicit val consumerPatienceConfig: Eventually.PatienceConfig = Eventually.PatienceConfig(timeout = 90.seconds)
+  val consumerPatienceConfig: PatienceConfig = PatienceConfig(timeout = 10.seconds, interval = 500.millis)
 
   case class Message(value: String)
 
@@ -40,7 +41,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogg
         handler.receivedMessages should have size 1
 
         handler.receivedMessages.head shouldBe Message(expectedMessage)
-      }
+      }(consumerPatienceConfig, Position.here)
     }
   }
 
@@ -81,7 +82,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogg
       eventually {
         handler.receivedMessages should have size 1
         handler.receivedMessages.head shouldBe expected
-      }
+      }(consumerPatienceConfig, Position.here)
     }
   }
 
@@ -95,10 +96,10 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogg
 
       eventually {
         handler.receivedMessages should have size 1
-      }
+      }(consumerPatienceConfig, Position.here)
       eventually {
         app.dlqHandler.get.receivedMessages should have size 1
-      }
+      }(consumerPatienceConfig, Position.here)
     }
   }
 
@@ -116,7 +117,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogg
         inside(handler.receivedMessages.head) {
           case Delivery(body, _, _, _) => Payload(body.value).unmarshal[String] shouldBe Success(expectedMessage)
         }
-      }
+      }(consumerPatienceConfig, Position.here)
     }
   }
 
@@ -136,7 +137,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogg
         inside(handler.receivedMessages.head) {
           case Delivery(body, _, _, properties) => properties.headers.get("hello").map(_.toString) shouldBe Some("world")
         }
-      }
+      }(consumerPatienceConfig, Position.here)
     }
   }
 }
