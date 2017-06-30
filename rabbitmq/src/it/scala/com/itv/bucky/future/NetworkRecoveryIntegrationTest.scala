@@ -54,7 +54,7 @@ class NetworkRecoveryIntegrationTest extends FunSuite with ScalaFutures {
       yield (proxy, handlerA, handlerB, publisherA, publisherB)
   }
 
-  implicit val eventuallyPatienceConfig = Eventually.PatienceConfig(5.seconds, 1.second)
+  implicit val eventuallyPatienceConfig = Eventually.PatienceConfig(15.seconds, 500.millis)
 
   test("can recover publishers and consumers from a network failure") {
     Lifecycle.using(testLifecycle) { case (proxy, handlerA, handlerB, publisherA, publisherB) =>
