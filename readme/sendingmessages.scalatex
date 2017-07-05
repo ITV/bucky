@@ -1,0 +1,118 @@
+@import Main._
+
+@sect{Sending messages}
+  @p
+    This section explains how your application can use Bucky to send messages to an AMQP broker for routing and delivery.
+
+  @p
+    Note: we usually refer to the act of sending a message as "publication" of a message. The component used to do this is referred to as a "publisher".
+
+  @p
+    Messages are published to an Exchange, and have an associated Routing Key. The broker dispatches copies of the message to queues. There are different types of exchange, each with distinct routing logic. The @lnk("RabbitMQ AMQP Concepts documentation", "https://www.rabbitmq.com/tutorials/amqp-concepts.html") is a great resource to study this in more detail.
+
+  @p
+    By convention we usually expect a publisher to declare the Exchange before a message is published. The publisher should @b{not} be responsible for declaring destination queues or exchange bindings, as coupling beween publishers and consumers should be kept to a minimum. 
+
+  @sect{Low level message publication}
+    @p
+      In these snippets we create an application that declares an Exchange, and publishes a message to it.
+
+    @hl.ref(
+      wd/'example/'src/'main/'scala/'com/'itv/'bucky/'example/'basic/"RawPublisher.scala",
+      start = "val brokerHostname",
+      end = "end snippet 1"
+    )
+
+    @p
+      First of all we create some config, and define the AMQP resources we'll be interacting with (an exchange and a routing key). Nothing of major note yet.
+
+    @hl.ref(
+      wd/'example/'src/'main/'scala/'com/'itv/'bucky/'example/'basic/"RawPublisher.scala",
+      start = "val publisherLifecycle: Lifecycle",
+      end = "end snippet 2"
+    )
+
+    @p
+      Now, this is more interesting. We define a @hl.scala{Lifecycle} that will produce a @hl.scala{Publisher[Future, PublishCommand]}. If you're not familiar with what the @hl.scala{Lifecycle} is doing, @lnk("read all about resource management here", "#Resourcemanagement")!
+    @p
+      The type @hl.scala{Publisher[Future, PublishCommand]} looks intimidating. But it's just saying that the type of message you can send with the publisher is @hl.scala{PublishCommand} (a type defined in Bucky, describing an arbitrary valid AMQP message), and that each publication will be performed inside the context of a @hl.scala{Future}.
+    
+    @hl.ref(
+      wd/'example/'src/'main/'scala/'com/'itv/'bucky/'example/'basic/"RawPublisher.scala",
+      start = "Lifecycle.using(publisherLifecycle)",
+      end = "end snippet 3"
+    )
+
+    @p
+      And this is the part of our application that actually creates an instance of the publisher and sends something.
+    @p
+      Notice there's a lot of boiler plate here, read on to see how this can be reduced
+  @sect{High level message publication}
+    @p
+      It's completely acceptable (and probably beneficial in some cases) to use the method described in @lnk("Low level message publication", "#Lowlevelmessagepublication") to send messages.
+    @p
+      But there is a bit of boilerplate we could eliminate, most notably:
+    @ul
+      @li
+        After we've defined our message, we have to convert it to a @hl.scala{Payload} to be sent over the wire
+      @li
+        We have to define the Exchange and Routing Key the message should have each time we publish. We could encode this into the type system
+    @sect{Payload Marshallers}
+      @p  
+        A @hl.scala{PayloadMarshaller[T]} is a function that transforms a type into a @hl.scala{Payload}:
+
+      @hl.ref(
+            wd/'example/'src/'main/'scala/'com/'itv/'bucky/'example/'marshalling/"Shared.scala",
+            start = "case class Person",
+            end = "end snippet 1"
+          )
+      @sect{Circe/Argonaut Payload Marshallers}
+        @p    
+          Bucky has helper libraries with definitions of @hl.scala{PayloadMarshaller[T]} for types with a @lnk("Circe", "https://github.com/circe/circe") @hl.scala{Encoder[T]} in scope:
+        @hl.ref(
+            wd/'example/'src/'main/'scala/'com/'itv/'bucky/'example/'circe/"Shared.scala",
+            start = "import io.circe",
+            end = "end snippet 1"
+          )
+
+        @p
+          or an @lnk("Argonaut", "http://argonaut.io") @hl.scala{EncodeJson[T]} in scope:
+
+        @hl.ref(
+            wd/'example/'src/'main/'scala/'com/'itv/'bucky/'example/'argonaut/"Shared.scala",
+            start = "import com.itv.bucky.ArgonautSupport",
+            end = "end snippet 1"
+          )
+    @sect{Publish Command Builder}
+      @p
+        In the previous section we show how to define a @hl.scala{PayloadMarshaller[T]}: a function that transforms a type @hl.scala{T} into a @hl.scala{Payload} for delivery via. AMQP.
+      @p
+        We ultimately wish to come up with a way of defining a @hl.scala{PublishCommand} using the Scala type system.
+      @p
+        This is where @hl.scala{PublishCommandBuilder} may be used:
+      @hl.ref(
+            wd/'example/'src/'main/'scala/'com/'itv/'bucky/'example/'marshalling/"MarshallingPublisher.scala",
+            start = "val personMarshaller",
+            end = "end snippet 2"
+          )
+      @p
+        We specify a @hl.scala{PayloadMarshaller[Person]}, along with the @hl.scala{ExchangeName} and @hl.scala{RoutingKey} to be used when publishing messages of type @hl.scala{Person}.
+    @sect{Putting it all together}
+      @p
+        So how do we put this all together and publish messages using a @hl.scala{PublishCommandBuilder}?
+      @hl.ref(
+            wd/'example/'src/'main/'scala/'com/'itv/'bucky/'example/'marshalling/"MarshallingPublisher.scala",
+            start = "val lifecycle",
+            end = "end snippet 3"
+          )
+      @p
+        Interesting. By calling @hl.scala{amqpClient.publisherOf} with a @hl.scala{PublishCommandBuilder[Person]}, we've now got a @hl.scala{Lifecycle} that manages a @hl.scala{Publisher[Future, Person]}
+      @p
+        This is how we can use it:
+      @hl.ref(
+            wd/'example/'src/'main/'scala/'com/'itv/'bucky/'example/'marshalling/"MarshallingPublisher.scala",
+            start = "Lifecycle.using(lifecycle)",
+            end = "end snippet 4"
+          )
+      @p
+        That's a fair bit less boilerplate for message publication!

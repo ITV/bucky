@@ -2,7 +2,6 @@ package com.itv.bucky.example.argonaut
 
 import argonaut.Argonaut._
 import argonaut._
-import com.itv.bucky.ArgonautSupport._
 import com.itv.bucky.PayloadMarshaller
 import com.itv.bucky.PayloadUnmarshaller
 
@@ -20,6 +19,9 @@ object Shared {
         yield Person(name, age)
     )
 
+  //start snippet 1
+  import com.itv.bucky.ArgonautSupport._
+
   implicit val personEncodeJson: EncodeJson[Person] =
     EncodeJson(p =>
       jObjectFields(
@@ -28,9 +30,9 @@ object Shared {
       )
     )
 
-  //bucky things
   val personMarshaller: PayloadMarshaller[Person] =
     marshallerFromEncodeJson
+  //end snippet 1
 
   val personUnmarshaller: PayloadUnmarshaller[Person] =
     unmarshallerFromDecodeJson

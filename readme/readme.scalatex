@@ -1,5 +1,20 @@
 @import Main._
 
+@link(
+  rel:="stylesheet",
+  href:="custom.css"
+)
+
+@a(
+  href:="https://github.com/ITV/bucky",
+  position.absolute,
+  top:=0,right:=0,border:=0,
+  img(
+    src:="https://s3.amazonaws.com/github/ribbons/forkme_right_darkblue_121621.png",
+    alt:="Fork me on GitHub"
+  )
+)
+
 @sect{Bucky}
 
   @scalatex.intro()
@@ -7,3 +22,9 @@
   @scalatex.gettingstarted()
 
 @scalatex.resourcemanagement()
+
+@scalatex.sendingmessages()
+
+@scalatex.receivingmessages()
+
+@scalatex.glossary()

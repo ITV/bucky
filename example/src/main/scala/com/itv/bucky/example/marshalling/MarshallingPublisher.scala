@@ -1,5 +1,6 @@
 package com.itv.bucky.example.marshalling
 
+import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.PublishCommandBuilder.publishCommandBuilder
 import com.itv.lifecycle.Lifecycle
 import com.itv.bucky._
@@ -15,40 +16,45 @@ import scala.concurrent.duration._
 
 object MarshallingPublisher extends App {
 
+  //start snippet 1
+  val brokerHostname = ConfigFactory.load("bucky").getString("rmq.host")
+  val amqpClientConfig: AmqpClientConfig = AmqpClientConfig(brokerHostname, 5672, "guest", "guest")
+
   object Declarations {
-    val queue = Queue(QueueName("queue.people"))
     val routingKey = RoutingKey("personPublisherRoutingKey")
-    val exchange = Exchange(ExchangeName("exchange.person-publisher")).binding(routingKey -> queue.name)
-
-    val all = List(queue, exchange)
+    val exchange = Exchange(ExchangeName("exchange.person-publisher"))
   }
+  case class Person(name: String, age: Int)
+  //end snippet 1
 
-
-  val config = ConfigFactory.load("bucky")
-  val amqpClientConfig: AmqpClientConfig = AmqpClientConfig(config.getString("rmq.host"), 5672, "guest", "guest")
-
-  /**
-    * A publisher delivers a message of a fixed type to an exchange.
-    * The routing key, along with exchange name, determine where the message will reach.
-    */
+  //start snippet 2
+  val personMarshaller: PayloadMarshaller[Person] =
+    StringPayloadMarshaller.contramap(p => s"${p.name},${p.age}")
   val publisherConfig =
-    publishCommandBuilder(Shared.personMarshaller) using Declarations.routingKey using Declarations.exchange.name
+    publishCommandBuilder(personMarshaller)
+        .using(Declarations.routingKey)
+        .using(Declarations.exchange.name)
+  //end snippet 2
 
-  /**
-    * A lifecycle is a monadic try/finally statement.
-    * More detailed information is available here https://github.com/ITV/lifecycle
-    */
+  //start snippet 3
   val lifecycle: Lifecycle[Publisher[Future, Person]] =
     for {
       amqpClient <- AmqpClientLifecycle(amqpClientConfig)
-      _ <- DeclarationLifecycle(Declarations.all, amqpClient)
+      _ <- DeclarationLifecycle(Seq(Declarations.exchange), amqpClient)
       publisher <- amqpClient.publisherOf(publisherConfig)
     }
       yield publisher
+  //end snippet 3
 
+  //start snippet 4
   Lifecycle.using(lifecycle) { publisher: Publisher[Future, Person] =>
-    val result: Future[Unit] = publisher(Person("Bob", 21))
+    //build the message
+    val message = Person("Bob", 67)
+    //publish the message!
+    val result: Future[Unit] = publisher(message)
+    //wait for the result
     Await.result(result, 1.second)
   }
+  //end snippet 4
 
 }

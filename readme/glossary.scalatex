@@ -1,0 +1,93 @@
+@import Main._
+
+@val dfn=tag("dfn")
+
+@sect{Glossary}
+  @p
+    RabbitMQ provide an @lnk("excellent tutorial of AMQP concepts", "https://www.rabbitmq.com/tutorials/amqp-concepts.html").
+  @p
+    There are a lot of terms surrounding AMQP, here's a rundown:
+
+  @dl
+    @dt
+      @dfn
+        Broker
+    @dd
+      A running instance of a server conforming to the @lnk("AMQP specification", "https://www.amqp.org/resources/download"). Publishers connect to send messages, consumers connect to receive messages. The broker is responsible for storing and routing the messages.
+  @dl
+    @dt
+      @dfn
+        Binding
+    @dd
+      @p
+        A pairing of a Routing Key and a Queue Name.
+      @p
+        Exchanges contain a set of Bindings, these can be used to route incoming messages. 
+  @dl
+    @dt
+      @dfn
+        Consumer
+    @dd
+      @p 
+        A queue can have multiple consumers associated with it.
+      @p
+        When a message arrives on a queue, the broker will dispatch it to one of the queue's consumers.
+      @p
+        If the consumer has been started using Bucky, the message will be processed using the Handler configured for the consumer.
+      @p
+        Thus, a consumer can be thought of as an active running instance of a Handler that has been bound to a queue. 
+  @dl
+    @dt
+      @dfn
+        Exchange
+    @dd
+      @p
+        An entity the broker uses to determine the destination of an incoming message. Multiple exchanges can be declared on a virtual host within a Broker.
+      @p
+        There are many different types of exchanges, each with different routing behaviours.
+      @p
+        One simple type of exchange is point-to-point: in this case the an incoming message is stored in a Queue determined by matching the Routing Key to a table of Bindings.
+  @dl
+    @dt
+      @dfn
+        Handler
+    @dd
+      @p
+        A function that accepts a message, and processes it.
+      @p
+        The function returns an action: this tells bucky how to treat this message after processing. It could be acknowledged (removed from the queue), negatively acknowledged (removed from the queue, but possibly routed to another queue first), or requeued (placed on the same queue again for reprocessing at a later time).
+      @p
+        It is expected that a handler could incur side effects or asynchronicity when processing a message, so the result action must be wrapped in some supported container (e.g. @hl.scala{scala.concurrent.Future} or @hl.scala{scalaz.concurrent.Task})
+      @hl.scala{
+        type Handler[F[_], -T] = T => F[ConsumeAction]
+      }
+
+@dl
+  @dt
+    @dfn
+      Publisher
+  @dd
+    @p
+      A function that accepts a value of a certain type, and upon application, asks the broker to route the value as a message.
+    @p
+      The value is always published to an Exchange with a Routing Key. This determines which Queue(s) the Broker will store the message in.
+@dl
+  @dt
+    @dfn
+      Queue
+  @dd
+    @p
+      A named unit of message storage in AMQP. Multiple queues can be declared within a virtual host on a Broker.
+    @p
+      It is common to have a separate queue declared for each type of message.
+    @p
+      Each queue can store many messages, bounded by the broker resources.
+@dl
+  @dt
+    @dfn
+      Routing Key
+  @dd
+    @p
+      An identifier that an Exchange can use to dispatch messages to incoming Queue(s).
+    @p
+      This can be the name of a destination Queue, but this is not a requirement.
