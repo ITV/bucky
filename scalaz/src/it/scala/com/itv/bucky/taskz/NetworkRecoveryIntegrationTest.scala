@@ -41,7 +41,7 @@ class NetworkRecoveryIntegrationTest extends FunSuite with ScalaFutures with Str
   test("can recover connection from a network failure on start") {
 
     val (freePort, amqpClientConfig, proxyConfig) = config
-    val queueA                                    = QueueName("proxy" + Random.nextInt())
+    val queueA                                    = QueueName("task-proxy-start" + Random.nextInt())
     val exchangeName                              = ExchangeName("tmp")
     val routingKey                                = RoutingKey(queueA.value)
 
@@ -114,7 +114,13 @@ class NetworkRecoveryIntegrationTest extends FunSuite with ScalaFutures with Str
           eventually {
             publisherA.apply(()).unsafePerformSyncAttempt shouldBe success
           }
-          publisherB.apply(()).unsafePerformSyncAttempt shouldBe success
+        }
+        publisherB.apply(()).unsafePerformSyncAttempt shouldBe success
+
+        withClue("should be able to consume from Queue A after broker allows connections again") {
+          eventually {
+            handlerA.receivedMessages should have size 3
+          }
         }
 
         withClue("should be able to consume from Queue B after broker allows connections again") {
@@ -123,11 +129,6 @@ class NetworkRecoveryIntegrationTest extends FunSuite with ScalaFutures with Str
           }
         }
 
-        withClue("should be able to consume from Queue A after broker allows connections again") {
-          eventually {
-            handlerA.receivedMessages should have size 3
-          }
-        }
     }
   }
 
@@ -149,8 +150,8 @@ class NetworkRecoveryIntegrationTest extends FunSuite with ScalaFutures with Str
 
     Lifecycle.using(lifecycle) {
       case (proxy, client) =>
-        val queueA = QueueName("proxy" + Random.nextInt())
-        val queueB = QueueName("proxy" + Random.nextInt())
+        val queueA = QueueName("task-proxyA" + Random.nextInt())
+        val queueB = QueueName("task-proxyB" + Random.nextInt())
 
         val pcbA = publishCommandBuilder[Unit](marshaller) using ExchangeName("") using RoutingKey(queueA.value)
         val pcbB = publishCommandBuilder[Unit](marshaller) using ExchangeName("") using RoutingKey(queueB.value)
@@ -168,6 +169,8 @@ class NetworkRecoveryIntegrationTest extends FunSuite with ScalaFutures with Str
         client.consumer(queueB, AmqpClient.handlerOf(handlerB, unmarshaller)).run.unsafePerformAsync { result =>
           logger.info(s"Closing consumer b: $result")
         }
+        client.performOps(_.purgeQueue(queueA))
+        client.performOps(_.purgeQueue(queueB))
         f(proxy, handlerA, handlerB, publisherA, publisherB)
     }
   }
