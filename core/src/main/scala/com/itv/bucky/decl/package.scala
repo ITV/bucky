@@ -25,7 +25,6 @@ package object decl {
           _ <- TryUtil.sequence(exchanges.map(_.run(ops)))
           _ <- TryUtil.sequence(bindings.map(_.run(ops)))
         } yield ()
-
       }
   }
 
