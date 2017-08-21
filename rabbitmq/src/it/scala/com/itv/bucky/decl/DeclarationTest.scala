@@ -14,7 +14,7 @@ import org.scalatest.concurrent.{Eventually, ScalaFutures}
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.util.Random
+import scala.util.{Random, Try}
 
 class DeclarationTest extends FunSuite with ScalaFutures with StrictLogging {
   import com.itv.bucky.future.FutureExt._
@@ -36,8 +36,7 @@ class DeclarationTest extends FunSuite with ScalaFutures with StrictLogging {
       val lifecycle =
         for {
           _ <- amqpClient.consumer(QueueName(queueName), handler)
-          serializer = publishCommandBuilder(StringPayloadMarshaller) using RoutingKey(queueName) using ExchangeName(
-            "")
+          serializer = publishCommandBuilder(StringPayloadMarshaller) using RoutingKey(queueName) using ExchangeName("")
           publisher <- amqpClient.publisher().map(AmqpClient.publisherOf(serializer))
         } yield publisher
 
@@ -134,5 +133,25 @@ class DeclarationTest extends FunSuite with ScalaFutures with StrictLogging {
         }
       }
     }
+  }
+
+  test("Should be able to declare a non order declaration") {
+
+    val testBadQueueName = QueueName("testbad")
+    val testBadQueue     = Queue(testBadQueueName)
+
+    val testGoodQueueName = QueueName("testgood")
+    val testGoodQueue     = Queue(testGoodQueueName)
+
+    val testExchangeName = ExchangeName("test")
+    val testExchange     = Exchange(testExchangeName).binding(RoutingKey("testbad") -> testBadQueueName)
+    val testBinding      = Binding(testExchangeName, testGoodQueueName, RoutingKey("testgood"), Map.empty)
+
+    val declarations = List(testExchange, testBinding, testBadQueue, testGoodQueue)
+
+    Try(Lifecycle.using(AmqpClientLifecycle(IntegrationUtils.config)) { amqpClient =>
+      DeclarationExecutor(declarations, amqpClient)
+    }) shouldBe 'success
+
   }
 }

@@ -1,7 +1,6 @@
 package com.itv.bucky
 
 import com.typesafe.scalalogging.StrictLogging
-import com.itv.bucky._
 
 import scala.concurrent.duration.FiniteDuration
 import scala.util.Try
@@ -12,12 +11,13 @@ package object decl {
     def run: AmqpOps => Try[Unit]
   }
 
-  object Declaration {
+  object Declaration extends StrictLogging {
     def runAll(declaration: Iterable[Declaration]): AmqpOps => Try[Unit] =
       ops => {
         val (bindings, rest) = declaration.partition {
-          case binding: Binding => true
-          case _                => false
+          case binding: Binding         => true
+          case binding: ExchangeBinding => true
+          case _                        => false
         }
         for {
           _ <- TryUtil.sequence(rest.map(_.run(ops)))
