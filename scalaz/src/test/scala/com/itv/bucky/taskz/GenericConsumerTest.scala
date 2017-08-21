@@ -1,21 +1,25 @@
 package com.itv.bucky.taskz
 
-import java.util.concurrent.Executors
 
 import com.itv.bucky._
 import com.rabbitmq.client.impl.AMQImpl.Basic
 import com.typesafe.scalalogging.StrictLogging
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
+import org.scalatest.concurrent.Eventually
 import org.scalatest.concurrent.Eventually._
 
-import scala.language.higherKinds
+import scala.language.{higherKinds, postfixOps}
 import scalaz.concurrent.Task
+import scala.concurrent.duration._
 
 class GenericConsumerTest extends FunSuite with StrictLogging {
 
   import com.itv.bucky.UnmarshalResult._
   import TaskExt._
+
+  implicit val patienceConfig: Eventually.PatienceConfig =
+    Eventually.PatienceConfig(timeout = 5 seconds, interval = 100 millis)
 
   test(s"Runs callback with delivered messages") {
     val unmarshaller: Unmarshaller[Payload, Payload] = Unmarshaller.liftResult(_.unmarshalSuccess)
