@@ -14,22 +14,18 @@ package object decl {
   object Declaration extends StrictLogging {
     def runAll(declaration: Iterable[Declaration]): AmqpOps => Try[Unit] =
       ops => {
-        val (bindings, rest) = declaration.partition {
-          case binding: Binding         => true
-          case binding: ExchangeBinding => true
-          case _                        => false
+        val queues    = declaration.collect { case queue: Queue       => queue }
+        val exchanges = declaration.collect { case exchange: Exchange => exchange }
+        val bindings = declaration.collect {
+          case binding: Binding                 => binding
+          case exchangeBinding: ExchangeBinding => exchangeBinding
         }
         for {
-          _ <- TryUtil.sequence(
-            rest.toList
-              .sortWith {
-                case (queue: Queue, _) => true
-                case (_, queue: Queue) => true
-                case _                 => false
-              }
-              .map(_.run(ops)))
+          _ <- TryUtil.sequence(queues.map(_.run(ops)))
+          _ <- TryUtil.sequence(exchanges.map(_.run(ops)))
           _ <- TryUtil.sequence(bindings.map(_.run(ops)))
         } yield ()
+
       }
   }
 
