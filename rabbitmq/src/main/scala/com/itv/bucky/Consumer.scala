@@ -29,6 +29,7 @@ object Consumer extends StrictLogging {
                                handler: Handler[F, Delivery],
                                actionOnFailure: ConsumeAction)(implicit F: MonadError[F, E]): Consumer =
     new DefaultConsumer(channel) {
+      logger.info(s"Creating consumer for $queueName")
       override def handleDelivery(consumerTag: String,
                                   envelope: RabbitMQEnvelope,
                                   properties: BasicProperties,

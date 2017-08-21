@@ -61,6 +61,7 @@ case class TaskAmqpClient(channel: Id[RabbitChannel])(implicit pool: ExecutorSer
 
     def createConsumer: Task[RabbitMqConsumer] = Task {
       val consumer: RabbitMqConsumer = new DefaultConsumer(channel) {
+        logger.info(s"Creating consumer for $queueName")
         override def handleDelivery(consumerTag: String,
                                     envelope: Envelope,
                                     properties: BasicProperties,

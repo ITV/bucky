@@ -25,7 +25,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures with StrictLoggi
   implicit val intMarshaller: PayloadMarshaller[Int] = StringPayloadMarshaller.contramap(_.toString)
 
   implicit val requeuePatienceConfig: Eventually.PatienceConfig =
-    Eventually.PatienceConfig(timeout = 2.second, interval = 100.millis)
+    Eventually.PatienceConfig(timeout = 10.second, interval = 100.millis)
 
   val exchange = ExchangeName("")
 
@@ -81,9 +81,8 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures with StrictLoggi
 
   test("It should reprocess the message at least maximumProcessAttempts times upon repeated requeue") {
     val handler = new StubRequeueHandler[Task, Int]
+    handler.nextResponse = Task.now(Requeue)
     withPublisherAndConsumer(requeueStrategy = TypeRequeue(handler, requeuePolicy, intMessageDeserializer)) { app =>
-      handler.nextResponse = Task.now(Requeue)
-
       app.publish(Payload.from(1)).unsafePerformSyncAttempt shouldBe published
 
       eventually {
@@ -94,9 +93,8 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures with StrictLoggi
 
   test("It should requeue the message if handler returns a failed future and is configured to requeue on failure") {
     val handler = new StubRequeueHandler[Task, Int]
+    handler.nextResponse = Task.fail(new RuntimeException("Handler problem"))
     withPublisherAndConsumer(requeueStrategy = TypeRequeue(handler, requeuePolicy, intMessageDeserializer)) { app =>
-      handler.nextResponse = Task.fail(new RuntimeException("Handler problem"))
-
       app.publish(Payload.from(1)).unsafePerformSyncAttempt shouldBe published
 
       eventually {
@@ -108,9 +106,8 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures with StrictLoggi
   test(
     "(Raw) requeue consumer should requeue the message if handler throws an exception and is configured to requeue on failure") {
     val handler = new StubRequeueHandler[Task, Delivery]
+    handler.nextResponse = Task.fail(new RuntimeException("Handler problem"))
     withPublisherAndConsumer(requeueStrategy = RawRequeue(handler, requeuePolicy)) { app =>
-      handler.nextResponse = Task.fail(new RuntimeException("Handler problem"))
-
       app.publish(Payload.from(1)).unsafePerformSyncAttempt shouldBe published
 
       eventually {
@@ -122,9 +119,8 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures with StrictLoggi
   test(
     "Requeue consumer should requeue the message if handler throws an exception and is configured to requeue on failure") {
     val handler = new StubRequeueHandler[Task, Int]
+    handler.nextException = Some(new RuntimeException("Handler problem"))
     withPublisherAndConsumer(requeueStrategy = TypeRequeue(handler, requeuePolicy, intMessageDeserializer)) { app =>
-      handler.nextException = Some(new RuntimeException("Handler problem"))
-
       app.publish(Payload.from(1)).unsafePerformSyncAttempt shouldBe published
 
       eventually {
@@ -135,9 +131,8 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures with StrictLoggi
 
   test(s"It should deadletter the message after maximumProcessAttempts unsuccessful attempts to process") {
     val handler = new StubRequeueHandler[Task, Int]
+    handler.nextResponse = Task.now(Requeue)
     withPublisherAndConsumer(requeueStrategy = TypeRequeue(handler, requeuePolicy, intMessageDeserializer)) { app =>
-      handler.nextResponse = Task.now(Requeue)
-
       val payload = Payload.from(1)
       app.publish(payload).unsafePerformSyncAttempt shouldBe published
 
@@ -151,12 +146,11 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures with StrictLoggi
   }
 
   test(s"It should deadletter the message if requeued and maximumProcessAttempts is < 1") {
-    val handler                              = new StubRequeueHandler[Task, Int]
+    val handler = new StubRequeueHandler[Task, Int]
+    handler.nextResponse = Task.now(Requeue)
     val negativeProcessAttemptsRequeuePolicy = RequeuePolicy(Random.nextInt(10) * -1, 1.second)
     withPublisherAndConsumer(
       requeueStrategy = TypeRequeue(handler, negativeProcessAttemptsRequeuePolicy, intMessageDeserializer)) { app =>
-      handler.nextResponse = Task.now(Requeue)
-
       val payload = Payload.from(1)
       app.publish(payload).unsafePerformSyncAttempt shouldBe published
 

@@ -119,10 +119,9 @@ object IntegrationUtils extends StrictLogging {
           }
 
           consumer.run.unsafePerformAsync { result =>
-            logger.info(s"Closing consumer ${app.queueName}: $result")
-          }
+            }
+
           f(app.copy(dlqHandler = dlqHandler))
-          logger.info(s"Closing the the consumer")
         }
     }
 
