@@ -35,8 +35,8 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures with StrictLoggi
 
   test(s"Should retain any custom headers when republishing") {
     val handler = new StubRequeueHandler[Task, Delivery]()
+    handler.nextResponse = Task.now(Requeue)
     withPublisherAndConsumer(requeueStrategy = RawRequeue(handler, requeuePolicy)) { app =>
-      handler.nextResponse = Task.now(Requeue)
       val properties = MessageProperties.persistentTextPlain.withHeader("foo" -> "bar")
 
       app.publish(Any.payload(), properties).unsafePerformSyncAttempt shouldBe published
@@ -50,9 +50,8 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures with StrictLoggi
 
   test("Should retain any custom amqp properties when republishing") {
     val handler = new StubRequeueHandler[Task, Delivery]
+    handler.nextResponse = Task.now(Requeue)
     withPublisherAndConsumer(requeueStrategy = RawRequeue(handler, requeuePolicy)) { app =>
-      handler.nextResponse = Task.now(Requeue)
-
       val expectedCorrelationId: Option[String] = Some("banana")
       val properties                            = MessageProperties.persistentTextPlain.copy(correlationId = expectedCorrelationId)
       app.publish(Payload.from("Hello World!"), properties).unsafePerformSyncAttempt shouldBe published
