@@ -20,7 +20,14 @@ package object decl {
           case _                        => false
         }
         for {
-          _ <- TryUtil.sequence(rest.map(_.run(ops)))
+          _ <- TryUtil.sequence(
+            rest.toList
+              .sortWith {
+                case (queue: Queue, _) => true
+                case (_, queue: Queue) => true
+                case _                 => false
+              }
+              .map(_.run(ops)))
           _ <- TryUtil.sequence(bindings.map(_.run(ops)))
         } yield ()
       }

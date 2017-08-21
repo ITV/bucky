@@ -137,21 +137,23 @@ class DeclarationTest extends FunSuite with ScalaFutures with StrictLogging {
 
   test("Should be able to declare a non order declaration") {
 
-    val testBadQueueName = QueueName("testbad")
+    val testBadQueueName = QueueName(s"testbad-${Random.nextInt(1000)}")
     val testBadQueue     = Queue(testBadQueueName)
 
-    val testGoodQueueName = QueueName("testgood")
+    val testGoodQueueName = QueueName(s"testgood-${Random.nextInt(1000)}")
     val testGoodQueue     = Queue(testGoodQueueName)
 
-    val testExchangeName = ExchangeName("test")
+    val testExchangeName = ExchangeName(s"test-${Random.nextInt(1000)}")
     val testExchange     = Exchange(testExchangeName).binding(RoutingKey("testbad") -> testBadQueueName)
     val testBinding      = Binding(testExchangeName, testGoodQueueName, RoutingKey("testgood"), Map.empty)
 
     val declarations = List(testExchange, testBinding, testBadQueue, testGoodQueue)
 
-    Try(Lifecycle.using(AmqpClientLifecycle(IntegrationUtils.config)) { amqpClient =>
-      DeclarationExecutor(declarations, amqpClient)
-    }) shouldBe 'success
+    Try(Lifecycle.using(for {
+      amqpClient <- AmqpClientLifecycle(IntegrationUtils.config)
+      _          <- DeclarationLifecycle(declarations, amqpClient)
+    } yield ()) { _ =>
+      }) shouldBe 'success
 
   }
 }

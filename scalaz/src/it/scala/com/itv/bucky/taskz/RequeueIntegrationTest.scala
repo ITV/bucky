@@ -72,8 +72,11 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures with StrictLoggi
         app.amqpClient.estimatedMessageCount(app.queueName) shouldBe Success(0)
       }
       app.amqpClient.estimatedMessageCount(app.requeueQueueName) shouldBe Success(0)
-      app.dlqHandler.get.receivedMessages shouldBe 'empty
-      handler.receivedMessages.length shouldBe 1
+      eventually {
+        app.dlqHandler.get.receivedMessages shouldBe 'empty
+
+        handler.receivedMessages.length shouldBe 1
+      }
     }
   }
 
