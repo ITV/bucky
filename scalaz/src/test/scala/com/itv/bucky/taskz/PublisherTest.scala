@@ -15,7 +15,6 @@ import org.scalatest.concurrent.{Eventually, ScalaFutures}
 
 import scala.concurrent.duration._
 
-
 class PublisherTest extends FunSuite with ScalaFutures {
 
   import Eventually._
@@ -60,7 +59,6 @@ class PublisherTest extends FunSuite with ScalaFutures {
     }
   }
 
-
   test("Negative acknowledgements result in failed future") {
     withPublisher(timeout = 100.hours) { publisher =>
       import publisher._
@@ -74,7 +72,6 @@ class PublisherTest extends FunSuite with ScalaFutures {
       task.failure.getMessage should include("Nack")
     }
   }
-
 
   test("Only futures corresponding to acknowledged publications are completed") {
     withPublisher(timeout = 100.hours) { publisher =>
@@ -102,65 +99,69 @@ class PublisherTest extends FunSuite with ScalaFutures {
     }
   }
 
+  test("Only futures corresponding to acknowledged publications are completed: negative acknowledgment (nack)") {
+    withPublisher(timeout = 100.hours) { publisher =>
+      import publisher._
 
-    test("Only futures corresponding to acknowledged publications are completed: negative acknowledgment (nack)") {
-      withPublisher(timeout = 100.hours) { publisher =>
-        import publisher._
+      val task1 = resultFrom(publish(Any.publishCommand()))
+      val task2 = resultFrom(publish(Any.publishCommand()))
+      val task3 = resultFrom(publish(Any.publishCommand()))
 
-        val task1 = resultFrom(publish(Any.publishCommand()))
-        val task2 = resultFrom(publish(Any.publishCommand()))
-        val task3 = resultFrom(publish(Any.publishCommand()))
+      task1 should not be 'completed
+      task2 should not be 'completed
+      task3 should not be 'completed
 
-        task1 should not be 'completed
-        task2 should not be 'completed
-        task3 should not be 'completed
+      channel.replyWith(new AMQImpl.Basic.Nack(2L, true, false))
 
-        channel.replyWith(new AMQImpl.Basic.Nack(2L, true, false))
+      task1 shouldBe 'completed
+      task2 shouldBe 'completed
+      task3 should not be 'completed
 
-        task1 shouldBe 'completed
-        task2 shouldBe 'completed
-        task3 should not be 'completed
+      channel.replyWith(new AMQImpl.Basic.Ack(3L, false))
 
-        channel.replyWith(new AMQImpl.Basic.Ack(3L, false))
+      task1 shouldBe 'completed
+      task2 shouldBe 'completed
+      task3 shouldBe 'completed
+    }
+  }
 
-        task1 shouldBe 'completed
-        task2 shouldBe 'completed
-        task3 shouldBe 'completed
+  test("Cannot publish when there is a IOException") {
+    val expectedMsg = "There is a network problem"
+    val mockCannel = new StubChannel {
+      override def basicPublish(exchange: String,
+                                routingKey: String,
+                                mandatory: Boolean,
+                                immediate: Boolean,
+                                props: AMQP.BasicProperties,
+                                body: Array[Byte]): Unit =
+        throw new IOException(expectedMsg)
+
+    }
+    withPublisher(timeout = 100.hours, channel = mockCannel) { publisher =>
+      import publisher._
+
+      channel.transmittedCommands should have size 1
+      channel.transmittedCommands.last shouldBe an[AMQP.Confirm.Select]
+
+      val task = resultFrom(publish(Any.publishCommand()))
+
+      eventually {
+        task.failure.getMessage should ===(expectedMsg)
       }
     }
+  }
 
-    test("Cannot publish when there is a IOException") {
-      val expectedMsg = "There is a network problem"
-      val mockCannel = new StubChannel {
-        override def basicPublish(exchange: String, routingKey: String, mandatory: Boolean, immediate: Boolean, props: AMQP.BasicProperties, body: Array[Byte]): Unit =
-          throw new IOException(expectedMsg)
+  test("Publisher times out if configured to do so") {
 
-      }
-      withPublisher(timeout = 100.hours, channel = mockCannel) { publisher =>
-        import publisher._
+    withPublisher(timeout = 10.millis) { publisher =>
+      import publisher._
 
-        channel.transmittedCommands should have size 1
-        channel.transmittedCommands.last shouldBe an[AMQP.Confirm.Select]
+      val result = resultFrom(publish(Any.publishCommand()))
 
-        val task = resultFrom(publish(Any.publishCommand()))
-
-        eventually {
-          task.failure.getMessage should ===(expectedMsg)
-        }
+      eventually {
+        result.failure shouldBe a[TimeoutException]
       }
     }
-
-    test("Publisher times out if configured to do so") {
-
-      withPublisher(timeout = 10.millis) { publisher =>
-        import publisher._
-
-        val result = resultFrom(publish(Any.publishCommand()))
-
-        eventually {
-          result.failure shouldBe a[TimeoutException]
-        }
-      }
-    }
+  }
 
 }

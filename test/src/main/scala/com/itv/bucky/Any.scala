@@ -14,10 +14,8 @@ object Any {
   def payload() =
     Payload.from(string())
 
-
   def string() =
     s"Hello World ${new Random().nextInt(10000)}! "
-
 
   def queue() =
     QueueName(s"bucky-queue-${new Random().nextInt(10000)}")
@@ -27,5 +25,3 @@ object HeaderExt {
   def apply(header: String, properties: MessageProperties): Option[String] =
     properties.headers.get(header).map(_.toString)
 }
-
-

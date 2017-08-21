@@ -2,7 +2,6 @@ package com.itv.bucky
 
 import scala.concurrent.{ExecutionContext, Future}
 
-
 package object future {
 
   def futureMonad(implicit executionContext: ExecutionContext) = new MonadError[Future, Throwable] {
@@ -14,7 +13,9 @@ package object future {
 
     override def raiseError[A](e: Throwable): Future[A] = Future.failed(e)
 
-    override def handleError[A](fa: Future[A])(f: (Throwable) => Future[A]): Future[A] = fa.recoverWith { case t: Throwable => f(t) }
+    override def handleError[A](fa: Future[A])(f: (Throwable) => Future[A]): Future[A] = fa.recoverWith {
+      case t: Throwable => f(t)
+    }
   }
 
 }

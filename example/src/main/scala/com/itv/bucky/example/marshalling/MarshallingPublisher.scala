@@ -13,16 +13,15 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent._
 import scala.concurrent.duration._
 
-
 object MarshallingPublisher extends App {
 
   //start snippet 1
-  val brokerHostname = ConfigFactory.load("bucky").getString("rmq.host")
+  val brokerHostname                     = ConfigFactory.load("bucky").getString("rmq.host")
   val amqpClientConfig: AmqpClientConfig = AmqpClientConfig(brokerHostname, 5672, "guest", "guest")
 
   object Declarations {
     val routingKey = RoutingKey("personPublisherRoutingKey")
-    val exchange = Exchange(ExchangeName("exchange.person-publisher"))
+    val exchange   = Exchange(ExchangeName("exchange.person-publisher"))
   }
   case class Person(name: String, age: Int)
   //end snippet 1
@@ -32,18 +31,17 @@ object MarshallingPublisher extends App {
     StringPayloadMarshaller.contramap(p => s"${p.name},${p.age}")
   val publisherConfig =
     publishCommandBuilder(personMarshaller)
-        .using(Declarations.routingKey)
-        .using(Declarations.exchange.name)
+      .using(Declarations.routingKey)
+      .using(Declarations.exchange.name)
   //end snippet 2
 
   //start snippet 3
   val lifecycle: Lifecycle[Publisher[Future, Person]] =
     for {
       amqpClient <- AmqpClientLifecycle(amqpClientConfig)
-      _ <- DeclarationLifecycle(Seq(Declarations.exchange), amqpClient)
-      publisher <- amqpClient.publisherOf(publisherConfig)
-    }
-      yield publisher
+      _          <- DeclarationLifecycle(Seq(Declarations.exchange), amqpClient)
+      publisher  <- amqpClient.publisherOf(publisherConfig)
+    } yield publisher
   //end snippet 3
 
   //start snippet 4

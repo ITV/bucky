@@ -24,7 +24,8 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogg
   import IntegrationUtils._
   import TestLifecycle._
 
-  val consumerPatienceConfig: Eventually.PatienceConfig = Eventually.PatienceConfig(timeout = 10.seconds, interval = 500.millis)
+  val consumerPatienceConfig: Eventually.PatienceConfig =
+    Eventually.PatienceConfig(timeout = 10.seconds, interval = 500.millis)
 
   case class Message(value: String)
 
@@ -34,21 +35,26 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogg
 
     val handler = new StubConsumeHandler[Future, Message]()
 
-    Lifecycle.using(messageConsumer(QueueName("bucky-consumer-test"), handler, toDeliveryUnmarshaller(messageUnmarshaller))) { publisher =>
-      handler.receivedMessages shouldBe 'empty
+    Lifecycle.using(
+      messageConsumer(QueueName("bucky-consumer-test"), handler, toDeliveryUnmarshaller(messageUnmarshaller))) {
+      publisher =>
+        handler.receivedMessages shouldBe 'empty
 
-      val expectedMessage = "Hello World!"
-      publisher(PublishCommand(ExchangeName(""), RoutingKey("bucky-consumer-test"), MessageProperties.textPlain, Payload.from(expectedMessage)))
+        val expectedMessage = "Hello World!"
+        publisher(
+          PublishCommand(ExchangeName(""),
+                         RoutingKey("bucky-consumer-test"),
+                         MessageProperties.textPlain,
+                         Payload.from(expectedMessage)))
 
-      eventually {
-        logger.info(s"Waiting Can consume messages from a (pre-existing) queue")
-        handler.receivedMessages should have size 1
+        eventually {
+          logger.info(s"Waiting Can consume messages from a (pre-existing) queue")
+          handler.receivedMessages should have size 1
 
-        handler.receivedMessages.head shouldBe Message(expectedMessage)
-      }(consumerPatienceConfig, Position.here)
+          handler.receivedMessages.head shouldBe Message(expectedMessage)
+        }(consumerPatienceConfig, Position.here)
     }
   }
-
 
   test("Can extract headers from consumed message") {
     import com.itv.bucky.UnmarshalResult._
@@ -78,10 +84,12 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogg
 
       val expected = Foo(Bar("bar"), Baz("baz"))
 
-      val publishCommand = PublishCommand(ExchangeName(""),
+      val publishCommand = PublishCommand(
+        ExchangeName(""),
         RoutingKey("bucky-consumer-header-test"),
         MessageProperties.persistentBasic.withHeader("bar" -> expected.bar.value),
-        Payload.from(expected.baz.value))
+        Payload.from(expected.baz.value)
+      )
 
       publisher(publishCommand).futureValue
 
@@ -93,17 +101,17 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogg
   }
 
   test("DeadLetter upon exception from handler") {
-    val queueName = QueueName("exception-from-handler" + Random.nextInt())
-    val handler = new StubConsumeHandler[Future, Delivery]()
-    val dlqHandler = new QueueWatcher[Delivery]
+    val queueName                = QueueName("exception-from-handler" + Random.nextInt())
+    val handler                  = new StubConsumeHandler[Future, Delivery]()
+    val dlqHandler               = new QueueWatcher[Delivery]
     val config: AmqpClientConfig = IntegrationUtils.config.copy(networkRecoveryInterval = None)
     for {
       amqpClient <- AmqpClientLifecycle(config)
       declarations = basicRequeueDeclarations(queueName, retryAfter = 1.second) collect {
         case ex: Exchange => ex.autoDelete.expires(1.minute)
-        case q: Queue => q.autoDelete.expires(1.minute)
+        case q: Queue     => q.autoDelete.expires(1.minute)
       }
-      _ <- DeclarationLifecycle(declarations, amqpClient)
+      _         <- DeclarationLifecycle(declarations, amqpClient)
       publisher <- amqpClient.publisher()
 
       _ <- amqpClient.consumer(queueName, handler)
@@ -115,7 +123,11 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogg
       handler.nextException = Some(new RuntimeException("Hello, world"))
 
       val expectedMessage = "Message to dlq"
-      publisher(PublishCommand(ExchangeName(""), RoutingKey(queueName.value), MessageProperties.textPlain, Payload.from(expectedMessage)))
+      publisher(
+        PublishCommand(ExchangeName(""),
+                       RoutingKey(queueName.value),
+                       MessageProperties.textPlain,
+                       Payload.from(expectedMessage)))
 
       eventually {
         handler.receivedMessages should have size 1
@@ -124,52 +136,57 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogg
     }
   }
 
-
   test("Can consume messages from a (pre-existing) queue with the raw consumer") {
     val handler = new StubConsumeHandler[Future, Delivery]()
-    Lifecycle.using(rawConsumer(QueueName("bucky-consumer-raw-test"), handler)) {
-      publisher =>
-        handler.receivedMessages shouldBe 'empty
+    Lifecycle.using(rawConsumer(QueueName("bucky-consumer-raw-test"), handler)) { publisher =>
+      handler.receivedMessages shouldBe 'empty
 
-        val expectedMessage = "Hello World!"
-        publisher(PublishCommand(ExchangeName(""), RoutingKey("bucky-consumer-raw-test"), MessageProperties.textPlain, Payload.from(expectedMessage)))
+      val expectedMessage = "Hello World!"
+      publisher(
+        PublishCommand(ExchangeName(""),
+                       RoutingKey("bucky-consumer-raw-test"),
+                       MessageProperties.textPlain,
+                       Payload.from(expectedMessage)))
 
-        eventually {
-          handler.receivedMessages should have size 1
-          inside(handler.receivedMessages.head) {
-            case Delivery(body, _, _, _) => Payload(body.value).unmarshal[String] shouldBe Success(expectedMessage)
-          }
-        }(consumerPatienceConfig, Position.here)
+      eventually {
+        handler.receivedMessages should have size 1
+        inside(handler.receivedMessages.head) {
+          case Delivery(body, _, _, _) => Payload(body.value).unmarshal[String] shouldBe Success(expectedMessage)
+        }
+      }(consumerPatienceConfig, Position.here)
     }
   }
 
   test("Message headers are exposed to (raw) consumers") {
     val handler = new StubConsumeHandler[Future, Delivery]()
-    Lifecycle.using(rawConsumer(QueueName("bucky-consumer-headers-test"), handler)) {
-      publisher =>
-        handler.receivedMessages shouldBe 'empty
+    Lifecycle.using(rawConsumer(QueueName("bucky-consumer-headers-test"), handler)) { publisher =>
+      handler.receivedMessages shouldBe 'empty
 
-        val expectedMessage = "Hello World!"
+      val expectedMessage = "Hello World!"
 
-        val messageProperties = MessageProperties.textPlain.withHeader("hello" -> "world")
+      val messageProperties = MessageProperties.textPlain.withHeader("hello" -> "world")
 
+      publisher(
+        PublishCommand(ExchangeName(""),
+                       RoutingKey("bucky-consumer-headers-test"),
+                       messageProperties,
+                       Payload.from(expectedMessage)))
 
-        publisher(PublishCommand(ExchangeName(""), RoutingKey("bucky-consumer-headers-test"), messageProperties, Payload.from(expectedMessage)))
-
-        eventually {
-          handler.receivedMessages should have size 1
-          inside(handler.receivedMessages.head) {
-            case Delivery(body, _, _, properties) => properties.headers.get("hello").map(_.toString) shouldBe Some("world")
-          }
-        }(consumerPatienceConfig, Position.here)
+      eventually {
+        handler.receivedMessages should have size 1
+        inside(handler.receivedMessages.head) {
+          case Delivery(body, _, _, properties) =>
+            properties.headers.get("hello").map(_.toString) shouldBe Some("world")
+        }
+      }(consumerPatienceConfig, Position.here)
     }
   }
 
-  def messageConsumer[T](queueName: QueueName, handler: Handler[Future, T], unmarshaller: DeliveryUnmarshaller[T]) = for {
-    result <- base(defaultDeclaration(queueName))
-    (amqClient, publisher) = result
-    consumer <- amqClient.consumer(queueName, AmqpClient.deliveryHandlerOf(handler, unmarshaller))
-  } yield publisher
-
+  def messageConsumer[T](queueName: QueueName, handler: Handler[Future, T], unmarshaller: DeliveryUnmarshaller[T]) =
+    for {
+      result <- base(defaultDeclaration(queueName))
+      (amqClient, publisher) = result
+      consumer <- amqClient.consumer(queueName, AmqpClient.deliveryHandlerOf(handler, unmarshaller))
+    } yield publisher
 
 }

@@ -19,9 +19,9 @@ class PublisherIntegrationTest extends FunSuite with ScalaFutures with StrictLog
 
   test("Can publish messages to a (pre-existing) queue") {
     val testQueueName = "bucky-publisher-test"
-    val routingKey = RoutingKey(testQueueName)
-    val exchange = ExchangeName("")
-    val handler = new QueueWatcher[Delivery]
+    val routingKey    = RoutingKey(testQueueName)
+    val exchange      = ExchangeName("")
+    val handler       = new QueueWatcher[Delivery]
     Lifecycle.using(rawConsumer(QueueName(testQueueName), handler)) { publisher =>
       val body = Payload.from("Hello World!")
       publisher(PublishCommand(ExchangeName(""), routingKey, MessageProperties.textPlain, body)).asTry.futureValue shouldBe 'success
@@ -32,8 +32,8 @@ class PublisherIntegrationTest extends FunSuite with ScalaFutures with StrictLog
 
   test("Can publish messages to a (pre-existing) queue with Id") {
     val testQueueName = "bucky-publisher-test-2"
-    val routingKey = RoutingKey(testQueueName)
-    val exchange = ExchangeName("")
+    val routingKey    = RoutingKey(testQueueName)
+    val exchange      = ExchangeName("")
 
     val handler = new QueueWatcher[Delivery]
 
@@ -43,13 +43,12 @@ class PublisherIntegrationTest extends FunSuite with ScalaFutures with StrictLog
     amqpClient.consumer(QueueName(testQueueName), handler)
 
     val publisher = amqpClient.publisher()
-    val body = Payload.from("Hello World!")
+    val body      = Payload.from("Hello World!")
     publisher(PublishCommand(ExchangeName(""), routingKey, MessageProperties.textPlain, body)).asTry.futureValue shouldBe 'success
 
     handler.nextMessage().futureValue.body.value shouldBe body.value
 
     Channel.closeAll(amqpClient.channel)
   }
-
 
 }

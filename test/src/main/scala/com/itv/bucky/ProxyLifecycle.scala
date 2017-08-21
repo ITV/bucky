@@ -17,7 +17,6 @@ import scala.util.Random
 /** *
   * Inspired by aaronriekenberg/Scala-Netty-Proxy
   * **/
-
 case class HostPort(hostname: String, port: Int) {
   def toJava: InetSocketAddress = new InetSocketAddress(hostname, port)
 }
@@ -32,9 +31,8 @@ trait Proxy {
   def shutdown(): Unit
 }
 
-
 object Port {
-  val ports = 49152 to 65535
+  val ports  = 49152 to 65535
   val random = new Random()
 
   def randomPort(): Int =
@@ -55,7 +53,9 @@ object Netty {
     }
 }
 
-private class RemoteChannelHandler(val clientChannel: Channel, allChannels: ChannelGroup) extends SimpleChannelUpstreamHandler with StrictLogging {
+private class RemoteChannelHandler(val clientChannel: Channel, allChannels: ChannelGroup)
+    extends SimpleChannelUpstreamHandler
+    with StrictLogging {
   override def channelOpen(ctx: ChannelHandlerContext, e: ChannelStateEvent): Unit = {
     logger.info("remote channel open " + e.getChannel)
     allChannels.add(e.getChannel)
@@ -85,7 +85,9 @@ private class DoNotAcceptConnections extends SimpleChannelUpstreamHandler with S
 private class ClientChannelHandler(remoteAddress: InetSocketAddress,
                                    allChannels: ChannelGroup,
                                    acceptNewConnection: AcceptNewConnection,
-                                   clientSocketChannelFactory: ClientSocketChannelFactory) extends SimpleChannelUpstreamHandler with StrictLogging {
+                                   clientSocketChannelFactory: ClientSocketChannelFactory)
+    extends SimpleChannelUpstreamHandler
+    with StrictLogging {
 
   @volatile
   private var remoteChannel: Option[Channel] = None
@@ -105,8 +107,7 @@ private class ClientChannelHandler(remoteAddress: InetSocketAddress,
     val clientBootstrap = new ClientBootstrap(clientSocketChannelFactory)
 
     clientBootstrap.setOption("connectTimeoutMillis", 1000)
-    clientBootstrap.getPipeline.addLast("handler",
-      new RemoteChannelHandler(clientChannel, allChannels))
+    clientBootstrap.getPipeline.addLast("handler", new RemoteChannelHandler(clientChannel, allChannels))
 
     val connectFuture = clientBootstrap
       .connect(remoteAddress)
@@ -114,12 +115,14 @@ private class ClientChannelHandler(remoteAddress: InetSocketAddress,
     connectFuture.addListener(new ChannelFutureListener {
       override def operationComplete(future: ChannelFuture) {
         if (future.isSuccess) {
-          logger.info("remote channel connect success "
-            + remoteChannel)
+          logger.info(
+            "remote channel connect success "
+              + remoteChannel)
           clientChannel.setReadable(true)
         } else {
-          logger.info("remote channel connect failure "
-            + remoteChannel)
+          logger.info(
+            "remote channel connect failure "
+              + remoteChannel)
           clientChannel.close
         }
       }
@@ -143,7 +146,6 @@ private class ClientChannelHandler(remoteAddress: InetSocketAddress,
   }
 }
 
-
 object Proxy extends StrictLogging {
   def apply(local: HostPort, remote: HostPort): Proxy = {
     val allChannels: ChannelGroup = new DefaultChannelGroup()
@@ -154,15 +156,14 @@ object Proxy extends StrictLogging {
 
     val clientSocketChannelFactory = new NioClientSocketChannelFactory(executor, executor)
 
-
     object acceptNewConnection extends AcceptNewConnection {
       var shouldAcceptNewConnection: Boolean = true
     }
 
     object DefaultProxyPipelineFactory extends ChannelPipelineFactory {
       override def getPipeline: ChannelPipeline =
-        Channels.pipeline(new ClientChannelHandler(remote.toJava, allChannels, acceptNewConnection,
-          clientSocketChannelFactory))
+        Channels.pipeline(
+          new ClientChannelHandler(remote.toJava, allChannels, acceptNewConnection, clientSocketChannelFactory))
     }
 
     serverBootstrap.setPipelineFactory(DefaultProxyPipelineFactory)
@@ -171,7 +172,6 @@ object Proxy extends StrictLogging {
 
     serverBootstrap.bind(local.toJava)
     logger.info("Listening on " + local)
-
 
     new Proxy {
       override def shutdown(): Unit = {

@@ -14,21 +14,19 @@ object Shared {
     DecodeJson(c =>
       for {
         name <- (c --\ "name").as[String]
-        age <- (c --\ "age").as[Int]
-      }
-        yield Person(name, age)
-    )
+        age  <- (c --\ "age").as[Int]
+      } yield Person(name, age))
 
   //start snippet 1
   import com.itv.bucky.ArgonautSupport._
 
   implicit val personEncodeJson: EncodeJson[Person] =
-    EncodeJson(p =>
-      jObjectFields(
-        "name" -> jString(p.name),
-        "age" -> jNumber(p.age)
-      )
-    )
+    EncodeJson(
+      p =>
+        jObjectFields(
+          "name" -> jString(p.name),
+          "age"  -> jNumber(p.age)
+      ))
 
   val personMarshaller: PayloadMarshaller[Person] =
     marshallerFromEncodeJson
@@ -36,6 +34,5 @@ object Shared {
 
   val personUnmarshaller: PayloadUnmarshaller[Person] =
     unmarshallerFromDecodeJson
-
 
 }

@@ -16,7 +16,6 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Random, Success}
 
-
 class RequeueIntegrationTest extends FunSuite with ScalaFutures {
   import FutureExt._
 
@@ -26,7 +25,8 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
 
   implicit val intMarshaller: PayloadMarshaller[Int] = StringPayloadMarshaller.contramap(_.toString)
 
-  implicit val requeuePatienceConfig: Eventually.PatienceConfig = Eventually.PatienceConfig(timeout = 60.second, interval = 100.millis)
+  implicit val requeuePatienceConfig: Eventually.PatienceConfig =
+    Eventually.PatienceConfig(timeout = 60.second, interval = 100.millis)
 
   val exchange = ExchangeName("")
 
@@ -54,7 +54,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
       handler.nextResponse = Future.successful(Requeue)
 
       val expectedCorrelationId: Option[String] = Some("banana")
-      val properties = MessageProperties.persistentTextPlain.copy(correlationId = expectedCorrelationId)
+      val properties                            = MessageProperties.persistentTextPlain.copy(correlationId = expectedCorrelationId)
       app.publish(Payload.from("Hello World!"), properties).futureValue shouldBe published
 
       eventually {
@@ -104,7 +104,8 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
     }
   }
 
-  test("(Raw) requeue consumer should requeue the message if handler throws an exception and is configured to requeue on failure") {
+  test(
+    "(Raw) requeue consumer should requeue the message if handler throws an exception and is configured to requeue on failure") {
     val handler = new StubRequeueHandler[Future, Delivery]
     Lifecycle.using(testLifecycle(handler, requeuePolicy)) { app =>
       handler.nextException = Some(new RuntimeException("Handler problem"))
@@ -116,7 +117,8 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
     }
   }
 
-  test("Requeue consumer should requeue the message if handler throws an exception and is configured to requeue on failure") {
+  test(
+    "Requeue consumer should requeue the message if handler throws an exception and is configured to requeue on failure") {
     val handler = new StubRequeueHandler[Future, Int]
     Lifecycle.using(testLifecycle(handler, requeuePolicy, intMessageDeserializer)) { app =>
       handler.nextException = Some(new RuntimeException("Handler problem"))
@@ -145,10 +147,9 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
   }
 
   test("It should deadletter the message if requeued and maximumProcessAttempts is < 1") {
-    val handler = new StubRequeueHandler[Future,Int]
+    val handler                              = new StubRequeueHandler[Future, Int]
     val negativeProcessAttemptsRequeuePolicy = RequeuePolicy(Random.nextInt(10) * -1, 1.second)
     Lifecycle.using(testLifecycle(handler, negativeProcessAttemptsRequeuePolicy, intMessageDeserializer)) { app =>
-
       handler.nextResponse = Future.successful(Requeue)
       val payload = Payload.from(1)
       app.publish(payload).futureValue shouldBe published
@@ -162,44 +163,52 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
     }
   }
 
-  case class TestFixture(amqpClient: AmqpClient[Lifecycle, Future, Throwable, Unit], queueName: QueueName, requeueQueueName: QueueName, deadletterQueue: QueueWatcher[Delivery], publisher: Publisher[Future, PublishCommand]) {
-    def publish(body: Payload, properties: MessageProperties = MessageProperties.persistentBasic): Future[Unit] = publisher(
-      PublishCommand(ExchangeName(""), RoutingKey(queueName.value), properties, body))
+  case class TestFixture(amqpClient: AmqpClient[Lifecycle, Future, Throwable, Unit],
+                         queueName: QueueName,
+                         requeueQueueName: QueueName,
+                         deadletterQueue: QueueWatcher[Delivery],
+                         publisher: Publisher[Future, PublishCommand]) {
+    def publish(body: Payload, properties: MessageProperties = MessageProperties.persistentBasic): Future[Unit] =
+      publisher(PublishCommand(ExchangeName(""), RoutingKey(queueName.value), properties, body))
   }
 
   private def baseTestLifecycle(): Lifecycle[TestFixture] = {
     val testQueueName = "bucky-requeue-consumer-ack" + Random.nextInt()
 
-    val declarations = requeueDeclarations(QueueName(testQueueName), RoutingKey(testQueueName), Exchange(ExchangeName(testQueueName + ".dlx")), retryAfter = 1.second) collect {
+    val declarations = requeueDeclarations(QueueName(testQueueName),
+                                           RoutingKey(testQueueName),
+                                           Exchange(ExchangeName(testQueueName + ".dlx")),
+                                           retryAfter = 1.second) collect {
       case ex: Exchange => ex.autoDelete.expires(1.minute)
-      case q: Queue => q.autoDelete.expires(1.minute)
+      case q: Queue     => q.autoDelete.expires(1.minute)
     }
 
     for {
       client <- AmqpClientLifecycle(IntegrationUtils.config)
-      _ <- DeclarationLifecycle(declarations, client)
+      _      <- DeclarationLifecycle(declarations, client)
 
       publish <- client.publisher()
       deadletterWatcher = new QueueWatcher[Delivery]
       deadletterQueue <- client.consumer(QueueName(testQueueName + ".dlq"), deadletterWatcher)
-    } yield TestFixture(client, QueueName(testQueueName), QueueName(testQueueName + ".requeue"), deadletterWatcher, publish)
+    } yield
+      TestFixture(client, QueueName(testQueueName), QueueName(testQueueName + ".requeue"), deadletterWatcher, publish)
   }
 
-  def testLifecycle[T](handler: RequeueHandler[Future, T], requeuePolicy: RequeuePolicy, unmarshaller: PayloadUnmarshaller[T])(implicit M: Monad[Future]): Lifecycle[TestFixture] = for {
-    testFixture <- baseTestLifecycle()
-    consumer <- testFixture.amqpClient.requeueHandlerOf(testFixture.queueName, handler, requeuePolicy, unmarshaller)
-  } yield testFixture
+  def testLifecycle[T](handler: RequeueHandler[Future, T],
+                       requeuePolicy: RequeuePolicy,
+                       unmarshaller: PayloadUnmarshaller[T])(implicit M: Monad[Future]): Lifecycle[TestFixture] =
+    for {
+      testFixture <- baseTestLifecycle()
+      consumer    <- testFixture.amqpClient.requeueHandlerOf(testFixture.queueName, handler, requeuePolicy, unmarshaller)
+    } yield testFixture
 
-
-  def testLifecycle(handler: RequeueHandler[Future, Delivery], requeuePolicy: RequeuePolicy): Lifecycle[TestFixture] = for {
-    testFixture <- baseTestLifecycle()
-    consumer <- testFixture.amqpClient.requeueOf(testFixture.queueName, handler, requeuePolicy)
-  } yield testFixture
-
+  def testLifecycle(handler: RequeueHandler[Future, Delivery], requeuePolicy: RequeuePolicy): Lifecycle[TestFixture] =
+    for {
+      testFixture <- baseTestLifecycle()
+      consumer    <- testFixture.amqpClient.requeueOf(testFixture.queueName, handler, requeuePolicy)
+    } yield testFixture
 
   private def getHeader(header: String, properties: MessageProperties): Option[String] =
     properties.headers.get(header).map(_.toString)
 
 }
-
-

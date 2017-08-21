@@ -1,6 +1,5 @@
 package com.itv.bucky.taskz
 
-
 import com.itv.bucky._
 import com.rabbitmq.client.impl.AMQImpl.Basic
 import com.typesafe.scalalogging.StrictLogging
@@ -46,9 +45,9 @@ class GenericConsumerTest extends FunSuite with StrictLogging {
     }
   }
 
-
   test("should fail when there is a deserialization problem") {
-    val unmarshaller: Unmarshaller[Payload, Payload] = Unmarshaller.liftResult(_ => "There is a problem".unmarshalFailure)
+    val unmarshaller: Unmarshaller[Payload, Payload] =
+      Unmarshaller.liftResult(_ => "There is a problem".unmarshalFailure)
 
     wihConsumer(unmarshaller) { consumer =>
       import consumer._
@@ -57,7 +56,8 @@ class GenericConsumerTest extends FunSuite with StrictLogging {
       }
       val msg = Payload.from("Hello World!")
 
-      channel.deliver(new Basic.Deliver(channel.consumers.head.getConsumerTag, 1L, false, "exchange", "routingKey"), msg)
+      channel.deliver(new Basic.Deliver(channel.consumers.head.getConsumerTag, 1L, false, "exchange", "routingKey"),
+                      msg)
 
       eventually {
         channel.transmittedCommands.last shouldBe a[Basic.Nack]
@@ -67,14 +67,16 @@ class GenericConsumerTest extends FunSuite with StrictLogging {
   }
 
   test("should perform deserialization action when there is a an exception during deserialization") {
-    val unmarshaller: Unmarshaller[Payload, Payload] = Unmarshaller.liftResult(_ => "There is a problem".unmarshalFailure)
+    val unmarshaller: Unmarshaller[Payload, Payload] =
+      Unmarshaller.liftResult(_ => "There is a problem".unmarshalFailure)
     wihConsumer(unmarshaller, Ack, DeadLetter) { consumer =>
       import consumer._
       eventually {
         channel.consumers should have size 1
       }
       val msg = Payload.from("Hello World!")
-      channel.deliver(new Basic.Deliver(channel.consumers.head.getConsumerTag, 1L, false, "exchange", "routingKey"), msg)
+      channel.deliver(new Basic.Deliver(channel.consumers.head.getConsumerTag, 1L, false, "exchange", "routingKey"),
+                      msg)
 
       eventually {
         channel.transmittedCommands.last shouldBe a[Basic.Ack]
@@ -83,9 +85,9 @@ class GenericConsumerTest extends FunSuite with StrictLogging {
     }
   }
 
-
   test("should nack by default when there is a an exception during deserialization") {
-    val unmarshaller: Unmarshaller[Payload, Payload] = Unmarshaller.liftResult(_ => throw new RuntimeException("Oh No!"))
+    val unmarshaller: Unmarshaller[Payload, Payload] =
+      Unmarshaller.liftResult(_ => throw new RuntimeException("Oh No!"))
 
     wihConsumer(unmarshaller) { consumer =>
       import consumer._
@@ -94,7 +96,8 @@ class GenericConsumerTest extends FunSuite with StrictLogging {
       }
       val msg = Payload.from("Hello World!")
 
-      channel.deliver(new Basic.Deliver(channel.consumers.head.getConsumerTag, 1L, false, "exchange", "routingKey"), msg)
+      channel.deliver(new Basic.Deliver(channel.consumers.head.getConsumerTag, 1L, false, "exchange", "routingKey"),
+                      msg)
 
       eventually {
         withClue("transmittedCommands are " + channel.transmittedCommands) {
@@ -107,20 +110,20 @@ class GenericConsumerTest extends FunSuite with StrictLogging {
 
   case class TestConsumer(channel: StubChannel, handler: StubConsumeHandler[Task, Payload])
 
-  def wihConsumer(unmarshaller: Unmarshaller[Payload, Payload], unmarshalFailureAction: ConsumeAction = DeadLetter, actionOnFailure: ConsumeAction = DeadLetter)
-                 (f: TestConsumer => Unit): Unit = {
+  def wihConsumer(unmarshaller: Unmarshaller[Payload, Payload],
+                  unmarshalFailureAction: ConsumeAction = DeadLetter,
+                  actionOnFailure: ConsumeAction = DeadLetter)(f: TestConsumer => Unit): Unit = {
     val channel = new StubChannel()
-    val client = new TaskAmqpClient(channel)
+    val client  = new TaskAmqpClient(channel)
     val handler = new StubConsumeHandler[Task, Payload]()
 
     val of1: Handler[Task, Delivery] = AmqpClient.handlerOf(handler, unmarshaller, unmarshalFailureAction)
-    val queueName = QueueName("blah")
+    val queueName                    = QueueName("blah")
     client.consumer(queueName, of1, actionOnFailure).run.unsafePerformAsync { result =>
       logger.info(s"Close consumer for $queueName: $result")
     }
 
     f(TestConsumer(channel, handler))
   }
-
 
 }

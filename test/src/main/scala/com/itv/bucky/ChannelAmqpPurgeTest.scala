@@ -17,7 +17,9 @@ trait ChannelAmqpPurgeTest[F[_]] extends FunSuite with PublisherBaseTest[F] with
 
     withPublisher(queueName) { app =>
       logger.info(s"Publish message on $queueName")
-      verifySuccess(app.publisher(PublishCommand(app.exchangeName, app.routingKey, MessageProperties.persistentBasic, Any.payload())))
+      verifySuccess(
+        app.publisher(
+          PublishCommand(app.exchangeName, app.routingKey, MessageProperties.persistentBasic, Any.payload())))
     }
     withPublisher(queueName, shouldDeclare = false) { app =>
       Eventually.eventually {

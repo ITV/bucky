@@ -15,12 +15,12 @@ import scala.concurrent.Future
 object UnmarshallingConsumer extends App with StrictLogging {
 
   //start snippet 1
-  val config = ConfigFactory.load("bucky")
+  val config                             = ConfigFactory.load("bucky")
   val amqpClientConfig: AmqpClientConfig = AmqpClientConfig(config.getString("rmq.host"), 5672, "guest", "guest")
 
   object Declarations {
     val queue = Queue(QueueName("queue.people"))
-    val all = List(queue)
+    val all   = List(queue)
   }
   case class Person(name: String, age: Int)
   //end snippet 1
@@ -45,9 +45,8 @@ object UnmarshallingConsumer extends App with StrictLogging {
   val personUnmarshaller: PayloadUnmarshaller[Person] =
     for {
       csvString <- StringPayloadUnmarshaller
-      person <- csvStringToPerson(csvString)
-    }
-      yield person
+      person    <- csvStringToPerson(csvString)
+    } yield person
   //end snippet 2
 
   //start snippet 3
@@ -68,12 +67,11 @@ object UnmarshallingConsumer extends App with StrictLogging {
   val lifecycle: Lifecycle[Unit] =
     for {
       amqpClient <- AmqpClientLifecycle(amqpClientConfig)
-      _ <- DeclarationLifecycle(Declarations.all, amqpClient)
+      _          <- DeclarationLifecycle(Declarations.all, amqpClient)
       effectMonad = amqpClient.effectMonad
       _ <- amqpClient.consumer(Declarations.queue.name,
-        AmqpClient.handlerOf(personHandler, personUnmarshaller)(effectMonad))
-    }
-      yield ()
+                               AmqpClient.handlerOf(personHandler, personUnmarshaller)(effectMonad))
+    } yield ()
 
   lifecycle.runUntilJvmShutdown()
   //end snippet 4

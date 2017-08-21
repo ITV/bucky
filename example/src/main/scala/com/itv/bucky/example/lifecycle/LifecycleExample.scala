@@ -99,9 +99,8 @@ object OuterLifecycleExample {
     val main =
       for {
         connection <- connectionLifecycle
-        _ <- consumerLifecycle(connection, "queue1")
-      }
-        yield ()
+        _          <- consumerLifecycle(connection, "queue1")
+      } yield ()
 
     main.map(_ => program()).runUntilJvmShutdown()
   }

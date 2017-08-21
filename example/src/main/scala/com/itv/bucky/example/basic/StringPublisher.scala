@@ -1,6 +1,5 @@
 package com.itv.bucky.example.basic
 
-
 import com.itv.lifecycle.Lifecycle
 import com.itv.bucky._
 import com.itv.bucky.decl._
@@ -15,22 +14,22 @@ import scala.concurrent.{Await, Future}
 
 /*
 This example aims to give a minimal structure to:
-* Declare a queue, exchange and binding
-* Publish a raw String to a routing key
+ * Declare a queue, exchange and binding
+ * Publish a raw String to a routing key
 It is not very useful by itself, but hopefully reveals the structure of how Bucky components fit together
  */
 
 object StringPublisher extends App {
 
   object Declarations {
-    val queue = Queue(QueueName("queue.string"))
+    val queue      = Queue(QueueName("queue.string"))
     val routingKey = RoutingKey("stringPublisherRoutingKey")
-    val exchange = Exchange(ExchangeName("exchange.string-publisher")).binding(routingKey -> queue.name)
+    val exchange   = Exchange(ExchangeName("exchange.string-publisher")).binding(routingKey -> queue.name)
 
     val all = List(queue, exchange)
   }
 
-  val config = ConfigFactory.load("bucky")
+  val config                             = ConfigFactory.load("bucky")
   val amqpClientConfig: AmqpClientConfig = AmqpClientConfig(config.getString("rmq.host"), 5672, "guest", "guest")
 
   /**
@@ -47,10 +46,9 @@ object StringPublisher extends App {
   val lifecycle: Lifecycle[Publisher[Future, String]] =
     for {
       amqpClient <- AmqpClientLifecycle(amqpClientConfig)
-      _ <- DeclarationLifecycle(Declarations.all, amqpClient)
-      publisher <- amqpClient.publisherOf(publisherConfig)
-    }
-      yield publisher
+      _          <- DeclarationLifecycle(Declarations.all, amqpClient)
+      publisher  <- amqpClient.publisherOf(publisherConfig)
+    } yield publisher
 
   Lifecycle.using(lifecycle) { publisher: Publisher[Future, String] =>
     val result: Future[Unit] = publisher("Hello, world!")

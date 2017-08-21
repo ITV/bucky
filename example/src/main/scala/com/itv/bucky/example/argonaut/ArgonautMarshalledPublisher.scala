@@ -19,14 +19,14 @@ import com.typesafe.config.ConfigFactory
 object ArgonautMarshalledPublisher extends App {
 
   object Declarations {
-    val queue = Queue(QueueName("queue.people.argonaut"))
+    val queue      = Queue(QueueName("queue.people.argonaut"))
     val routingKey = RoutingKey("personArgonautPublisherRoutingKey")
-    val exchange = Exchange(ExchangeName("exchange.person-publisher")).binding(routingKey -> queue.name)
+    val exchange   = Exchange(ExchangeName("exchange.person-publisher")).binding(routingKey -> queue.name)
 
     val all = List(queue, exchange)
   }
 
-  val config = ConfigFactory.load("bucky")
+  val config                             = ConfigFactory.load("bucky")
   val amqpClientConfig: AmqpClientConfig = AmqpClientConfig(config.getString("rmq.host"), 5672, "guest", "guest")
 
   /**
@@ -43,10 +43,9 @@ object ArgonautMarshalledPublisher extends App {
   val lifecycle: Lifecycle[Publisher[Future, Person]] =
     for {
       amqpClient <- AmqpClientLifecycle(amqpClientConfig)
-      _ <- DeclarationLifecycle(Declarations.all, amqpClient)
-      publisher <- amqpClient.publisherOf(publisherConfig)
-    }
-      yield publisher
+      _          <- DeclarationLifecycle(Declarations.all, amqpClient)
+      publisher  <- amqpClient.publisherOf(publisherConfig)
+    } yield publisher
 
   Lifecycle.using(lifecycle) { publisher: Publisher[Future, Person] =>
     val result: Future[Unit] = publisher(Person("Bob", 21))

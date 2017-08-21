@@ -15,7 +15,7 @@ package object bucky {
 
   trait MonadError[F[_], E] extends Monad[F] {
     def raiseError[A](e: E): F[A]
-    def handleError[A](fa: F[A])(f: E=> F[A]): F[A]
+    def handleError[A](fa: F[A])(f: E => F[A]): F[A]
   }
 
   object Monad {
@@ -32,21 +32,21 @@ package object bucky {
     import scala.language.implicitConversions
     class MonadOps[F[_], A](fa: F[A])(implicit M: Monad[F]) {
       def flatMap[B](f: A => F[B]) = M.flatMap(fa)(f)
-      def map[B]()(f: A => B) = M.map(fa)(f)
+      def map[B]()(f: A => B)      = M.map(fa)(f)
     }
 
     implicit def toMonad[F[_], A](fa: F[A])(implicit M: Monad[F]) = new MonadOps(fa)
   }
 
-  type Publisher[F[_], -T] = T => F[Unit]
-  type Handler[F[_], -T] = T => F[ConsumeAction]
+  type Publisher[F[_], -T]      = T => F[Unit]
+  type Handler[F[_], -T]        = T => F[ConsumeAction]
   type RequeueHandler[F[_], -T] = T => F[RequeueConsumeAction]
 
   object Handler {
     def apply[F[_], T](f: T => F[ConsumeAction]): Handler[F, T] = new Handler[F, T] {
-        override def apply(message: T): F[ConsumeAction] =
-          f(message)
-      }
+      override def apply(message: T): F[ConsumeAction] =
+        f(message)
+    }
   }
 
   object RequeueHandler {
@@ -59,10 +59,13 @@ package object bucky {
 
   type Bindings = PartialFunction[RoutingKey, QueueName]
 
-  type PayloadUnmarshaller[T] = Unmarshaller[Payload, T]
+  type PayloadUnmarshaller[T]  = Unmarshaller[Payload, T]
   type DeliveryUnmarshaller[T] = Unmarshaller[Delivery, T]
 
-  case class PublishCommand(exchange: ExchangeName, routingKey: RoutingKey, basicProperties: MessageProperties, body: Payload) {
+  case class PublishCommand(exchange: ExchangeName,
+                            routingKey: RoutingKey,
+                            basicProperties: MessageProperties,
+                            body: Payload) {
     def description = s"${exchange.value}:${routingKey.value} $body"
   }
 
@@ -87,7 +90,8 @@ package object bucky {
   case class ConsumerTag(value: String)
 
   object ConsumerTag {
-    def create(queueName: QueueName): ConsumerTag = ConsumerTag(s"${ManagementFactory.getRuntimeMXBean.getName}-${queueName.value}")
+    def create(queueName: QueueName): ConsumerTag =
+      ConsumerTag(s"${ManagementFactory.getRuntimeMXBean.getName}-${queueName.value}")
   }
 
   case class Envelope(deliveryTag: Long, redeliver: Boolean, exchangeName: ExchangeName, routingKey: RoutingKey)
@@ -95,21 +99,21 @@ package object bucky {
   case class Delivery(body: Payload, consumerTag: ConsumerTag, envelope: Envelope, properties: MessageProperties)
 
   case class MessageProperties(
-                                contentType: Option[ContentType],
-                                contentEncoding: Option[ContentEncoding],
-                                headers: Map[String, AnyRef],
-                                deliveryMode: Option[DeliveryMode],
-                                priority: Option[Int],
-                                correlationId: Option[String],
-                                replyTo: Option[String],
-                                expiration: Option[String],
-                                messageId: Option[String],
-                                timestamp: Option[Date],
-                                messageType: Option[String],
-                                userId: Option[String],
-                                appId: Option[String],
-                                clusterId: Option[String]
-                              ) {
+      contentType: Option[ContentType],
+      contentEncoding: Option[ContentEncoding],
+      headers: Map[String, AnyRef],
+      deliveryMode: Option[DeliveryMode],
+      priority: Option[Int],
+      correlationId: Option[String],
+      replyTo: Option[String],
+      expiration: Option[String],
+      messageId: Option[String],
+      timestamp: Option[Date],
+      messageType: Option[String],
+      userId: Option[String],
+      appId: Option[String],
+      clusterId: Option[String]
+  ) {
     def withHeader(header: (String, AnyRef)): MessageProperties = this.copy(
       headers = this.headers + header
     )
@@ -118,7 +122,7 @@ package object bucky {
   case class DeliveryMode(value: Int)
 
   object DeliveryMode {
-    val persistent = DeliveryMode(2)
+    val persistent    = DeliveryMode(2)
     val nonPersistent = DeliveryMode(1)
   }
 
@@ -126,7 +130,7 @@ package object bucky {
 
   object ContentType {
     val octetStream = ContentType("application/octet-stream")
-    val textPlain = ContentType("text/plain")
+    val textPlain   = ContentType("text/plain")
   }
 
   case class ContentEncoding(value: String)
@@ -136,20 +140,18 @@ package object bucky {
   }
 
   object MessageProperties {
-    val minimalBasic = MessageProperties(None, None, Map(), None, None, None, None, None, None, None, None, None, None, None)
+    val minimalBasic =
+      MessageProperties(None, None, Map(), None, None, None, None, None, None, None, None, None, None, None)
 
-    val minimalPersistentBasic = minimalBasic.copy(
-      deliveryMode = Some(DeliveryMode.persistent))
+    val minimalPersistentBasic = minimalBasic.copy(deliveryMode = Some(DeliveryMode.persistent))
 
-    val basic = minimalBasic.copy(
-      contentType = Some(ContentType.octetStream),
-      deliveryMode = Some(DeliveryMode.nonPersistent),
-      priority = Some(0))
+    val basic = minimalBasic.copy(contentType = Some(ContentType.octetStream),
+                                  deliveryMode = Some(DeliveryMode.nonPersistent),
+                                  priority = Some(0))
 
-    val persistentBasic = minimalBasic.copy(
-      contentType = Some(ContentType.octetStream),
-      deliveryMode = Some(DeliveryMode.persistent),
-      priority = Some(0))
+    val persistentBasic = minimalBasic.copy(contentType = Some(ContentType.octetStream),
+                                            deliveryMode = Some(DeliveryMode.persistent),
+                                            priority = Some(0))
 
     val textPlain = minimalBasic.copy(
       contentType = Some(ContentType.textPlain),

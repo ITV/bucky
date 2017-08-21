@@ -8,12 +8,12 @@ import com.rabbitmq.client.{AMQP, Method, MessageProperties => RMessagePropertie
 
 import scala.collection.mutable.ListBuffer
 
+class StubChannel
+    extends ChannelN(null, 0, new ConsumerWorkService(MoreExecutors.newDirectExecutorService(), null, 1)) {
 
-class StubChannel extends ChannelN(null, 0, new ConsumerWorkService(MoreExecutors.newDirectExecutorService(), null, 1)) {
-
-  val transmittedCommands: ListBuffer[Method] = ListBuffer.empty
+  val transmittedCommands: ListBuffer[Method]   = ListBuffer.empty
   val consumers: ListBuffer[AMQP.Basic.Consume] = ListBuffer.empty
-  var setPrefetchCount = 0
+  var setPrefetchCount                          = 0
 
   override def quiescingTransmit(c: AMQCommand): Unit = {
     val method = c.getMethod
@@ -43,7 +43,9 @@ class StubChannel extends ChannelN(null, 0, new ConsumerWorkService(MoreExecutor
     handleCompleteInboundCommand(new AMQCommand(method))
   }
 
-  def deliver(delivery: AMQP.Basic.Deliver, body: Payload, properties: AMQP.BasicProperties = RMessageProperties.BASIC): Unit = {
+  def deliver(delivery: AMQP.Basic.Deliver,
+              body: Payload,
+              properties: AMQP.BasicProperties = RMessageProperties.BASIC): Unit = {
     handleCompleteInboundCommand(new AMQCommand(delivery, properties, body.value))
   }
 }

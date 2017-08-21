@@ -13,11 +13,11 @@ import scala.concurrent.{Await, Future}
 object RawConsumer extends App with StrictLogging {
 
   //start snippet 1
-  val brokerHostname = ConfigFactory.load("bucky").getString("rmq.host")
+  val brokerHostname   = ConfigFactory.load("bucky").getString("rmq.host")
   val amqpClientConfig = AmqpClientConfig(brokerHostname, 5672, "guest", "guest")
 
   object Declarations {
-    val queue = Queue(QueueName("raw.consumer.queue"))
+    val queue      = Queue(QueueName("raw.consumer.queue"))
     val routingKey = RoutingKey("raw.publish.routingkey")
     val exchange =
       Exchange(ExchangeName("raw.publisher.exchange"))
@@ -39,10 +39,10 @@ object RawConsumer extends App with StrictLogging {
         case UnmarshalResult.Success(string) =>
           logger.info("Received message " + string)
           Ack
-          //if we CANNOT translate this payload into into a UTF8 string
-          //log and deadletter the message
-          //(remove from queue, re-route to the deadletter exchange configured
-          //on the queue
+        //if we CANNOT translate this payload into into a UTF8 string
+        //log and deadletter the message
+        //(remove from queue, re-route to the deadletter exchange configured
+        //on the queue
         case UnmarshalResult.Failure(reason, _) =>
           logger.error(s"could not translate message to a string")
           DeadLetter
@@ -54,14 +54,13 @@ object RawConsumer extends App with StrictLogging {
   //start snippet 3
   val consumerLifecycle: Lifecycle[Unit] =
     for {
-    //create a connection to the broker
+      //create a connection to the broker
       client <- AmqpClientLifecycle(amqpClientConfig)
       //declare the exchange we will publish to
       _ <- DeclarationLifecycle(Declarations.all, client)
       //create an instance of a generic publisher
       _ <- client.consumer(Declarations.queue.name, handler)
-    }
-      yield ()
+    } yield ()
 
   consumerLifecycle.runUntilJvmShutdown()
   //end snippet 3

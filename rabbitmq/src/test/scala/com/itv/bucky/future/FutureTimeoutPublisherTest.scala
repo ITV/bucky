@@ -22,18 +22,19 @@ class FutureTimeoutPublisherTest extends FunSuite with ScalaFutures with StrictL
   import FutureExt._
 
   test("Returns result of delegate publisher if result occurs before timeout") {
-    val command1 = Any.publishCommand()
-    val command2 = Any.publishCommand()
+    val command1         = Any.publishCommand()
+    val command2         = Any.publishCommand()
     val expectedOutcome1 = Success(())
     val expectedOutcome2 = Failure(new RuntimeException("Bang!"))
     val delegate: Publisher[Future, PublishCommand] = {
-      case `command1` => Future.fromTry(expectedOutcome1)
-      case `command2` => Future.fromTry(expectedOutcome2)
+      case `command1`                 => Future.fromTry(expectedOutcome1)
+      case `command2`                 => Future.fromTry(expectedOutcome2)
       case PublishCommand(_, _, _, _) => fail("Unexpected outcome")
     }
     val service = mock[ScheduledExecutorService]
     when(service.execute(any[Runnable]())).thenAnswer(new Answer[Unit] {
-      override def answer(invocation: InvocationOnMock): Unit = invocation.getArguments()(0).asInstanceOf[Runnable].run()
+      override def answer(invocation: InvocationOnMock): Unit =
+        invocation.getArguments()(0).asInstanceOf[Runnable].run()
     })
 
     val publisher = new FutureTimeoutPublisher(delegate, 5.seconds)(service)
@@ -44,7 +45,9 @@ class FutureTimeoutPublisherTest extends FunSuite with ScalaFutures with StrictL
 
   test(s"Returns timeout of delegate publisher if result occurs after timeout") {
     Lifecycle.using(ExecutorLifecycles.singleThreadScheduledExecutor) { scheduledExecutor =>
-      val delegate: Publisher[Future, PublishCommand] = { _ => Promise[Nothing]().future }
+      val delegate: Publisher[Future, PublishCommand] = { _ =>
+        Promise[Nothing]().future
+      }
 
       val publisher = new FutureTimeoutPublisher(delegate, 250.millis)(scheduledExecutor)
 

@@ -8,13 +8,14 @@ import scala.concurrent.duration.{FiniteDuration, _}
 import scala.util.{Failure, Success}
 import scala.language.higherKinds
 
-
-object DeclarationExecutor extends StrictLogging{
-  def apply[B[_], F[_], E, C](declarations: Iterable[Declaration], client: AmqpClient[B, F, E, C], timeout: FiniteDuration = 5.seconds): Id[Unit] = {
+object DeclarationExecutor extends StrictLogging {
+  def apply[B[_], F[_], E, C](declarations: Iterable[Declaration],
+                              client: AmqpClient[B, F, E, C],
+                              timeout: FiniteDuration = 5.seconds): Id[Unit] = {
     logger.info(s"Applying the following declarations: $declarations")
 
     client.performOps(Declaration.runAll(declarations)) match {
-      case Success(_) => ()
+      case Success(_)      => ()
       case Failure(reason) => throw new IllegalStateException("Unable to apply all declarations", reason)
     }
   }

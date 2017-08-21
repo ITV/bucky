@@ -17,7 +17,7 @@ package object decl {
       ops => {
         val (bindings, rest) = declaration.partition {
           case binding: Binding => true
-          case _ => false
+          case _                => false
         }
         for {
           _ <- TryUtil.sequence(rest.map(_.run(ops)))
@@ -49,7 +49,9 @@ package object decl {
                       shouldAutoDelete: Boolean = false,
                       isInternal: Boolean = false,
                       arguments: Map[String, AnyRef] = Map.empty,
-                      bindings: List[Binding] = List.empty) extends Declaration with StrictLogging {
+                      bindings: List[Binding] = List.empty)
+      extends Declaration
+      with StrictLogging {
 
     def notDurable: Exchange = copy(isDurable = false)
 
@@ -65,20 +67,22 @@ package object decl {
       copy(bindings = this.bindings :+ Binding(name, routingKeyToQueue._2, routingKeyToQueue._1, arguments))
 
     override def run: (AmqpOps) => Try[Unit] = ops => {
-      logger.info(s"Declaring Exchange($name, $exchangeType, isDurable=$isDurable, shouldAutoDelete=$shouldAutoDelete, isInternal=$isInternal, arguments=$arguments)")
+      logger.info(
+        s"Declaring Exchange($name, $exchangeType, isDurable=$isDurable, shouldAutoDelete=$shouldAutoDelete, isInternal=$isInternal, arguments=$arguments)")
 
       for {
         _ <- ops.declareExchange(this)
         _ <- TryUtil.sequence(bindings.map(_.run(ops)))
-      }
-        yield ()
+      } yield ()
     }
   }
 
   case class Binding(exchangeName: ExchangeName,
                      queueName: QueueName,
                      routingKey: RoutingKey,
-                     arguments: Map[String, AnyRef]) extends Declaration with StrictLogging {
+                     arguments: Map[String, AnyRef])
+      extends Declaration
+      with StrictLogging {
     override def run: (AmqpOps) => Try[Unit] = ops => {
       logger.info(s"Declaring $this")
       ops.bindQueue(this)
@@ -88,7 +92,9 @@ package object decl {
   case class ExchangeBinding(destinationExchangeName: ExchangeName,
                              sourceExchangeName: ExchangeName,
                              routingKey: RoutingKey,
-                             arguments: Map[String, AnyRef]) extends Declaration with StrictLogging {
+                             arguments: Map[String, AnyRef])
+      extends Declaration
+      with StrictLogging {
     override def run: (AmqpOps) => Try[Unit] = ops => {
       logger.info(s"Declaring $this")
       ops.bindExchange(this)
@@ -99,7 +105,9 @@ package object decl {
                    isDurable: Boolean = true,
                    isExclusive: Boolean = false,
                    shouldAutoDelete: Boolean = false,
-                   arguments: Map[String, AnyRef] = Map.empty) extends Declaration with StrictLogging {
+                   arguments: Map[String, AnyRef] = Map.empty)
+      extends Declaration
+      with StrictLogging {
 
     def notDurable: Queue = copy(isDurable = false)
 
@@ -111,7 +119,8 @@ package object decl {
 
     def expires(value: FiniteDuration): Queue = argument("x-expires" -> Long.box(value.toMillis))
 
-    def deadLetterExchange(exchangeName: ExchangeName): Queue = argument("x-dead-letter-exchange" -> exchangeName.value)
+    def deadLetterExchange(exchangeName: ExchangeName): Queue =
+      argument("x-dead-letter-exchange" -> exchangeName.value)
 
     def messageTTL(value: FiniteDuration): Queue = argument("x-message-ttl" -> Long.box(value.toMillis))
 

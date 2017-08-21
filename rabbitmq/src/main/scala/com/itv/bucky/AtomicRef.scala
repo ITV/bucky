@@ -7,7 +7,7 @@ object AtomicRef {
 
   type Ref[A] = AtomicReference[A]
 
-  implicit class Atomic[A](val atomic: AtomicReference[A]){
+  implicit class Atomic[A](val atomic: AtomicReference[A]) {
     @tailrec final def update(f: A => A): A = {
       val oldValue = atomic.get()
       val newValue = f(oldValue)

@@ -9,7 +9,7 @@ import scala.language.higherKinds
 import scala.util.Try
 
 case class FutureIdAmqpClient(channel: Id[RabbitChannel])(implicit executionContext: ExecutionContext)
-  extends FutureAmqpClient[Id](channel)(executionContext) {
+    extends FutureAmqpClient[Id](channel)(executionContext) {
 
   override implicit def monad: Monad[Id] = Monad.idMonad
 
@@ -19,16 +19,17 @@ case class FutureIdAmqpClient(channel: Id[RabbitChannel])(implicit executionCont
     Channel.estimateMessageCount(channel, queueName)
 }
 
-
 object FutureIdAmqpClient {
   import Monad.toMonad
 
   def apply(config: AmqpClientConfig)(implicit executionContext: ExecutionContext): Id[FutureIdAmqpClient] = {
-    Connection(config).flatMap(
-      Channel(_)
-    ).flatMap(
-      FutureIdAmqpClient(_)
-    )
+    Connection(config)
+      .flatMap(
+        Channel(_)
+      )
+      .flatMap(
+        FutureIdAmqpClient(_)
+      )
   }
 
 }

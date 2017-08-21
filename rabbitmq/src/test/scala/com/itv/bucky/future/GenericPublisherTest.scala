@@ -12,8 +12,8 @@ class GenericPublisherTest extends FunSuite with ScalaFutures {
   import FutureExt._
 
   test("Publishing only returns success once publication is acknowledged") {
-    val client = createClient()
-    val expectedExchange = ExchangeName("")
+    val client             = createClient()
+    val expectedExchange   = ExchangeName("")
     val expectedRoutingKey = RoutingKey("mymessage")
     val expectedProperties = MessageProperties.textPlain
 
@@ -28,7 +28,7 @@ class GenericPublisherTest extends FunSuite with ScalaFutures {
       publishCommandBuilder(bananaMarshaller) using expectedExchange using expectedRoutingKey using expectedProperties
 
     val publish = AmqpClient.publisherOf(bananaSerializer)(client)
-    val result = publish(Banana)
+    val result  = publish(Banana)
 
     result shouldBe 'completed
     result.futureValue.shouldBe(())
@@ -43,23 +43,21 @@ class GenericPublisherTest extends FunSuite with ScalaFutures {
   }
 
   test("publishing with a broken publish command serializer should fail the publish future") {
-      object Banana
-      val expectedException = new RuntimeException("What's a banana?")
+    object Banana
+    val expectedException = new RuntimeException("What's a banana?")
 
-
-      implicit val serializer = new PublishCommandBuilder[Banana.type] {
-        def toPublishCommand(t: Banana.type): PublishCommand =
-          throw expectedException
-      }
-
-      val client = createClient()
-
-      val publish = AmqpClient.publisherOf[Future, Banana.type](serializer)(client)
-      val result = publish(Banana).failed.futureValue
-
-      result shouldBe expectedException
+    implicit val serializer = new PublishCommandBuilder[Banana.type] {
+      def toPublishCommand(t: Banana.type): PublishCommand =
+        throw expectedException
     }
 
+    val client = createClient()
+
+    val publish = AmqpClient.publisherOf[Future, Banana.type](serializer)(client)
+    val result  = publish(Banana).failed.futureValue
+
+    result shouldBe expectedException
+  }
 
   private def createClient(): StubPublisher[Future, PublishCommand] = {
     new StubPublisher[Future, PublishCommand]()

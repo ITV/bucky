@@ -12,12 +12,18 @@ import scala.util.Random
 class MessagePropertiesConverter extends FunSuite {
 
   test("it should be able to convert default message properties") {
-    MessagePropertiesConverters(RMessageProperties.BASIC) shouldBe MessagePropertiesConverters(MessagePropertiesConverters(MessageProperties.basic))
-    MessagePropertiesConverters(RMessageProperties.MINIMAL_BASIC) shouldBe MessagePropertiesConverters(MessagePropertiesConverters(MessageProperties.minimalBasic))
-    MessagePropertiesConverters(RMessageProperties.MINIMAL_PERSISTENT_BASIC) shouldBe MessagePropertiesConverters(MessagePropertiesConverters(MessageProperties.minimalPersistentBasic))
-    MessagePropertiesConverters(RMessageProperties.PERSISTENT_BASIC) shouldBe MessagePropertiesConverters(MessagePropertiesConverters(MessageProperties.persistentBasic))
-    MessagePropertiesConverters(RMessageProperties.PERSISTENT_TEXT_PLAIN) shouldBe MessagePropertiesConverters(MessagePropertiesConverters(MessageProperties.persistentTextPlain))
-    MessagePropertiesConverters(RMessageProperties.TEXT_PLAIN) shouldBe MessagePropertiesConverters(MessagePropertiesConverters(MessageProperties.textPlain))
+    MessagePropertiesConverters(RMessageProperties.BASIC) shouldBe MessagePropertiesConverters(
+      MessagePropertiesConverters(MessageProperties.basic))
+    MessagePropertiesConverters(RMessageProperties.MINIMAL_BASIC) shouldBe MessagePropertiesConverters(
+      MessagePropertiesConverters(MessageProperties.minimalBasic))
+    MessagePropertiesConverters(RMessageProperties.MINIMAL_PERSISTENT_BASIC) shouldBe MessagePropertiesConverters(
+      MessagePropertiesConverters(MessageProperties.minimalPersistentBasic))
+    MessagePropertiesConverters(RMessageProperties.PERSISTENT_BASIC) shouldBe MessagePropertiesConverters(
+      MessagePropertiesConverters(MessageProperties.persistentBasic))
+    MessagePropertiesConverters(RMessageProperties.PERSISTENT_TEXT_PLAIN) shouldBe MessagePropertiesConverters(
+      MessagePropertiesConverters(MessageProperties.persistentTextPlain))
+    MessagePropertiesConverters(RMessageProperties.TEXT_PLAIN) shouldBe MessagePropertiesConverters(
+      MessagePropertiesConverters(MessageProperties.textPlain))
   }
 
   test("it should be able to convert convert all the properties") {

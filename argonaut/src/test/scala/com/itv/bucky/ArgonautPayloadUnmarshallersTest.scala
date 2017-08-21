@@ -9,7 +9,7 @@ import org.scalatest.Matchers._
 
 import scala.util.Random
 
-class ArgonautPayloadUnmarshallersTest  extends FunSuite {
+class ArgonautPayloadUnmarshallersTest extends FunSuite {
 
   import UnmarshalResultOps._
   import com.itv.bucky.ArgonautSupport._
@@ -18,7 +18,7 @@ class ArgonautPayloadUnmarshallersTest  extends FunSuite {
   implicit val someCodec: CodecJson[Some] = casecodec1(Some.apply, Some.unapply)("foo")
 
   test("it should parse a json object") {
-    val expectedValue = s"bar ${new Random().nextInt(10)}"
+    val expectedValue    = s"bar ${new Random().nextInt(10)}"
     val payload: Payload = validJson(expectedValue)
     val jsonResult: Json = new UnmarshalResultOps(unmarshallerFromDecodeJson[Json].unmarshal(payload)).success
 
@@ -34,7 +34,7 @@ class ArgonautPayloadUnmarshallersTest  extends FunSuite {
 
   test("it should convert to a type") {
     val expectedValue = s"Test-${new Random().nextInt().toString.take(10)}"
-    val payload = validJson(expectedValue)
+    val payload       = validJson(expectedValue)
 
     val someResult = unmarshallerFromDecodeJson[Some].unmarshal(payload).success
 
@@ -42,7 +42,7 @@ class ArgonautPayloadUnmarshallersTest  extends FunSuite {
   }
 
   test("it should not parse to a type with an invalid json") {
-    val payload = invalidJson()
+    val payload    = invalidJson()
     val jsonResult = unmarshallerFromDecodeJson[Some].unmarshal(payload).failure
 
     jsonResult should include(StringPayloadUnmarshaller.unmarshal(payload).success)
@@ -50,21 +50,21 @@ class ArgonautPayloadUnmarshallersTest  extends FunSuite {
 
   test("can implicitly unmarshal a json") {
     val jsonPayload = validJson("Hello")
-    val result = jsonPayload.unmarshal(unmarshallerFromDecodeJson[Json]).success.nospaces
-    val expected = StringPayloadUnmarshaller.unmarshal(jsonPayload).success
+    val result      = jsonPayload.unmarshal(unmarshallerFromDecodeJson[Json]).success.nospaces
+    val expected    = StringPayloadUnmarshaller.unmarshal(jsonPayload).success
     result shouldBe expected
   }
 
   test("can implicitly unmarshal a type") {
     val jsonPayload = validJson("Hello")
 
-    val result = jsonPayload.unmarshal(unmarshallerFromDecodeJson[Some]).success.asJson.nospaces
+    val result   = jsonPayload.unmarshal(unmarshallerFromDecodeJson[Some]).success.asJson.nospaces
     val expected = StringPayloadUnmarshaller.unmarshal(jsonPayload).success
 
     result shouldBe expected
   }
 
-  def validJson(value: String): Payload =  Payload.from(s"""{"foo":"$value"}""")(StringPayloadMarshaller)
-  def invalidJson() = Payload.from(s"<[Bar: ${new Random().nextInt()}}]")
+  def validJson(value: String): Payload = Payload.from(s"""{"foo":"$value"}""")(StringPayloadMarshaller)
+  def invalidJson()                     = Payload.from(s"<[Bar: ${new Random().nextInt()}}]")
 
 }
