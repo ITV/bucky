@@ -128,7 +128,6 @@ class NetworkRecoveryIntegrationTest extends FunSuite with ScalaFutures with Str
             handlerB.receivedMessages should have size 3
           }
         }
-
     }
   }
 
