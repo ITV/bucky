@@ -25,7 +25,6 @@ class NetworkRecoveryIntegrationTest extends FunSuite with ScalaFutures with Str
 
   test("cannot recover connection from a network failure on start when the policy is not defined") {
     val (freePort, amqpClientConfig, proxyConfig) = config
-
     val lifecycle = for {
       proxy <- ProxyLifecycle.apply(local = HostPort("localhost", freePort),
                                     remote = HostPort(amqpClientConfig.host, amqpClientConfig.port))
@@ -37,7 +36,6 @@ class NetworkRecoveryIntegrationTest extends FunSuite with ScalaFutures with Str
     Try(Lifecycle.using(lifecycle) {
       case (_, _) =>
     }) shouldBe 'failure
-
   }
 
   test("can recover connection from a network failure on start") {
@@ -131,7 +129,6 @@ class NetworkRecoveryIntegrationTest extends FunSuite with ScalaFutures with Str
           }
         }
     }
-
   }
 
   def withProxyConfigured(
@@ -208,10 +205,8 @@ class NetworkRecoveryIntegrationTest extends FunSuite with ScalaFutures with Str
 
     val stubConsumeHandler = new StubConsumeHandler[Task, Delivery]()
 
-    amqpClient.consumer(queueName, stubConsumeHandler).run.unsafePerformAsync { result =>
+    amqpClient.consumer(queueName, stubConsumeHandler).run.unsafePerformAsync { _ =>
       }
-
     stubConsumeHandler
   }
-
 }
