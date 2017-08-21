@@ -20,7 +20,7 @@ class PublisherTest extends FunSuite with ScalaFutures {
 
   test("Publishing only returns success once publication is acknowledged with Id") {
     val channel = new StubChannel()
-    val client = new FutureIdAmqpClient(channel)
+    val client  = new FutureIdAmqpClient(channel)
 
     val publish = client.publisher(timeout = Duration.Inf)
 
@@ -42,10 +42,9 @@ class PublisherTest extends FunSuite with ScalaFutures {
 
   test("Publishing only returns success once publication is acknowledged") {
     val channel = new StubChannel()
-    val client = createClient(channel)
+    val client  = createClient(channel)
 
     Lifecycle.using(client.publisher(timeout = Duration.Inf)) { publish =>
-
       channel.transmittedCommands should have size 1
       channel.transmittedCommands.last shouldBe an[AMQP.Confirm.Select]
 
@@ -65,10 +64,9 @@ class PublisherTest extends FunSuite with ScalaFutures {
 
   test("Negative acknowledgements result in failed future") {
     val channel = new StubChannel()
-    val client = createClient(channel)
+    val client  = createClient(channel)
 
     Lifecycle.using(client.publisher(timeout = Duration.Inf)) { publish =>
-
       val result = publish(Any.publishCommand())
 
       result should not be 'completed
@@ -82,10 +80,9 @@ class PublisherTest extends FunSuite with ScalaFutures {
 
   test("Only futures corresponding to acknowledged publications are completed") {
     val channel = new StubChannel()
-    val client = createClient(channel)
+    val client  = createClient(channel)
 
     Lifecycle.using(client.publisher(timeout = Duration.Inf)) { publish =>
-
       val pub1 = publish(Any.publishCommand())
       val pub2 = publish(Any.publishCommand())
       val pub3 = publish(Any.publishCommand())
@@ -110,10 +107,9 @@ class PublisherTest extends FunSuite with ScalaFutures {
 
   test("Only futures corresponding to acknowledged publications are completed: negative acknowledgment (nack)") {
     val channel = new StubChannel()
-    val client = createClient(channel)
+    val client  = createClient(channel)
 
     Lifecycle.using(client.publisher(timeout = Duration.Inf)) { publish =>
-
       val pub1 = publish(Any.publishCommand())
       val pub2 = publish(Any.publishCommand())
       val pub3 = publish(Any.publishCommand())
@@ -139,14 +135,18 @@ class PublisherTest extends FunSuite with ScalaFutures {
   test("Cannot publish when there is a IOException") {
     val expectedMsg = "There is a network problem"
     val channel = new StubChannel {
-      override def basicPublish(exchange: String, routingKey: String, mandatory: Boolean, immediate: Boolean, props: AMQP.BasicProperties, body: Array[Byte]): Unit =
+      override def basicPublish(exchange: String,
+                                routingKey: String,
+                                mandatory: Boolean,
+                                immediate: Boolean,
+                                props: AMQP.BasicProperties,
+                                body: Array[Byte]): Unit =
         throw new IOException(expectedMsg)
 
     }
     val client = createClient(channel)
 
     Lifecycle.using(client.publisher(Duration.Inf)) { publish =>
-
       channel.transmittedCommands should have size 1
       channel.transmittedCommands.last shouldBe an[AMQP.Confirm.Select]
 
@@ -160,10 +160,9 @@ class PublisherTest extends FunSuite with ScalaFutures {
 
   test("Publisher times out if configured to do so") {
     val channel = new StubChannel()
-    val client = createClient(channel)
+    val client  = createClient(channel)
 
     Lifecycle.using(client.publisher(timeout = 10.millis)) { publish =>
-
       val result = publish(Any.publishCommand())
 
       result.asTry.futureValue.failed.get shouldBe a[TimeoutException]

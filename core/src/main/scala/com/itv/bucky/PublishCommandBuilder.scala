@@ -21,7 +21,9 @@ object PublishCommandBuilder {
 
   }
 
-  case class WithoutRoutingKey[T](exchange: ExchangeName, properties: Option[MessageProperties] = None, marshaller: PayloadMarshaller[T]) {
+  case class WithoutRoutingKey[T](exchange: ExchangeName,
+                                  properties: Option[MessageProperties] = None,
+                                  marshaller: PayloadMarshaller[T]) {
 
     def using(routingKey: RoutingKey): Builder[T] =
       Builder(exchange, routingKey, properties, marshaller)
@@ -31,7 +33,9 @@ object PublishCommandBuilder {
 
   }
 
-  case class WithoutExchange[T](routingKey: RoutingKey, properties: Option[MessageProperties] = None, marshaller: PayloadMarshaller[T]) {
+  case class WithoutExchange[T](routingKey: RoutingKey,
+                                properties: Option[MessageProperties] = None,
+                                marshaller: PayloadMarshaller[T]) {
 
     def using(exchange: ExchangeName): Builder[T] =
       Builder(exchange, routingKey, properties, marshaller)
@@ -40,7 +44,11 @@ object PublishCommandBuilder {
       copy(properties = Some(basicProperties))
   }
 
-  case class Builder[T](exchange: ExchangeName, routingKey: RoutingKey, properties: Option[MessageProperties], marshaller: PayloadMarshaller[T]) extends PublishCommandBuilder[T] {
+  case class Builder[T](exchange: ExchangeName,
+                        routingKey: RoutingKey,
+                        properties: Option[MessageProperties],
+                        marshaller: PayloadMarshaller[T])
+      extends PublishCommandBuilder[T] {
 
     override def toPublishCommand(t: T): PublishCommand =
       PublishCommand(exchange, routingKey, properties.fold(MessageProperties.persistentBasic)(identity), marshaller(t))

@@ -18,7 +18,7 @@ class CircePayloadUnmarshallersTest extends FunSuite {
   case class Some(foo: String)
 
   test("it should parse a json object") {
-    val expectedValue = s"bar ${new Random().nextInt(10)}"
+    val expectedValue    = s"bar ${new Random().nextInt(10)}"
     val payload: Payload = validJson(expectedValue)
     val jsonResult: Json = unmarshallerFromDecodeJson[Json].unmarshal(payload).success
 
@@ -34,15 +34,14 @@ class CircePayloadUnmarshallersTest extends FunSuite {
 
   test(s"it should convert to a type") {
     val expectedValue = s"Random-${new Random().nextInt(100)}"
-    val payload = validJson(expectedValue)
+    val payload       = validJson(expectedValue)
 
     val someResult = unmarshallerFromDecodeJson[Some].unmarshal(payload).success
     someResult.foo shouldBe expectedValue
   }
 
-
   test("it should not parse to a type with an invalid json") {
-    val payload = invalidJson()
+    val payload    = invalidJson()
     val jsonResult = unmarshallerFromDecodeJson[Some].unmarshal(payload).failure
 
     jsonResult should include("< (line 1, column 1)")
@@ -50,15 +49,15 @@ class CircePayloadUnmarshallersTest extends FunSuite {
 
   test("can implicitly unmarshal a json") {
     val jsonPayload = validJson("Hello")
-    val result = jsonPayload.unmarshal(unmarshallerFromDecodeJson[Json]).success.noSpaces
-    val expected = StringPayloadUnmarshaller.unmarshal(jsonPayload).success
+    val result      = jsonPayload.unmarshal(unmarshallerFromDecodeJson[Json]).success.noSpaces
+    val expected    = StringPayloadUnmarshaller.unmarshal(jsonPayload).success
     result shouldBe expected
   }
 
   test("can implicitly unmarshal a type") {
     val jsonPayload = validJson("Hello")
 
-    val result = jsonPayload.unmarshal(unmarshallerFromDecodeJson[Some]).success.asJson.noSpaces
+    val result   = jsonPayload.unmarshal(unmarshallerFromDecodeJson[Some]).success.asJson.noSpaces
     val expected = StringPayloadUnmarshaller.unmarshal(jsonPayload).success
 
     result shouldBe expected

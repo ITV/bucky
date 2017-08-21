@@ -13,7 +13,7 @@ object UnmarshalResultOps {
         cause.fold(fail(message))(exception => fail(message, exception))
     }
     def failure: String = result match {
-      case Success(actualElem) => fail(s"It should not convert when an invalid payload is provided: $actualElem")
+      case Success(actualElem)    => fail(s"It should not convert when an invalid payload is provided: $actualElem")
       case Failure(reason, cause) => reason
     }
   }

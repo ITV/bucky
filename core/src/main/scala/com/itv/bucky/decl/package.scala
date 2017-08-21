@@ -1,7 +1,6 @@
 package com.itv.bucky
 
 import com.typesafe.scalalogging.StrictLogging
-import com.itv.bucky._
 
 import scala.concurrent.duration.FiniteDuration
 import scala.util.Try
@@ -12,15 +11,18 @@ package object decl {
     def run: AmqpOps => Try[Unit]
   }
 
-  object Declaration {
+  object Declaration extends StrictLogging {
     def runAll(declaration: Iterable[Declaration]): AmqpOps => Try[Unit] =
       ops => {
-        val (bindings, rest) = declaration.partition {
-          case binding: Binding => true
-          case _ => false
+        val queues    = declaration.collect { case queue: Queue       => queue }
+        val exchanges = declaration.collect { case exchange: Exchange => exchange }
+        val bindings = declaration.collect {
+          case binding: Binding                 => binding
+          case exchangeBinding: ExchangeBinding => exchangeBinding
         }
         for {
-          _ <- TryUtil.sequence(rest.map(_.run(ops)))
+          _ <- TryUtil.sequence(queues.map(_.run(ops)))
+          _ <- TryUtil.sequence(exchanges.map(_.run(ops)))
           _ <- TryUtil.sequence(bindings.map(_.run(ops)))
         } yield ()
       }
@@ -49,7 +51,9 @@ package object decl {
                       shouldAutoDelete: Boolean = false,
                       isInternal: Boolean = false,
                       arguments: Map[String, AnyRef] = Map.empty,
-                      bindings: List[Binding] = List.empty) extends Declaration with StrictLogging {
+                      bindings: List[Binding] = List.empty)
+      extends Declaration
+      with StrictLogging {
 
     def notDurable: Exchange = copy(isDurable = false)
 
@@ -65,20 +69,22 @@ package object decl {
       copy(bindings = this.bindings :+ Binding(name, routingKeyToQueue._2, routingKeyToQueue._1, arguments))
 
     override def run: (AmqpOps) => Try[Unit] = ops => {
-      logger.info(s"Declaring Exchange($name, $exchangeType, isDurable=$isDurable, shouldAutoDelete=$shouldAutoDelete, isInternal=$isInternal, arguments=$arguments)")
+      logger.info(
+        s"Declaring Exchange($name, $exchangeType, isDurable=$isDurable, shouldAutoDelete=$shouldAutoDelete, isInternal=$isInternal, arguments=$arguments)")
 
       for {
         _ <- ops.declareExchange(this)
         _ <- TryUtil.sequence(bindings.map(_.run(ops)))
-      }
-        yield ()
+      } yield ()
     }
   }
 
   case class Binding(exchangeName: ExchangeName,
                      queueName: QueueName,
                      routingKey: RoutingKey,
-                     arguments: Map[String, AnyRef]) extends Declaration with StrictLogging {
+                     arguments: Map[String, AnyRef])
+      extends Declaration
+      with StrictLogging {
     override def run: (AmqpOps) => Try[Unit] = ops => {
       logger.info(s"Declaring $this")
       ops.bindQueue(this)
@@ -88,7 +94,9 @@ package object decl {
   case class ExchangeBinding(destinationExchangeName: ExchangeName,
                              sourceExchangeName: ExchangeName,
                              routingKey: RoutingKey,
-                             arguments: Map[String, AnyRef]) extends Declaration with StrictLogging {
+                             arguments: Map[String, AnyRef])
+      extends Declaration
+      with StrictLogging {
     override def run: (AmqpOps) => Try[Unit] = ops => {
       logger.info(s"Declaring $this")
       ops.bindExchange(this)
@@ -99,7 +107,9 @@ package object decl {
                    isDurable: Boolean = true,
                    isExclusive: Boolean = false,
                    shouldAutoDelete: Boolean = false,
-                   arguments: Map[String, AnyRef] = Map.empty) extends Declaration with StrictLogging {
+                   arguments: Map[String, AnyRef] = Map.empty)
+      extends Declaration
+      with StrictLogging {
 
     def notDurable: Queue = copy(isDurable = false)
 
@@ -111,7 +121,8 @@ package object decl {
 
     def expires(value: FiniteDuration): Queue = argument("x-expires" -> Long.box(value.toMillis))
 
-    def deadLetterExchange(exchangeName: ExchangeName): Queue = argument("x-dead-letter-exchange" -> exchangeName.value)
+    def deadLetterExchange(exchangeName: ExchangeName): Queue =
+      argument("x-dead-letter-exchange" -> exchangeName.value)
 
     def messageTTL(value: FiniteDuration): Queue = argument("x-message-ttl" -> Long.box(value.toMillis))
 

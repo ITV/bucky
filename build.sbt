@@ -8,12 +8,12 @@ name := "bucky"
 crossScalaVersions := Seq("2.11.8", "2.12.1")
 
 val itvLifecycleVersion = "0.16"
-val amqpClientVersion = "4.0.2"
+val amqpClientVersion   = "4.0.2"
 val scalaLoggingVersion = "3.5.0"
-val scalaTestVersion = "3.0.1"
-val mockitoVersion = "1.9.0"
-val argonautVersion = "6.2-RC2"
-val circeVersion = "0.7.0"
+val scalaTestVersion    = "3.0.1"
+val mockitoVersion      = "1.9.0"
+val argonautVersion     = "6.2-RC2"
+val circeVersion        = "0.7.0"
 
 releaseProcess := Seq[ReleaseStep](
   checkSnapshotDependencies,
@@ -31,7 +31,9 @@ releaseProcess := Seq[ReleaseStep](
 releaseCrossBuild := true
 publishMavenStyle := true
 publishArtifact in Test := false
-pomIncludeRepository := { _ => false }
+pomIncludeRepository := { _ =>
+  false
+}
 releasePublishArtifactsAction := PgpKeys.publishSigned.value
 
 pgpPublicRing := file("./ci/public.asc")
@@ -114,7 +116,7 @@ lazy val kernelSettings = Seq(
           <organizationUrl>http://www.itv.com</organizationUrl>
         </developer>
       </developers>
-    )
+  )
 )
 
 lazy val core = project
@@ -124,7 +126,7 @@ lazy val core = project
   .settings(
     libraryDependencies ++= Seq(
       "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
-      "org.scalatest" %% "scalatest" % scalaTestVersion % "test"
+      "org.scalatest"              %% "scalatest"     % scalaTestVersion % "test"
     )
   )
   .configs(IntegrationTest)
@@ -137,12 +139,12 @@ lazy val test = project
   .dependsOn(core)
   .settings(
     libraryDependencies ++= Seq(
-      "com.itv" %% "lifecycle" % itvLifecycleVersion,
+      "com.itv"                    %% "lifecycle"     % itvLifecycleVersion,
       "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
-      "org.apache.qpid" % "qpid-broker" % "6.0.4",
-      "io.netty" % "netty" % "3.4.2.Final",
-      "org.scalatest" %% "scalatest" % scalaTestVersion,
-      "com.rabbitmq" % "amqp-client" % amqpClientVersion
+      "org.apache.qpid"            % "qpid-broker"    % "6.0.4",
+      "io.netty"                   % "netty"          % "3.4.2.Final",
+      "org.scalatest"              %% "scalatest"     % scalaTestVersion,
+      "com.rabbitmq"               % "amqp-client"    % amqpClientVersion
     )
   )
 
@@ -154,12 +156,12 @@ lazy val example = project
   .dependsOn(core, rabbitmq, scalaz, argonaut, circe)
   .settings(
     libraryDependencies ++= Seq(
-      "io.argonaut" %% "argonaut" % argonautVersion,
-      "com.itv" %% "lifecycle" % itvLifecycleVersion,
+      "io.argonaut"                %% "argonaut"      % argonautVersion,
+      "com.itv"                    %% "lifecycle"     % itvLifecycleVersion,
       "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
-      "org.apache.qpid" % "qpid-broker" % "6.0.4",
-      "org.scalatest" %% "scalatest" % scalaTestVersion,
-      "com.typesafe" % "config" % "1.2.1"
+      "org.apache.qpid"            % "qpid-broker"    % "6.0.4",
+      "org.scalatest"              %% "scalatest"     % scalaTestVersion,
+      "com.typesafe"               % "config"         % "1.2.1"
     )
   )
 
@@ -177,12 +179,11 @@ lazy val argonaut = project
   )
   .settings(
     libraryDependencies ++= Seq(
-      "io.argonaut" %% "argonaut" % argonautVersion,
+      "io.argonaut"                %% "argonaut"      % argonautVersion,
       "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
-      "org.scalatest" %% "scalatest" % scalaTestVersion % "test, it"
+      "org.scalatest"              %% "scalatest"     % scalaTestVersion % "test, it"
     )
   )
-
 
 lazy val circe = project
   .settings(name := "com.itv")
@@ -198,14 +199,13 @@ lazy val circe = project
   )
   .settings(
     libraryDependencies ++= Seq(
-      "io.circe" %% "circe-core" % circeVersion,
-      "io.circe" %% "circe-generic" % circeVersion,
-      "io.circe" %% "circe-parser" % circeVersion,
+      "io.circe"                   %% "circe-core"    % circeVersion,
+      "io.circe"                   %% "circe-generic" % circeVersion,
+      "io.circe"                   %% "circe-parser"  % circeVersion,
       "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
-      "org.scalatest" %% "scalatest" % scalaTestVersion % "test, it"
+      "org.scalatest"              %% "scalatest"     % scalaTestVersion % "test, it"
     )
   )
-
 
 lazy val xml = project
   .settings(name := "itv")
@@ -221,12 +221,11 @@ lazy val xml = project
   )
   .settings(
     libraryDependencies ++= Seq(
-      "org.scala-lang.modules" %% "scala-xml" % "1.0.6",
+      "org.scala-lang.modules"     %% "scala-xml"     % "1.0.6",
       "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
-      "org.scalatest" %% "scalatest" % scalaTestVersion % "test, it"
+      "org.scalatest"              %% "scalatest"     % scalaTestVersion % "test, it"
     )
   )
-
 
 lazy val rabbitmq = project
   .settings(name := "itv")
@@ -242,15 +241,14 @@ lazy val rabbitmq = project
   )
   .settings(
     libraryDependencies ++= Seq(
-      "com.itv" %% "lifecycle" % itvLifecycleVersion,
-      "com.rabbitmq" % "amqp-client" % amqpClientVersion,
+      "com.itv"                    %% "lifecycle"     % itvLifecycleVersion,
+      "com.rabbitmq"               % "amqp-client"    % amqpClientVersion,
       "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
-      "org.scalatest" %% "scalatest" % scalaTestVersion % "test, it",
-      "com.typesafe" % "config" % "1.2.1" % "it",
-      "org.mockito" % "mockito-core" % mockitoVersion % "test"
+      "org.scalatest"              %% "scalatest"     % scalaTestVersion % "test, it",
+      "com.typesafe"               % "config"         % "1.2.1" % "it",
+      "org.mockito"                % "mockito-core"   % mockitoVersion % "test"
     )
   )
-
 
 lazy val scalaz = project
   .settings(name := "itv")
@@ -268,7 +266,7 @@ lazy val scalaz = project
   .settings(
     libraryDependencies ++= Seq(
       "org.scalaz.stream" %% "scalaz-stream" % "0.8.6a",
-      "com.typesafe" % "config" % "1.2.1" % "it"
+      "com.typesafe"      % "config"         % "1.2.1" % "it"
     )
   )
 
@@ -276,12 +274,14 @@ lazy val root = (project in file("."))
   .aggregate(rabbitmq, scalaz, xml, circe, argonaut, example, test, core)
   .settings(publishArtifact := false)
 
-lazy val readme = scalatex.ScalatexReadme(
+lazy val readme = scalatex
+  .ScalatexReadme(
     projectId = "readme",
     wd = file(""),
     url = "https://github.com/ITV/bucky/tree/master",
     source = "readme"
-  ).settings(
+  )
+  .settings(
     publishArtifact in (Compile, packageDoc) := false,
     publishSigned := (),
     publishLocalSigned := (),

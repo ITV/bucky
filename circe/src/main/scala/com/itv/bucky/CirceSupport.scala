@@ -8,9 +8,10 @@ import Unmarshaller.StringPayloadUnmarshaller
 object CirceSupport {
 
   def unmarshallerFromDecodeJson[T](implicit decoder: Decoder[T]): PayloadUnmarshaller[T] =
-    StringPayloadUnmarshaller.map(decode[T]).flatMap(Unmarshaller.liftResult(res =>
-      res.fold(error => UnmarshalResult.Failure(error.getMessage, Option(error)), UnmarshalResult.Success.apply)
-    ))
+    StringPayloadUnmarshaller
+      .map(decode[T])
+      .flatMap(Unmarshaller.liftResult(res =>
+        res.fold(error => UnmarshalResult.Failure(error.getMessage, Option(error)), UnmarshalResult.Success.apply)))
 
   def marshallerFromEncodeJson[T](implicit encoder: Encoder[T]): PayloadMarshaller[T] =
     StringPayloadMarshaller.contramap { value =>
@@ -22,4 +23,3 @@ object CirceSupport {
   }
 
 }
-

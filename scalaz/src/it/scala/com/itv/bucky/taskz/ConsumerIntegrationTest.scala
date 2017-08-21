@@ -15,10 +15,10 @@ import scalaz.concurrent.Task
 import org.scalatest.Matchers._
 import org.scalatest.Inside._
 
-import scalaz.\/-
-
 class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogging with Eventually {
   import TaskExt._
+  import PublishExt._
+  implicit val eventuallyPatienceConfig = Eventually.PatienceConfig(1.seconds, 100.millis)
 
   val consumerPatienceConfig: PatienceConfig = PatienceConfig(timeout = 10.seconds, interval = 500.millis)
 
@@ -26,15 +26,19 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogg
 
   val messageUnmarshaller = StringPayloadUnmarshaller map Message
 
-  private val success = \/-(())
-
   test(s"Can consume messages from a (pre-existing) queue") {
     val handler = new StubConsumeHandler[Task, Message]()
-    withPublisherAndConsumer(requeueStrategy = NoneRequeue(AmqpClient.deliveryHandlerOf(handler, toDeliveryUnmarshaller(messageUnmarshaller)))) { app =>
+    withPublisherAndConsumer(requeueStrategy =
+      NoneRequeue(AmqpClient.deliveryHandlerOf(handler, toDeliveryUnmarshaller(messageUnmarshaller)))) { app =>
       handler.receivedMessages shouldBe 'empty
 
       val expectedMessage = Any.string()
-      app.publisher(PublishCommand(app.exchangeName, app.routingKey, MessageProperties.persistentBasic, Payload.from(expectedMessage))).unsafePerformSyncAttempt should ===(success)
+
+      publish(app,
+              PublishCommand(app.exchangeName,
+                             app.routingKey,
+                             MessageProperties.persistentBasic,
+                             Payload.from(expectedMessage)))
 
       eventually {
         logger.info(s"Waiting Can consume messages from a (pre-existing) queue")
@@ -68,21 +72,23 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogg
 
     val handler = new StubConsumeHandler[Task, Foo]
 
-    withPublisherAndConsumer(requeueStrategy = NoneRequeue(AmqpClient.deliveryHandlerOf(handler, fooUnmarshaller))) { app =>
-      handler.receivedMessages shouldBe 'empty
-      val expected = Foo(Bar("bar"), Baz("baz"))
+    withPublisherAndConsumer(requeueStrategy = NoneRequeue(AmqpClient.deliveryHandlerOf(handler, fooUnmarshaller))) {
+      app =>
+        handler.receivedMessages shouldBe 'empty
+        val expected = Foo(Bar("bar"), Baz("baz"))
 
-      val publishCommand = PublishCommand(ExchangeName(""),
-        app.routingKey,
-        MessageProperties.persistentBasic.withHeader("bar" -> expected.bar.value),
-        Payload.from(expected.baz.value))
+        publish(
+          app,
+          PublishCommand(ExchangeName(""),
+                         app.routingKey,
+                         MessageProperties.persistentBasic.withHeader("bar" -> expected.bar.value),
+                         Payload.from(expected.baz.value))
+        )
 
-      app.publisher(publishCommand).unsafePerformSyncAttempt should ===(success)
-
-      eventually {
-        handler.receivedMessages should have size 1
-        handler.receivedMessages.head shouldBe expected
-      }(consumerPatienceConfig, Position.here)
+        eventually {
+          handler.receivedMessages should have size 1
+          handler.receivedMessages.head shouldBe expected
+        }(consumerPatienceConfig, Position.here)
     }
   }
 
@@ -92,7 +98,12 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogg
       app.dlqHandler.get.receivedMessages shouldBe 'empty
       handler.nextException = Some(new RuntimeException("Hello, world"))
       val expectedMessage = "Message to dlq"
-      app.publisher(PublishCommand(app.exchangeName, app.routingKey, MessageProperties.persistentBasic, Payload.from(expectedMessage))).unsafePerformSyncAttempt should ===(success)
+
+      publish(app,
+              PublishCommand(app.exchangeName,
+                             app.routingKey,
+                             MessageProperties.persistentBasic,
+                             Payload.from(expectedMessage)))
 
       eventually {
         handler.receivedMessages should have size 1
@@ -109,8 +120,9 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogg
       handler.receivedMessages shouldBe 'empty
 
       val expectedMessage = "Hello World!"
-      app.publish(Payload.from(expectedMessage), MessageProperties.textPlain).unsafePerformSyncAttempt should ===(success)
 
+      app.publish(Payload.from(expectedMessage), MessageProperties.textPlain).unsafePerformSyncAttempt should ===(
+        success)
 
       eventually {
         handler.receivedMessages should have size 1
@@ -135,9 +147,11 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogg
       eventually {
         handler.receivedMessages should have size 1
         inside(handler.receivedMessages.head) {
-          case Delivery(body, _, _, properties) => properties.headers.get("hello").map(_.toString) shouldBe Some("world")
+          case Delivery(body, _, _, properties) =>
+            properties.headers.get("hello").map(_.toString) shouldBe Some("world")
         }
       }(consumerPatienceConfig, Position.here)
     }
   }
+
 }

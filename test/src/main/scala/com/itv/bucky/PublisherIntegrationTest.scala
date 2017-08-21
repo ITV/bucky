@@ -8,13 +8,15 @@ import org.scalatest.concurrent.Eventually
 import scala.concurrent.duration._
 import scala.language.higherKinds
 
-trait PublisherIntegrationTest[F[_], E] extends FunSuite with PublisherConsumerBaseTest[F] with StrictLogging with Eventually {
-
+trait PublisherIntegrationTest[F[_], E]
+    extends FunSuite
+    with PublisherConsumerBaseTest[F]
+    with StrictLogging
+    with Eventually {
 
   implicit val consumerPatienceConfig: Eventually.PatienceConfig = Eventually.PatienceConfig(timeout = 90.seconds)
 
-  implicit def effectMonad : MonadError[F, E]
-
+  implicit def effectMonad: MonadError[F, E]
 
   test(s"Can publish messages to a (pre-existing) queue") {
     val handler = new StubConsumeHandler[F, Delivery]

@@ -38,6 +38,7 @@ object Connection extends StrictLogging {
 }
 
 object Channel extends StrictLogging {
+
   /**
     * Close channel and connection associated with the IdAmqpClient
     *
@@ -79,21 +80,19 @@ case class ChannelAmqpOps(channel: RabbitChannel) extends AmqpOps {
   import scala.collection.JavaConverters._
 
   override def declareExchange(exchange: Exchange): Try[Unit] = Try {
-    channel.exchangeDeclare(
-      exchange.name.value,
-      exchange.exchangeType.value,
-      exchange.isDurable,
-      exchange.shouldAutoDelete,
-      exchange.isInternal,
-      exchange.arguments.asJava)
+    channel.exchangeDeclare(exchange.name.value,
+                            exchange.exchangeType.value,
+                            exchange.isDurable,
+                            exchange.shouldAutoDelete,
+                            exchange.isInternal,
+                            exchange.arguments.asJava)
   }
 
   override def bindQueue(binding: Binding): Try[Unit] = Try {
-    channel.queueBind(
-      binding.queueName.value,
-      binding.exchangeName.value,
-      binding.routingKey.value,
-      binding.arguments.asJava)
+    channel.queueBind(binding.queueName.value,
+                      binding.exchangeName.value,
+                      binding.routingKey.value,
+                      binding.arguments.asJava)
   }
 
   override def bindExchange(binding: ExchangeBinding): Try[Unit] = Try {
@@ -106,12 +105,11 @@ case class ChannelAmqpOps(channel: RabbitChannel) extends AmqpOps {
   }
 
   override def declareQueue(queue: Queue): Try[Unit] = Try {
-    channel.queueDeclare(
-      queue.name.value,
-      queue.isDurable,
-      queue.isExclusive,
-      queue.shouldAutoDelete,
-      queue.arguments.asJava)
+    channel.queueDeclare(queue.name.value,
+                         queue.isDurable,
+                         queue.isExclusive,
+                         queue.shouldAutoDelete,
+                         queue.arguments.asJava)
   }
 
   override def purgeQueue(name: QueueName): Try[Unit] = Try {

@@ -7,7 +7,7 @@ class QueueWatcher[T] extends Handler[Future, T] {
 
   private val messages = Stream.continually(Promise[T]())
 
-  private val reader: Iterator[Future[T]] = messages.iterator.map(_.future)
+  private val reader: Iterator[Future[T]]  = messages.iterator.map(_.future)
   private val writer: Iterator[Promise[T]] = messages.iterator
 
   def nextMessage() = reader.next()

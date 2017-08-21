@@ -9,7 +9,6 @@ import org.scalatest.concurrent.Eventually._
 
 import scalaz.concurrent.Task
 
-
 class ConsumerTest extends FunSuite with StrictLogging {
 
   test(s"Runs callback with delivered messages with Id") {
@@ -23,20 +22,23 @@ class ConsumerTest extends FunSuite with StrictLogging {
 
       val msg = Payload.from("Hello World!")
       handler.nextResponse = Task.now(Ack)
-      channel.deliver(new Basic.Deliver(channel.consumers.head.getConsumerTag, 1L, false, "exchange", "routingKey"), msg)
+      channel.deliver(new Basic.Deliver(channel.consumers.head.getConsumerTag, 1L, false, "exchange", "routingKey"),
+                      msg)
       eventually {
         logger.info("Waiting for ack")
         channel.transmittedCommands.last shouldBe a[Basic.Ack]
       }
       handler.nextResponse = Task.now(DeadLetter)
-      channel.deliver(new Basic.Deliver(channel.consumers.head.getConsumerTag, 1L, false, "exchange", "routingKey"), msg)
+      channel.deliver(new Basic.Deliver(channel.consumers.head.getConsumerTag, 1L, false, "exchange", "routingKey"),
+                      msg)
       eventually {
         logger.info("Waiting for nack")
         channel.transmittedCommands.last shouldBe a[Basic.Nack]
         channel.transmittedCommands.last.asInstanceOf[Basic.Nack].getRequeue shouldBe false
       }
       handler.nextResponse = Task.now(RequeueImmediately)
-      channel.deliver(new Basic.Deliver(channel.consumers.head.getConsumerTag, 1L, false, "exchange", "routingKey"), msg)
+      channel.deliver(new Basic.Deliver(channel.consumers.head.getConsumerTag, 1L, false, "exchange", "routingKey"),
+                      msg)
       eventually {
         logger.info("Waiting for nack")
         channel.transmittedCommands.last shouldBe a[Basic.Nack]
@@ -57,20 +59,23 @@ class ConsumerTest extends FunSuite with StrictLogging {
       val msg = Payload.from("Hello World!")
 
       handler.nextResponse = Task.now(Ack)
-      channel.deliver(new Basic.Deliver(channel.consumers.head.getConsumerTag, 1L, false, "exchange", "routingKey"), msg)
+      channel.deliver(new Basic.Deliver(channel.consumers.head.getConsumerTag, 1L, false, "exchange", "routingKey"),
+                      msg)
       eventually {
         channel.transmittedCommands.last shouldBe a[Basic.Ack]
       }
 
       handler.nextResponse = Task.now(DeadLetter)
-      channel.deliver(new Basic.Deliver(channel.consumers.head.getConsumerTag, 1L, false, "exchange", "routingKey"), msg)
+      channel.deliver(new Basic.Deliver(channel.consumers.head.getConsumerTag, 1L, false, "exchange", "routingKey"),
+                      msg)
       eventually {
         channel.transmittedCommands.last shouldBe a[Basic.Nack]
         channel.transmittedCommands.last.asInstanceOf[Basic.Nack].getRequeue shouldBe false
       }
 
       handler.nextResponse = Task.now(RequeueImmediately)
-      channel.deliver(new Basic.Deliver(channel.consumers.head.getConsumerTag, 1L, false, "exchange", "routingKey"), msg)
+      channel.deliver(new Basic.Deliver(channel.consumers.head.getConsumerTag, 1L, false, "exchange", "routingKey"),
+                      msg)
       eventually {
         channel.transmittedCommands.last shouldBe a[Basic.Nack]
         channel.transmittedCommands.last.asInstanceOf[Basic.Nack].getRequeue shouldBe true
@@ -89,7 +94,8 @@ class ConsumerTest extends FunSuite with StrictLogging {
       val msg = Payload.from("Hello World!")
 
       handler.nextResponse = Task.fail(new RuntimeException("Blah"))
-      channel.deliver(new Basic.Deliver(channel.consumers.head.getConsumerTag, 1L, false, "exchange", "routingKey"), msg)
+      channel.deliver(new Basic.Deliver(channel.consumers.head.getConsumerTag, 1L, false, "exchange", "routingKey"),
+                      msg)
 
       eventually {
         channel.transmittedCommands.last shouldBe a[Basic.Nack]
@@ -103,7 +109,7 @@ class ConsumerTest extends FunSuite with StrictLogging {
   import TaskExt._
   private def withConsumer(f: TestConsumer => Unit): Unit = {
     val channel = new StubChannel()
-    val client = new TaskAmqpClient(channel)
+    val client  = new TaskAmqpClient(channel)
 
     val handler = new StubConsumeHandler[Task, Delivery]()
 
@@ -113,8 +119,5 @@ class ConsumerTest extends FunSuite with StrictLogging {
     }
     f(TestConsumer(channel, handler))
   }
-
-
-
 
 }

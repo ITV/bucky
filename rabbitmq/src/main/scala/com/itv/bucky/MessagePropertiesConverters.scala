@@ -7,11 +7,11 @@ object MessagePropertiesConverters {
 
   import scala.collection.JavaConverters._
 
-  def apply(envelope: RabbitMQEnvelope): Envelope = Envelope(
-    envelope.getDeliveryTag,
-    envelope.isRedeliver,
-    ExchangeName(envelope.getExchange),
-    RoutingKey(envelope.getRoutingKey))
+  def apply(envelope: RabbitMQEnvelope): Envelope =
+    Envelope(envelope.getDeliveryTag,
+             envelope.isRedeliver,
+             ExchangeName(envelope.getExchange),
+             RoutingKey(envelope.getRoutingKey))
 
   def apply(properties: BasicProperties): MessageProperties =
     MessageProperties(
@@ -35,8 +35,7 @@ object MessagePropertiesConverters {
     new BasicProperties.Builder()
       .contentType(toJString(properties.contentType.map(_.value)))
       .contentEncoding(toJString(properties.contentEncoding.map(_.value)))
-      .headers(
-        if (properties.headers.isEmpty) null else properties.headers.asJava)
+      .headers(if (properties.headers.isEmpty) null else properties.headers.asJava)
       .deliveryMode(toJInt(properties.deliveryMode.map(_.value)))
       .priority(toJInt(properties.priority))
       .correlationId(toJString(properties.correlationId))

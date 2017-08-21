@@ -19,10 +19,10 @@ object ArgonautUnmarshalledConsumer extends App with StrictLogging {
 
   object Declarations {
     val queue = Queue(QueueName("queue.people.argonaut"))
-    val all = List(queue)
+    val all   = List(queue)
   }
 
-  val config = ConfigFactory.load("bucky")
+  val config                             = ConfigFactory.load("bucky")
   val amqpClientConfig: AmqpClientConfig = AmqpClientConfig(config.getString("rmq.host"), 5672, "guest", "guest")
 
   val personHandler =
@@ -40,10 +40,10 @@ object ArgonautUnmarshalledConsumer extends App with StrictLogging {
   val lifecycle: Lifecycle[Unit] =
     for {
       amqpClient <- AmqpClientLifecycle(amqpClientConfig)
-      _ <- DeclarationLifecycle(Declarations.all, amqpClient)
-      _ <- amqpClient.consumer(Declarations.queue.name, AmqpClient.handlerOf(personHandler, Shared.personUnmarshaller)(amqpClient.effectMonad))
-    }
-      yield ()
+      _          <- DeclarationLifecycle(Declarations.all, amqpClient)
+      _ <- amqpClient.consumer(Declarations.queue.name,
+                               AmqpClient.handlerOf(personHandler, Shared.personUnmarshaller)(amqpClient.effectMonad))
+    } yield ()
 
   lifecycle.runUntilJvmShutdown()
 

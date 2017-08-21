@@ -5,7 +5,7 @@ import org.scalatest.Matchers._
 
 import scala.util.Random
 
-class PayloadTest extends FunSuite{
+class PayloadTest extends FunSuite {
 
   test("2 Payload instances with identical values are considered equal") {
     val bytes = randomArrayOfBytes()

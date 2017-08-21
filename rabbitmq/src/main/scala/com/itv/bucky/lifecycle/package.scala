@@ -2,10 +2,7 @@ package com.itv.bucky
 
 import com.itv.lifecycle.{Lifecycle, NoOpLifecycle}
 
-
-
 package object lifecycle {
-
 
   implicit val lifecycleMonad = new Monad[Lifecycle] {
     override def apply[A](a: => A): Lifecycle[A] = NoOpLifecycle(a)
@@ -14,6 +11,5 @@ package object lifecycle {
 
     override def flatMap[A, B](m: Lifecycle[A])(f: (A) => Lifecycle[B]): Lifecycle[B] = m.flatMap(f)
   }
-
 
 }

@@ -12,7 +12,6 @@ class XmlMarshallerTest extends FunSuite {
 
     val foo = <foo><bar>doo</bar></foo>
 
-
     marshaller(foo) shouldBe Payload.from(foo.toString)
   }
 

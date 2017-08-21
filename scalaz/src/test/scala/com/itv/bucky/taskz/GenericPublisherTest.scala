@@ -15,11 +15,10 @@ class GenericPublisherTest extends FunSuite with ScalaFutures {
   import TaskExt._
   implicit val publisherPatienceConfig: Eventually.PatienceConfig = Eventually.PatienceConfig(timeout = 90.seconds)
 
-
   test("Publishing only returns success once publication is acknowledged") {
     val client = createClient()
 
-    val expectedExchange = ExchangeName("")
+    val expectedExchange   = ExchangeName("")
     val expectedRoutingKey = RoutingKey("mymessage")
     val expectedProperties = MessageProperties.textPlain
 
@@ -32,7 +31,7 @@ class GenericPublisherTest extends FunSuite with ScalaFutures {
       publishCommandBuilder(bananaMarshaller) using expectedExchange using expectedRoutingKey using expectedProperties
 
     val publish = AmqpClient.publisherOf(bananaSerializer)(client)
-    val result = resultFrom(publish(Banana))
+    val result  = resultFrom(publish(Banana))
 
     eventually {
       result shouldBe 'completed
@@ -48,11 +47,9 @@ class GenericPublisherTest extends FunSuite with ScalaFutures {
     message.body shouldBe expectedBody
   }
 
-
   test("Publishing with a broken publish command serializer should fail the publish future") {
     object Banana
     val expectedException = new RuntimeException("What's a banana?")
-
 
     implicit val serializer = new PublishCommandBuilder[Banana.type] {
       def toPublishCommand(t: Banana.type): PublishCommand =
@@ -62,13 +59,12 @@ class GenericPublisherTest extends FunSuite with ScalaFutures {
     val client = createClient()
 
     val publish = AmqpClient.publisherOf[Task, Banana.type](serializer)(client)
-    val result = resultFrom(publish(Banana))
+    val result  = resultFrom(publish(Banana))
 
     eventually {
       result.failure shouldBe expectedException
     }
   }
-
 
   private def createClient(): StubPublisher[Task, PublishCommand] = {
     new StubPublisher[Task, PublishCommand]()

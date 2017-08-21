@@ -12,11 +12,15 @@ import scala.language.higherKinds
 import scala.util.{Failure, Success, Try}
 
 abstract class FutureAmqpClient[B[_]](channelFactory: B[RabbitChannel])(implicit executionContext: ExecutionContext)
-  extends AmqpClient[B, Future, Throwable, Unit] with StrictLogging {
+    extends AmqpClient[B, Future, Throwable, Unit]
+    with StrictLogging {
 
   override implicit def effectMonad = futureMonad(executionContext)
 
-  override def consumer(queueName: QueueName, handler: Handler[Future, Delivery], actionOnFailure: ConsumeAction = DeadLetter, prefetchCount: Int = 0): B[Unit] =
+  override def consumer(queueName: QueueName,
+                        handler: Handler[Future, Delivery],
+                        actionOnFailure: ConsumeAction = DeadLetter,
+                        prefetchCount: Int = 0): B[Unit] =
     monad.flatMap(channelFactory) { (channel: RabbitChannel) =>
       monad.apply {
         val consumer = Consumer.defaultConsumer(channel, queueName, handler, actionOnFailure)
@@ -40,7 +44,9 @@ abstract class FutureAmqpClient[B[_]](channelFactory: B[RabbitChannel])(implicit
 
           publisherWrapperLifecycle(timeout) { cmd =>
             val promise = Promise[Unit]()
-            Publisher.publish(channel, cmd, promise, unconfirmedPublications) { (t, e) => t.failure(e) }
+            Publisher.publish(channel, cmd, promise, unconfirmedPublications) { (t, e) =>
+              t.failure(e)
+            }
             promise.future
           }
         } match {
@@ -55,8 +61,8 @@ abstract class FutureAmqpClient[B[_]](channelFactory: B[RabbitChannel])(implicit
       )
     }
 
-
-  private def publisherWrapperLifecycle(timeout: Duration): Publisher[Future, PublishCommand] => Publisher[Future, PublishCommand] = timeout match {
+  private def publisherWrapperLifecycle(
+      timeout: Duration): Publisher[Future, PublishCommand] => Publisher[Future, PublishCommand] = timeout match {
     case finiteTimeout: FiniteDuration =>
       new FutureTimeoutPublisher(_, finiteTimeout)(Executors.newSingleThreadScheduledExecutor())
     case _ => identity

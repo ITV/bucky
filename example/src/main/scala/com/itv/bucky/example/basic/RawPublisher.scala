@@ -14,11 +14,11 @@ import scala.concurrent.ExecutionContext.Implicits.global
 object RawPublisher extends App with StrictLogging {
 
   //start snippet 1
-  val brokerHostname = ConfigFactory.load("bucky").getString("rmq.host")
+  val brokerHostname   = ConfigFactory.load("bucky").getString("rmq.host")
   val amqpClientConfig = AmqpClientConfig(brokerHostname, 5672, "guest", "guest")
 
   object Declarations {
-    val exchange = Exchange(ExchangeName("raw.publisher.exchange"))
+    val exchange   = Exchange(ExchangeName("raw.publisher.exchange"))
     val routingKey = RoutingKey("raw.publish.routingkey")
   }
   case class Person(name: String, age: Int)
@@ -33,8 +33,7 @@ object RawPublisher extends App with StrictLogging {
       _ <- DeclarationLifecycle(Seq(Declarations.exchange), client)
       //create an instance of a generic publisher
       publisher <- client.publisher()
-    }
-      yield publisher
+    } yield publisher
   //end snippet 2
 
   //start snippet 3
@@ -44,10 +43,8 @@ object RawPublisher extends App with StrictLogging {
     //convert it to an AMQP payload
     val payload = Payload.from(s"${message.name},${message.age}")
     //build a PublishCommand
-    val publishCommand = PublishCommand(Declarations.exchange.name,
-                                        Declarations.routingKey,
-                                        MessageProperties.basic,
-                                        payload)
+    val publishCommand =
+      PublishCommand(Declarations.exchange.name, Declarations.routingKey, MessageProperties.basic, payload)
     //publish the command!
     val publishResult: Future[Unit] = publisher(publishCommand)
     //wait for the result

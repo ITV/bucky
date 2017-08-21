@@ -12,9 +12,12 @@ object IntegrationUtils {
 
   def config: AmqpClientConfig = {
     val config = ConfigFactory.load("bucky")
-    val host = config.getString("rmq.host")
+    val host   = config.getString("rmq.host")
 
-    AmqpClientConfig(config.getString("rmq.host"), config.getInt("rmq.port"), config.getString("rmq.username"), config.getString("rmq.password"))
+    AmqpClientConfig(config.getString("rmq.host"),
+                     config.getInt("rmq.port"),
+                     config.getString("rmq.username"),
+                     config.getString("rmq.password"))
   }
 
 }

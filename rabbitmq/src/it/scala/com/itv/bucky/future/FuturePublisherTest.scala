@@ -13,15 +13,15 @@ import org.scalatest.Matchers._
 trait FuturePublisherTest extends PublisherBaseTest[Future] with ScalaFutures {
   import FutureExt._
 
-
-  override def withPublisher(testQueueName: QueueName, requeueStrategy: RequeueStrategy[Future], shouldDeclare: Boolean)
-                            (f: (TestFixture[Future]) => Unit): Unit = {
-    val key = RoutingKey(testQueueName.value)
+  override def withPublisher(testQueueName: QueueName,
+                             requeueStrategy: RequeueStrategy[Future],
+                             shouldDeclare: Boolean)(f: (TestFixture[Future]) => Unit): Unit = {
+    val key          = RoutingKey(testQueueName.value)
     val exchangeName = ExchangeName("")
     val clientLifecycle = for {
       client <- AmqpClientLifecycle(IntegrationUtils.config)
-      _ <- DeclarationLifecycle(IntegrationUtils.defaultDeclaration(testQueueName), client)
-    }  yield client
+      _      <- DeclarationLifecycle(IntegrationUtils.defaultDeclaration(testQueueName), client)
+    } yield client
 
     Lifecycle.using(clientLifecycle) { amqpClient =>
       Lifecycle.using(amqpClient.publisher()) { publisher =>
