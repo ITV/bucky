@@ -113,7 +113,9 @@ class NetworkRecoveryIntegrationTest extends FunSuite with ScalaFutures with Str
         proxy.startAcceptingNewConnections()
 
         withClue("should be able to publish after broker allows connections again") {
-          publisherA.apply(()).unsafePerformSyncAttempt shouldBe success
+          eventually {
+            publisherA.apply(()).unsafePerformSyncAttempt shouldBe success
+          }
           publisherB.apply(()).unsafePerformSyncAttempt shouldBe success
         }
 
