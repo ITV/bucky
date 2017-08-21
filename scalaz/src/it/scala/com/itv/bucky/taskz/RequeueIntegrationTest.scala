@@ -65,9 +65,8 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures with StrictLoggi
 
   test("It should not requeue when the handler Acks") {
     val handler = new StubRequeueHandler[Task, Int]
+    handler.nextResponse = Task.now(Ack)
     withPublisherAndConsumer(requeueStrategy = TypeRequeue(handler, requeuePolicy, intMessageDeserializer)) { app =>
-      handler.nextResponse = Task.now(Ack)
-
       app.publish(Payload.from(1)).unsafePerformSyncAttempt shouldBe published
 
       eventually {
