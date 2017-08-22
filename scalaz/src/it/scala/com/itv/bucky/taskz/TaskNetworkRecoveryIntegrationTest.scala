@@ -15,7 +15,7 @@ import scala.util.{Random, Try}
 import scalaz.\/-
 import scalaz.concurrent.Task
 
-class NetworkRecoveryIntegrationTest extends FunSuite with ScalaFutures with StrictLogging {
+class TaskNetworkRecoveryIntegrationTest extends FunSuite with ScalaFutures with StrictLogging {
 
   import Eventually.eventually
   import TaskExt._
@@ -109,6 +109,9 @@ class NetworkRecoveryIntegrationTest extends FunSuite with ScalaFutures with Str
         }
 
         proxy.startAcceptingNewConnections()
+
+        handlerA.receivedMessages should have size 2
+        handlerB.receivedMessages should have size 2
 
         withClue("should be able to publish after broker allows connections again") {
           eventually {

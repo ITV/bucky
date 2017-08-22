@@ -16,7 +16,7 @@ import scala.util.{Random, Success}
 import scalaz.\/-
 import scalaz.concurrent.Task
 
-class RequeueIntegrationTest extends FunSuite with ScalaFutures with StrictLogging {
+class TaskRequeueIntegrationTest extends FunSuite with ScalaFutures with StrictLogging {
 
   private val published = \/-(())
 

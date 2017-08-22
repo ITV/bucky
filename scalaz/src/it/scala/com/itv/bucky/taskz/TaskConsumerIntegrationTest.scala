@@ -15,7 +15,7 @@ import scalaz.concurrent.Task
 import org.scalatest.Matchers._
 import org.scalatest.Inside._
 
-class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogging with Eventually {
+class TaskConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogging with Eventually {
   import TaskExt._
   import PublishExt._
   implicit val eventuallyPatienceConfig = Eventually.PatienceConfig(1.seconds, 100.millis)
