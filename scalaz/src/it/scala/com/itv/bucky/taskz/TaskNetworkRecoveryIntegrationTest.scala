@@ -83,7 +83,9 @@ class TaskNetworkRecoveryIntegrationTest extends FunSuite with ScalaFutures with
         handlerB.receivedMessages shouldBe 'empty
 
         withClue("should be able to publish and consume a couple of messages") {
-          publisherA.apply(()).unsafePerformSyncAttempt shouldBe success
+          eventually {
+            publisherA.apply(()).unsafePerformSyncAttempt shouldBe success
+          }
           publisherB.apply(()).unsafePerformSyncAttempt shouldBe success
 
           eventually {
