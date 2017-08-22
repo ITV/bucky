@@ -42,7 +42,10 @@ object UnmarshallingConsumer extends App with StrictLogging {
         UnmarshalResult.Failure(s"Expected message to be in format <name>,<age>: got '$csvString'")
     }
 
-  val personUnmarshaller: PayloadUnmarshaller[Person] = StringPayloadUnmarshaller.flatMap(x => csvStringToPerson(x))
+  val personUnmarshaller: PayloadUnmarshaller[Person] =
+    StringPayloadUnmarshaller.flatMap[Person](new Unmarshaller[String, Person] {
+      override def unmarshal(thing: String): UnmarshalResult[Person] = csvStringToPerson(thing)
+    })
   //end snippet 2
 
   //start snippet 3
