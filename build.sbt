@@ -13,7 +13,7 @@ val scalaLoggingVersion = "3.5.0"
 val scalaTestVersion    = "3.0.1"
 val mockitoVersion      = "1.9.0"
 val argonautVersion     = "6.2-RC2"
-val circeVersion        = "0.7.0"
+val circeVersion        = "0.8.0"
 
 releaseProcess := Seq[ReleaseStep](
   checkSnapshotDependencies,
