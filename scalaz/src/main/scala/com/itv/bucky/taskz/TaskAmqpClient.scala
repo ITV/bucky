@@ -169,7 +169,8 @@ object ProcessAmqpClient extends StrictLogging {
         .map(TaskAmqpClient.apply))(closeChannel)(f)
   }
 
-  private def safeBracket[A, O](req: Task[A])(release: A => Task[Unit])(rcv: A => Process[Task, O]): Process[Task, O] = {
+  private def safeBracket[A, O](req: Task[A])(release: A => Task[Unit])(
+      rcv: A => Process[Task, O]): Process[Task, O] = {
     val halted = async.signalOf[Boolean](false)
     Process
       .bracket(req) { a =>

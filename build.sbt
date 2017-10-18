@@ -120,7 +120,7 @@ lazy val kernelSettings = Seq(
 )
 
 lazy val core = project
-  .settings(name := "itv")
+  .settings(name := "com.itv")
   .settings(moduleName := "bucky-core")
   .settings(kernelSettings: _*)
   .settings(
@@ -132,7 +132,7 @@ lazy val core = project
   .configs(IntegrationTest)
 
 lazy val test = project
-  .settings(name := "itv")
+  .settings(name := "com.itv")
   .settings(moduleName := "bucky-test")
   .settings(kernelSettings: _*)
   .aggregate(core)
@@ -149,7 +149,7 @@ lazy val test = project
   )
 
 lazy val example = project
-  .settings(name := "itv")
+  .settings(name := "com.itv")
   .settings(moduleName := "bucky-example")
   .settings(kernelSettings: _*)
   .aggregate(core, rabbitmq, scalaz, argonaut, circe)
@@ -166,7 +166,7 @@ lazy val example = project
   )
 
 lazy val argonaut = project
-  .settings(name := "itv")
+  .settings(name := "com.itv")
   .settings(moduleName := "bucky-argonaut")
   .settings(kernelSettings: _*)
   .aggregate(core, test)
@@ -208,7 +208,7 @@ lazy val circe = project
   )
 
 lazy val xml = project
-  .settings(name := "itv")
+  .settings(name := "com.itv")
   .settings(moduleName := "bucky-xml")
   .settings(kernelSettings: _*)
   .aggregate(core, test)
@@ -228,7 +228,7 @@ lazy val xml = project
   )
 
 lazy val rabbitmq = project
-  .settings(name := "itv")
+  .settings(name := "com.itv")
   .settings(moduleName := "bucky-rabbitmq")
   .settings(kernelSettings: _*)
   .aggregate(core, test)
@@ -251,7 +251,7 @@ lazy val rabbitmq = project
   )
 
 lazy val scalaz = project
-  .settings(name := "itv")
+  .settings(name := "com.itv")
   .settings(moduleName := "bucky-scalaz")
   .settings(kernelSettings: _*)
   .aggregate(core, test, rabbitmq)
@@ -270,8 +270,31 @@ lazy val scalaz = project
     )
   )
 
+
+
+lazy val fs2 = project
+  .settings(name := "com.itv")
+  .settings(moduleName := "bucky-fs2")
+  .settings(kernelSettings: _*)
+  .aggregate(core, test, rabbitmq)
+  .dependsOn(core, rabbitmq, test % "test,it")
+  .configs(IntegrationTest)
+  .settings(Defaults.itSettings)
+  .settings(
+    internalDependencyClasspath in IntegrationTest += Attributed.blank((classDirectory in Test).value),
+    parallelExecution in IntegrationTest := false,
+    parallelExecution in Test := false
+  )
+  .settings(
+    libraryDependencies ++= Seq(
+      "co.fs2"            %% "fs2-core"      % "0.10.0-M7",
+      "com.typesafe"      % "config"         % "1.2.1" % "it"
+    )
+  )
+
+
 lazy val root = (project in file("."))
-  .aggregate(rabbitmq, scalaz, xml, circe, argonaut, example, test, core)
+  .aggregate(rabbitmq, scalaz, fs2, xml, circe, argonaut, example, test, core)
   .settings(publishArtifact := false)
 
 lazy val readme = scalatex

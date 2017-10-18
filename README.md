@@ -1,5 +1,5 @@
 [![Build Status](https://travis-ci.org/ITV/bucky.svg?branch=master)](https://travis-ci.org/ITV/bucky)
-[![Join the chat at https://gitter.im/itv-bucky/Lobby](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/itv-bucky/Lobby)
+[![Join the chat at https://gitter.im/com.itv-bucky/Lobby](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/com.itv-bucky/Lobby)
 
 
 # Bucky
@@ -28,39 +28,38 @@ libraryDependencies ++= Seq(
 ```
 
 
-# Run integration test
-You require to install to run on Mac OS:
- - docker
- - docker-machine
- - virtualbox
+### Running the unit tests
+    
+    sbt test
+
+### Running the integration tests
+You'll first need to install [Docker](https://docs.docker.com/docker-for-mac/install/), within which we'll run both Postgres and RabbitMQ. 
  
- Look at [Mac official documentation](https://docs.docker.com/docker-for-mac/install/) or use **brew** to install it.
+As well, you'll need `docker-compose`:
+
+     brew install docker-compose
  
- 
- 
-You need to create the RabbitMq server:
+Then, in the base directory:
 
-```$bash
-docker-machine create default --driver virtualbox
-eval "$(docker-machine env default)"
-vboxmanage controlvm default natpf1 "5672,tcp,127.0.0.1,5672,,5672"
-docker run -d -p 5672:5672 --hostname my-rabbit --name some-rabbit rabbitmq:3
-```
+    docker-compose up
 
+You should see log messages from both Postgres and RabbitMQ, but if you want to make doubly sure:
 
-
-Make sure the instance is running:
-```$bash
-docker ps
-CONTAINER ID        IMAGE               COMMAND                  CREATED             STATUS              PORTS                                                   NAMES
-4cb536661989        rabbitmq:3          "docker-entrypoint..."   X days ago          Up XX hours         4369/tcp, 5671/tcp, 25672/tcp, 0.0.0.0:5672->5672/tcp   some-rabbit 
- ```
-
+    docker ps
+    
+    CONTAINER ID        IMAGE               COMMAND                  CREATED             STATUS              PORTS                                                   NAMES
+    076e2f3591f2        postgres:9.5.4      "/docker-entrypoin..."   3 minutes ago       Up 5 seconds        0.0.0.0:5432->5432/tcp                                  fulfilmentplanningbackend_postgres_1
+    b1c319fedafa        rabbitmq:3.6        "docker-entrypoint..."   3 minutes ago       Up 5 seconds        4369/tcp, 5671/tcp, 25672/tcp, 0.0.0.0:5672->5672/tcp   fulfilmentplanningbackend_some-rabbit_1 
+     
+Please note that you can connect to the local Postgres as user `postgres` with a blank password; the database name is `craft_dev`.
+    
+    sbt it:test
+    
 # Example projects
 
 Basic Consumer
 ---
-[source code here](https://github.com/ITV/bucky/blob/master/example/src/main/scala/com/itv/bucky/example/basic/StringConsumer.scala)
+[source code here](https://github.com/ITV/bucky/blob/master/example/src/main/scala/com/com.itv/bucky/example/basic/StringConsumer.scala)
 
 A very simple project that:
 * Declares an AMQP queue
@@ -70,7 +69,7 @@ A very simple project that:
     
 Basic Publisher
 ---
-[source code here](https://github.com/ITV/bucky/blob/master/example/src/main/scala/com/itv/bucky/example/basic/StringPublisher.scala)
+[source code here](https://github.com/ITV/bucky/blob/master/example/src/main/scala/com/com.itv/bucky/example/basic/StringPublisher.scala)
 
 A very simple project that:
 * Declares an exchange
@@ -80,7 +79,7 @@ A very simple project that:
 Unmarshalling Consumer
 ----
 
-[source code here](https://github.com/ITV/bucky/blob/master/example/src/main/scala/com/itv/bucky/example/marshalling/UnmarshallingConsumer.scala)
+[source code here](https://github.com/ITV/bucky/blob/master/example/src/main/scala/com/com.itv/bucky/example/marshalling/UnmarshallingConsumer.scala)
 
 In this project we aim to consume higher level message payloads as opposed to `String`
 
@@ -118,7 +117,7 @@ The behaviour of the project is not very dissimilar to the "Basic Consumer" proj
 Unmarshalling Publisher
 ----
 
-[source code here](https://github.com/ITV/bucky/blob/master/example/src/main/scala/com/itv/bucky/example/marshalling/MarshallingPublisher.scala)
+[source code here](https://github.com/ITV/bucky/blob/master/example/src/main/scala/com/com.itv/bucky/example/marshalling/MarshallingPublisher.scala)
 
 In this project we aim to publish higher level message payloads as opposed to `String`
 
@@ -144,7 +143,7 @@ The behaviour of the project is not very dissimilar to the "Basic Publisher" pro
 Scalaz Consumer
 ----
 
-[source code here](https://github.com/ITV/bucky/blob/master/example/src/main/scala/com/itv/bucky/example/scalaz/StringConsumer.scala)
+[source code here](https://github.com/ITV/bucky/blob/master/example/src/main/scala/com/com.itv/bucky/example/scalaz/StringConsumer.scala)
 
 A very simple project using scalaz that:
 * Declares an AMQP queue
@@ -156,7 +155,7 @@ A very simple project using scalaz that:
 Scalaz Publisher
 ----
 
-[source code here](https://github.com/ITV/bucky/blob/master/example/src/main/scala/com/itv/bucky/example/scalaz/StringPublisher.scala)
+[source code here](https://github.com/ITV/bucky/blob/master/example/src/main/scala/com/com.itv/bucky/example/scalaz/StringPublisher.scala)
 
 A very simple project using scalaz that:
 * Declares an exchange
