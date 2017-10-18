@@ -81,11 +81,12 @@ package object fs2 {
                               prefetchCount: Int = 0): Id[Stream[IO, Unit]] =
           for {
             messages <- Stream.eval(async.unboundedQueue[IO, Delivery])
-            _ <- Stream eval IO {
+            buildConsumer = Stream eval IO {
               val consumer = IOConsumer(channel, queueName, messages)
               Consumer[IO, Throwable](channel, queueName, consumer, prefetchCount)(ioMonadError)
               consumer
             }
+            _ <- buildConsumer
             process <- messages.dequeue to Sink { delivery =>
               Consumer.processDelivery(channel, queueName, handler, actionOnFailure, delivery)(ioMonadError)
             }
