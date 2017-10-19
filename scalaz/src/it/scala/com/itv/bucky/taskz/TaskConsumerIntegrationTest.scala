@@ -9,6 +9,7 @@ import scala.concurrent.duration._
 import IntegrationUtils._
 import com.itv.bucky.UnmarshalResult.Success
 import com.itv.bucky._
+import com.itv.bucky.template.{NoneRequeue, SimpleRequeue}
 import org.scalactic.source.Position
 
 import scalaz.concurrent.Task

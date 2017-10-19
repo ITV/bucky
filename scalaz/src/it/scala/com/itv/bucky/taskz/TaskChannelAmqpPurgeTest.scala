@@ -1,7 +1,7 @@
 package com.itv.bucky.taskz
 
 import com.itv.bucky
-import com.itv.bucky.{ChannelAmqpPurgeTest, RequeueStrategy, TestFixture}
+import com.itv.bucky.template.{ChannelAmqpPurgeTest, RequeueStrategy, TestFixture}
 import org.scalatest.Assertion
 import org.scalatest.Matchers._
 

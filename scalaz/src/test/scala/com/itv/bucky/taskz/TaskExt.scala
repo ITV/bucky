@@ -2,7 +2,8 @@ package com.itv.bucky.taskz
 import java.util.concurrent.atomic.AtomicReference
 
 import com.itv.bucky.AtomicRef.Ref
-import com.itv.bucky.{PublishCommand, Publisher, StubChannel, TestFixture}
+import com.itv.bucky.template.TestFixture
+import com.itv.bucky.{PublishCommand, Publisher, StubChannel}
 import org.scalactic.source
 
 import scala.concurrent.ExecutionContextExecutor

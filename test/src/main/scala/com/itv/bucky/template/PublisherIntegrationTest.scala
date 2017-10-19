@@ -1,5 +1,6 @@
-package com.itv.bucky
+package com.itv.bucky.template
 
+import com.itv.bucky._
 import com.typesafe.scalalogging.StrictLogging
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
@@ -12,11 +13,10 @@ trait PublisherIntegrationTest[F[_], E]
     extends FunSuite
     with PublisherConsumerBaseTest[F]
     with StrictLogging
+    with EffectMonad[F, Throwable]
     with Eventually {
 
   implicit val consumerPatienceConfig: Eventually.PatienceConfig = Eventually.PatienceConfig(timeout = 90.seconds)
-
-  implicit def effectMonad: MonadError[F, E]
 
   test(s"Can publish messages to a (pre-existing) queue") {
     val handler = new StubConsumeHandler[F, Delivery]

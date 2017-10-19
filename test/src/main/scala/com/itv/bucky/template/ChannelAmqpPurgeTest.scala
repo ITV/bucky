@@ -1,13 +1,14 @@
-package com.itv.bucky
+package com.itv.bucky.template
 
+import com.itv.bucky.{Any, MessageProperties, PublishCommand}
 import com.typesafe.scalalogging.StrictLogging
 import org.scalatest.FunSuite
+import org.scalatest.Matchers._
 import org.scalatest.concurrent.Eventually
 
 import scala.concurrent.duration._
 import scala.language.higherKinds
 import scala.util.Success
-import org.scalatest.Matchers._
 
 trait ChannelAmqpPurgeTest[F[_]] extends FunSuite with PublisherBaseTest[F] with StrictLogging {
   implicit val eventuallyPatienceConfig = Eventually.PatienceConfig(5.seconds, 1.second)

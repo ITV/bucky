@@ -1,6 +1,7 @@
 package com.itv.bucky.taskz
 
 import com.itv.bucky._
+import com.itv.bucky.template.{PublisherIntegrationTest, RequeueStrategy, TestFixture}
 import org.scalatest.Assertion
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.Eventually

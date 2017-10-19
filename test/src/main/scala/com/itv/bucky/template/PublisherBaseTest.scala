@@ -1,5 +1,6 @@
-package com.itv.bucky
+package com.itv.bucky.template
 
+import com.itv.bucky._
 import com.itv.bucky.pattern.requeue.RequeuePolicy
 import org.scalactic.source
 import org.scalatest.Assertion
@@ -27,6 +28,10 @@ case class TestFixture[F[_]](publisher: Publisher[F, PublishCommand],
 
 trait EffectVerification[F[_]] {
   def verifySuccess(f: F[Unit]): Assertion
+}
+
+trait EffectMonad[F[_], E] {
+  implicit def effectMonad: MonadError[F, E]
 }
 
 trait PublisherBaseTest[F[_]] extends EffectVerification[F] {

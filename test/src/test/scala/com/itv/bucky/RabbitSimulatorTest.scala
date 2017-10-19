@@ -33,6 +33,7 @@ class RabbitSimulatorTest extends FunSuite with ScalaFutures {
     override def handleError[A](fa: Future[A])(f: (Throwable) => Future[A]): Future[A] = fa.recoverWith {
       case t: Throwable => f(t)
     }
+
   }
 
   test("Can publish and consume via simulator") {

@@ -2,12 +2,12 @@ package com.itv.bucky.future
 
 import com.itv.bucky._
 import com.itv.bucky.lifecycle.{AmqpClientLifecycle, DeclarationLifecycle}
+import com.itv.bucky.template.{PublisherBaseTest, RequeueStrategy, TestFixture}
 import com.itv.lifecycle.Lifecycle
 import org.scalatest.Assertion
 import org.scalatest.concurrent.ScalaFutures
 
 import scala.concurrent.Future
-
 import org.scalatest.Matchers._
 
 trait FuturePublisherTest extends PublisherBaseTest[Future] with ScalaFutures {

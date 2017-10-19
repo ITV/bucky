@@ -6,6 +6,7 @@ import com.itv.bucky.Monad.Id
 import com.itv.bucky._
 import com.itv.bucky.decl._
 import com.itv.bucky.pattern.requeue._
+import com.itv.bucky.template._
 import com.itv.lifecycle.Lifecycle
 import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.StrictLogging
@@ -15,7 +16,6 @@ import scala.concurrent.duration._
 import scalaz.\/-
 import scalaz.concurrent.{Strategy, Task}
 import scalaz.stream.Process
-
 import org.scalatest.Matchers._
 
 trait TaskEffectVerification extends EffectVerification[Task] {

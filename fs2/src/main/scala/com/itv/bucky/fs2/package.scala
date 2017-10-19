@@ -43,6 +43,7 @@ package object fs2 {
     override def map[A, B](m: IO[A])(f: (A) => B): IO[B] = m.map(f)
 
     override def flatMap[A, B](m: IO[A])(f: (A) => IO[B]): IO[B] = m.flatMap(f)
+
   }
 
   object IOAmqpClient extends StrictLogging {
