@@ -1,34 +1,32 @@
-package com.itv.bucky.taskz
+package com.itv.bucky.suite
 
+import com.itv.bucky.UnmarshalResult.Success
 import com.itv.bucky.Unmarshaller._
+import com.itv.bucky._
 import com.typesafe.scalalogging.StrictLogging
 import org.scalatest.FunSuite
-import org.scalatest.concurrent.{Eventually, ScalaFutures}
+import org.scalatest.Inside._
+import org.scalatest.Matchers._
+import org.scalatest.concurrent.Eventually
 
 import scala.concurrent.duration._
-import IntegrationUtils._
-import com.itv.bucky.UnmarshalResult.Success
-import com.itv.bucky._
-import com.itv.bucky.suite.{NoneRequeue, SimpleRequeue}
-import org.scalactic.source.Position
+import Eventually.eventually
 
-import scalaz.concurrent.Task
-import org.scalatest.Matchers._
-import org.scalatest.Inside._
+import scala.language.higherKinds
 
-class TaskConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogging with Eventually {
-  import TaskExt._
-  import PublishExt._
-  implicit val eventuallyPatienceConfig = Eventually.PatienceConfig(1.seconds, 100.millis)
-
-  val consumerPatienceConfig: PatienceConfig = PatienceConfig(timeout = 10.seconds, interval = 500.millis)
+trait ConsumerIntegrationTest[F[_]]
+    extends FunSuite
+    with PublisherConsumerBaseTest[F]
+    with StrictLogging
+    with EffectMonad[F, Throwable] {
+  implicit val eventuallyPatienceConfig = Eventually.PatienceConfig(10.seconds, 100.millis)
 
   case class Message(value: String)
 
   val messageUnmarshaller = StringPayloadUnmarshaller map Message
 
   test(s"Can consume messages from a (pre-existing) queue") {
-    val handler = new StubConsumeHandler[Task, Message]()
+    val handler = new StubConsumeHandler[F, Message]()
     withPublisherAndConsumer(requeueStrategy =
       NoneRequeue(AmqpClient.deliveryHandlerOf(handler, toDeliveryUnmarshaller(messageUnmarshaller)))) { app =>
       handler.receivedMessages shouldBe 'empty
@@ -46,7 +44,7 @@ class TaskConsumerIntegrationTest extends FunSuite with ScalaFutures with Strict
         handler.receivedMessages should have size 1
 
         handler.receivedMessages.head shouldBe Message(expectedMessage)
-      }(consumerPatienceConfig, Position.here)
+      }
     }
   }
 
@@ -71,7 +69,7 @@ class TaskConsumerIntegrationTest extends FunSuite with ScalaFutures with Strict
     val fooUnmarshaller: Unmarshaller[Delivery, Foo] =
       (barUnmarshaller zip bazUnmarshaller) map { case (bar, baz) => Foo(bar, baz) }
 
-    val handler = new StubConsumeHandler[Task, Foo]
+    val handler = new StubConsumeHandler[F, Foo]
 
     withPublisherAndConsumer(requeueStrategy = NoneRequeue(AmqpClient.deliveryHandlerOf(handler, fooUnmarshaller))) {
       app =>
@@ -89,12 +87,12 @@ class TaskConsumerIntegrationTest extends FunSuite with ScalaFutures with Strict
         eventually {
           handler.receivedMessages should have size 1
           handler.receivedMessages.head shouldBe expected
-        }(consumerPatienceConfig, Position.here)
+        }
     }
   }
 
   test(s"DeadLetter upon exception from handler") {
-    val handler = new StubConsumeHandler[Task, Delivery]()
+    val handler = new StubConsumeHandler[F, Delivery]()
     withPublisherAndConsumer(requeueStrategy = SimpleRequeue(handler)) { app =>
       app.dlqHandler.get.receivedMessages shouldBe 'empty
       handler.nextException = Some(new RuntimeException("Hello, world"))
@@ -108,34 +106,33 @@ class TaskConsumerIntegrationTest extends FunSuite with ScalaFutures with Strict
 
       eventually {
         handler.receivedMessages should have size 1
-      }(consumerPatienceConfig, Position.here)
+      }
       eventually {
         app.dlqHandler.get.receivedMessages should have size 1
-      }(consumerPatienceConfig, Position.here)
+      }
     }
   }
 
   test("Can consume messages from a (pre-existing) queue with the raw consumer") {
-    val handler = new StubConsumeHandler[Task, Delivery]()
+    val handler = new StubConsumeHandler[F, Delivery]()
     withPublisherAndConsumer(requeueStrategy = NoneRequeue(handler)) { app =>
       handler.receivedMessages shouldBe 'empty
 
       val expectedMessage = "Hello World!"
 
-      app.publish(Payload.from(expectedMessage), MessageProperties.textPlain).unsafePerformSyncAttempt should ===(
-        success)
+      verifySuccess(app.publish(Payload.from(expectedMessage), MessageProperties.textPlain))
 
       eventually {
         handler.receivedMessages should have size 1
         inside(handler.receivedMessages.head) {
           case Delivery(body, _, _, _) => Payload(body.value).unmarshal[String] shouldBe Success(expectedMessage)
         }
-      }(consumerPatienceConfig, Position.here)
+      }
     }
   }
 
   test("Message headers are exposed to (raw) consumers") {
-    val handler = new StubConsumeHandler[Task, Delivery]()
+    val handler = new StubConsumeHandler[F, Delivery]()
     withPublisherAndConsumer(requeueStrategy = SimpleRequeue(handler)) { app =>
       handler.receivedMessages shouldBe 'empty
 
@@ -143,7 +140,7 @@ class TaskConsumerIntegrationTest extends FunSuite with ScalaFutures with Strict
 
       val messageProperties = MessageProperties.textPlain.withHeader("hello" -> "world")
 
-      app.publish(Payload.from(expectedMessage), messageProperties).unsafePerformSyncAttempt should ===(success)
+      verifySuccess(app.publish(Payload.from(expectedMessage), messageProperties))
 
       eventually {
         handler.receivedMessages should have size 1
@@ -151,8 +148,13 @@ class TaskConsumerIntegrationTest extends FunSuite with ScalaFutures with Strict
           case Delivery(body, _, _, properties) =>
             properties.headers.get("hello").map(_.toString) shouldBe Some("world")
         }
-      }(consumerPatienceConfig, Position.here)
+      }
     }
   }
+
+  def publish(app: TestFixture[F], command: PublishCommand) =
+    eventually {
+      verifySuccess(app.publisher(command))
+    }
 
 }

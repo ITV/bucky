@@ -2,7 +2,7 @@ package com.itv.bucky.future
 
 import com.itv.bucky._
 import com.itv.bucky.lifecycle.{AmqpClientLifecycle, DeclarationLifecycle}
-import com.itv.bucky.template.{PublisherBaseTest, RequeueStrategy, TestFixture}
+import com.itv.bucky.suite.{PublisherBaseTest, RequeueStrategy, TestFixture}
 import com.itv.lifecycle.Lifecycle
 import org.scalatest.Assertion
 import org.scalatest.concurrent.ScalaFutures

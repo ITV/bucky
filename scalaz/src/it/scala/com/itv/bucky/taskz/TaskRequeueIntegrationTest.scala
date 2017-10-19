@@ -5,7 +5,7 @@ import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
 import com.itv.bucky.pattern.requeue.RequeuePolicy
 import com.itv.bucky.taskz.IntegrationUtils._
 import com.itv.bucky._
-import com.itv.bucky.template.{RawRequeue, TypeRequeue}
+import com.itv.bucky.suite.{RawRequeue, TypeRequeue}
 import com.typesafe.scalalogging.StrictLogging
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._

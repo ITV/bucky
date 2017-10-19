@@ -1,4 +1,4 @@
-package com.itv.bucky.template
+package com.itv.bucky.suite
 
 import com.itv.bucky._
 import com.itv.bucky.pattern.requeue.RequeuePolicy

@@ -1,7 +1,7 @@
 package com.itv.bucky.taskz
 
 import com.itv.bucky
-import com.itv.bucky.template.{EstimatedMessageCountTest, RequeueStrategy, TestFixture}
+import com.itv.bucky.suite.{EstimatedMessageCountTest, RequeueStrategy, TestFixture}
 import org.scalatest.{Assertion, FunSuite}
 
 import scalaz.\/-

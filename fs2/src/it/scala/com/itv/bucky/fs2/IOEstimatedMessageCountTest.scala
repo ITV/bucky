@@ -2,7 +2,7 @@ package com.itv.bucky.fs2
 
 import cats.effect.IO
 import com.itv.bucky.fs2.utils.{IOEffectVerification, IOPublisherBaseTest}
-import com.itv.bucky.template.EstimatedMessageCountTest
+import com.itv.bucky.suite.EstimatedMessageCountTest
 import org.scalatest.FunSuite
 
 class IOEstimatedMessageCountTest

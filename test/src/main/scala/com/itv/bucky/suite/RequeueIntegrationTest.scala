@@ -1,4 +1,4 @@
-package com.itv.bucky.template
+package com.itv.bucky.suite
 
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky._

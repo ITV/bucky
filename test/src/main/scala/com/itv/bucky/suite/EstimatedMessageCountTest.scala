@@ -1,4 +1,4 @@
-package com.itv.bucky.template
+package com.itv.bucky.suite
 
 import com.itv.bucky.{Any, MessageProperties, PublishCommand}
 import com.typesafe.scalalogging.StrictLogging
