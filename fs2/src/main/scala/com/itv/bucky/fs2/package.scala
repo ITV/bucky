@@ -10,6 +10,7 @@ import com.rabbitmq.client.{
   DefaultConsumer,
   Channel => RabbitChannel,
   Consumer => RabbitMqConsumer,
+  Connection => RabbitConnection,
   Envelope => RabbitEnvelope
 }
 
@@ -19,6 +20,8 @@ import scala.util.Try
 
 package object fs2 {
   type Register = (Either[Throwable, Unit]) => Unit
+
+  type IOConsumer = Id[Stream[IO, Unit]]
 
   type IOAmqpClient = AmqpClient[Id, IO, Throwable, Stream[IO, Unit]]
 
@@ -48,10 +51,75 @@ package object fs2 {
 
   object IOAmqpClient extends StrictLogging {
     import com.itv.bucky.Monad._
+    import _root_.fs2._
+    import _root_.fs2.async.mutable._
+    import cats.implicits._
+
+    def use[O](config: AmqpClientConfig)(f: IOAmqpClient => Stream[IO, O])(
+        implicit executionContext: ExecutionContext): Stream[IO, O] = {
+      val halted = async.signalOf[IO, Boolean](false).unsafeRunSync()
+      val p = Stream.bracket(IO(Connection(config)))(
+        connnection => {
+          buildChannel(connnection, halted)
+        },
+        connection => {
+          IO {
+            logger.info(s"Closing connection ...")
+            Connection.close(connection)
+            halted.set(true).unsafeRunSync()
+          }
+        }
+      )
+
+      p.flatMap { foo: IO[(IOAmqpClient, Signal[IO, Boolean])] =>
+        Stream.eval(foo).flatMap {
+          case (client, requestShutdown) =>
+            f(client).interruptWhen(requestShutdown)
+        }
+      }
+    }
+
+    private def buildChannel(connnection: Id[RabbitConnection], halted: Signal[IO, Boolean])(
+        implicit executionContext: ExecutionContext) = {
+      def addShutdownHook(requestShutdown: Signal[IO, Boolean], halted: Signal[IO, Boolean]): IO[Unit] =
+        IO {
+          sys.addShutdownHook {
+            val hook = requestShutdown.set(true).runAsync(_ => IO.unit) >>
+              halted.discrete
+                .takeWhile(_ == false)
+                .run
+            hook.unsafeRunSync()
+          }
+          ()
+        }
+      Stream.bracket(IO(Channel(connnection)))(
+        channel => {
+          logger.info(s"Using connection $channel")
+          Stream.emit(for {
+            requestShutdown <- async.signalOf[IO, Boolean](false)
+            _               <- addShutdownHook(requestShutdown, halted)
+          } yield IOAmqpClient(channel) -> requestShutdown)
+
+        },
+        channel =>
+          IO {
+            logger.info(s"Closing channel ...")
+            Channel.close(channel)
+        }
+      )
+    }
 
     def apply(config: AmqpClientConfig)(implicit executionContext: ExecutionContext): IOAmqpClient = apply {
+
       val connection = Connection(config)
-      Channel(connection)
+      sys.addShutdownHook {
+        Try(Connection.close(connection))
+      }
+      val channel = Channel(connection)
+      sys.addShutdownHook {
+        Try(Channel.close(channel))
+      }
+      channel
     }
 
     def apply(channel: Id[RabbitChannel])(implicit executionContext: ExecutionContext): IOAmqpClient =
@@ -79,7 +147,7 @@ package object fs2 {
         override def consumer(queueName: QueueName,
                               handler: Handler[IO, Delivery],
                               actionOnFailure: ConsumeAction = DeadLetter,
-                              prefetchCount: Int = 0): Id[Stream[IO, Unit]] =
+                              prefetchCount: Int = 0): IOConsumer =
           for {
             messages <- Stream.eval(async.unboundedQueue[IO, Delivery])
             buildConsumer = Stream eval IO {

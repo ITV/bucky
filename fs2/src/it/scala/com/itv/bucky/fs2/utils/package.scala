@@ -79,17 +79,17 @@ package object utils {
       }
   }
 
+  def config: AmqpClientConfig = {
+    val config = ConfigFactory.load("bucky")
+    AmqpClientConfig(config.getString("rmq.host"),
+                     config.getInt("rmq.port"),
+                     config.getString("rmq.username"),
+                     config.getString("rmq.password"))
+  }
+
   trait PublisherAndAmqpClient extends StrictLogging {
     def defaultDeclaration(queueName: QueueName): List[Queue] =
       List(queueName).map(Queue(_).autoDelete.expires(2.minutes))
-
-    def config: AmqpClientConfig = {
-      val config = ConfigFactory.load("bucky")
-      AmqpClientConfig(config.getString("rmq.host"),
-                       config.getInt("rmq.port"),
-                       config.getString("rmq.username"),
-                       config.getString("rmq.password"))
-    }
 
     def withPublisherAndAmqpClient(testQueueName: QueueName = Any.queue(),
                                    requeueStrategy: RequeueStrategy[IO] = NoneHandler,
