@@ -3,6 +3,7 @@ package com.itv.bucky.taskz
 import java.util.concurrent.ExecutorService
 
 import com.itv.bucky.Monad._
+import com.itv.bucky.taskz.AbstractTaskAmqpClient.TaskConsumer
 import com.itv.bucky.{Channel, _}
 import com.rabbitmq.client.AMQP.BasicProperties
 import com.rabbitmq.client.{
@@ -24,7 +25,8 @@ import scalaz.stream.{Process, async, wye}
 
 object AbstractTaskAmqpClient {
 
-  type TaskAmqpClient = AmqpClient[Id, Task, Throwable, Process[Task, Unit]]
+  type TaskConsumer   = Id[Process[Task, Unit]]
+  type TaskAmqpClient = AmqpClient[Id, Task, Throwable, TaskConsumer]
 
 }
 
@@ -55,7 +57,7 @@ case class TaskAmqpClient(channel: Id[RabbitChannel])(implicit pool: ExecutorSer
   override def consumer(queueName: QueueName,
                         handler: Handler[Task, Delivery],
                         actionOnFailure: ConsumeAction = DeadLetter,
-                        prefetchCount: Int = 0): Id[Process[Task, Unit]] = {
+                        prefetchCount: Int = 0): TaskConsumer = {
     import scalaz.stream.async
     val messages = async.unboundedQueue[Delivery]
 

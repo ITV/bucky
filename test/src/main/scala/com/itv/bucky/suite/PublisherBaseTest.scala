@@ -28,6 +28,7 @@ case class TestFixture[F[_]](publisher: Publisher[F, PublishCommand],
 
 trait EffectVerification[F[_]] {
   def verifySuccess(f: F[Unit]): Assertion
+  def verifyFailure(f: F[Unit]): Assertion
 }
 
 trait EffectMonad[F[_], E] {

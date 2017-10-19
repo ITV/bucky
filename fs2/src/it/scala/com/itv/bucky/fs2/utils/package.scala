@@ -18,6 +18,7 @@ package object utils {
   trait IOEffectVerification extends EffectVerification[IO] {
 
     def verifySuccess(f: IO[Unit]): Assertion = f.unsafeRunSync() should ===(())
+    def verifyFailure(f: IO[Unit]): Assertion = f.attempt.unsafeRunSync() shouldBe 'left
 
   }
 

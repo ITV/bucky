@@ -21,7 +21,6 @@ import scala.util.Random
 
 class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogging {
   import FutureExt._
-  import IntegrationUtils._
   import TestLifecycle._
 
   val consumerPatienceConfig: Eventually.PatienceConfig =
@@ -104,7 +103,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogg
     val queueName                = QueueName("exception-from-handler" + Random.nextInt())
     val handler                  = new StubConsumeHandler[Future, Delivery]()
     val dlqHandler               = new QueueWatcher[Delivery]
-    val config: AmqpClientConfig = IntegrationUtils.config.copy(networkRecoveryInterval = None)
+    val config: AmqpClientConfig = utils.config.copy(networkRecoveryInterval = None)
     for {
       amqpClient <- AmqpClientLifecycle(config)
       declarations = basicRequeueDeclarations(queueName, retryAfter = 1.second) collect {
@@ -184,7 +183,7 @@ class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogg
 
   def messageConsumer[T](queueName: QueueName, handler: Handler[Future, T], unmarshaller: DeliveryUnmarshaller[T]) =
     for {
-      result <- base(defaultDeclaration(queueName))
+      result <- base(utils.defaultDeclaration(queueName))
       (amqClient, publisher) = result
       consumer <- amqClient.consumer(queueName, AmqpClient.deliveryHandlerOf(handler, unmarshaller))
     } yield publisher
