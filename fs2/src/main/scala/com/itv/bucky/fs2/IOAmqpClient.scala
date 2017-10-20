@@ -39,10 +39,9 @@ object IOAmqpClient extends StrictLogging {
 
         cmd =>
           IO.async { pendingConfirmation: Register =>
-            Publisher.publish[Register](channel, cmd, pendingConfirmation, pendingConfirmations)(handleFailure)
-          }
-
-        // FIXME .timed(timeout)
+              Publisher.publish[Register](channel, cmd, pendingConfirmation, pendingConfirmations)(handleFailure)
+            }
+            .timed(timeout)
       }
 
       import _root_.fs2.async._

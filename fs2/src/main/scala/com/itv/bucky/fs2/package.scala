@@ -1,11 +1,13 @@
 package com.itv.bucky
 
+import java.util.concurrent.TimeoutException
+
 import cats.effect.IO
 import _root_.fs2._
 import com.itv.bucky.Monad.Id
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration._
 
 package object fs2 {
   type Register = (Either[Throwable, Unit]) => Unit
@@ -29,7 +31,17 @@ package object fs2 {
 
   }
 
-  implicit class IOExt[A](value: IO[A]) {
+  implicit class IOExt[A](io: IO[A]) {
+    def timed(duration: Duration): IO[A] = {
+      def timeout(message: String) = IO.raiseError(new TimeoutException(s"Timed out after $duration because $message"))
+      IO {
+        io.unsafeRunTimed(duration) //FIXME Implement a better implementation
+      }.attempt.flatMap(
+        _.fold(
+          exception => timeout(exception.getMessage),
+          _.fold[IO[A]](timeout("unable to execute the task"))(IO.pure)
+        ))
+    }
 
     def retry(delay: FiniteDuration,
               nextDelay: FiniteDuration => FiniteDuration,
@@ -37,7 +49,7 @@ package object fs2 {
               retriable: Throwable => Boolean = internal.NonFatal.apply)(implicit executionContext: ExecutionContext) =
       Scheduler
         .apply[IO](1)
-        .flatMap(_.retry(value, delay, nextDelay, maxRetries, retriable))
+        .flatMap(_.retry(io, delay, nextDelay, maxRetries, retriable))
         .runLast
   }
 
