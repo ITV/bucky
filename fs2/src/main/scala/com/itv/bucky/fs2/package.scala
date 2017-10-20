@@ -3,19 +3,19 @@ package com.itv.bucky
 import cats.effect.IO
 import _root_.fs2._
 import com.itv.bucky.Monad.Id
-import com.itv.lifecycle.VanillaLifecycle
+import com.itv.lifecycle.{Lifecycle, VanillaLifecycle}
 import com.rabbitmq.client.AMQP.BasicProperties
 import com.typesafe.scalalogging.StrictLogging
 import com.rabbitmq.client.{
   DefaultConsumer,
   Channel => RabbitChannel,
-  Consumer => RabbitMqConsumer,
   Connection => RabbitConnection,
+  Consumer => RabbitMqConsumer,
   Envelope => RabbitEnvelope
 }
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration.Duration
+import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.util.Try
 
 package object fs2 {
@@ -24,15 +24,6 @@ package object fs2 {
   type IOConsumer = Id[Stream[IO, Unit]]
 
   type IOAmqpClient = AmqpClient[Id, IO, Throwable, Stream[IO, Unit]]
-
-  case class IOAmqpClientLifecycle(config: AmqpClientConfig)(implicit executionContext: ExecutionContext)
-      extends VanillaLifecycle[IOAmqpClient]
-      with StrictLogging {
-    override def start(): IOAmqpClient = IOAmqpClient(config)
-
-    override def shutdown(instance: IOAmqpClient): Unit = ()
-
-  }
 
   implicit val ioMonadError = new MonadError[IO, Throwable] {
     override def raiseError[A](e: Throwable): IO[A] = IO.raiseError(e)
@@ -55,19 +46,26 @@ package object fs2 {
     import _root_.fs2.async.mutable._
     import cats.implicits._
 
+    private def connection(config: AmqpClientConfig)(
+        implicit executionContext: ExecutionContext): IO[RabbitConnection] =
+      config.networkRecoveryIntervalOnStart.fold(IO(Connection(config))) { c =>
+        IO(Connection(config))
+          .retry(c.interval, _ => c.interval, c.numberOfRetries.toInt, _ => true)
+          .flatMap { f =>
+            IO(f.get)
+          }
+      }
+
     def use[O](config: AmqpClientConfig)(f: IOAmqpClient => Stream[IO, O])(
         implicit executionContext: ExecutionContext): Stream[IO, O] = {
       val halted = async.signalOf[IO, Boolean](false).unsafeRunSync()
-      val p = Stream.bracket(IO(Connection(config)))(
-        connnection => {
-          buildChannel(connnection, halted)
-        },
-        connection => {
+      val p = Stream.bracket(connection(config))(
+        connnection => channel(connnection, halted),
+        connection =>
           IO {
             logger.info(s"Closing connection ...")
             Connection.close(connection)
             halted.set(true).unsafeRunSync()
-          }
         }
       )
 
@@ -79,7 +77,7 @@ package object fs2 {
       }
     }
 
-    private def buildChannel(connnection: Id[RabbitConnection], halted: Signal[IO, Boolean])(
+    private def channel(connnection: Id[RabbitConnection], halted: Signal[IO, Boolean])(
         implicit executionContext: ExecutionContext) = {
       def addShutdownHook(requestShutdown: Signal[IO, Boolean], halted: Signal[IO, Boolean]): IO[Unit] =
         IO {
@@ -109,18 +107,11 @@ package object fs2 {
       )
     }
 
-    def apply(config: AmqpClientConfig)(implicit executionContext: ExecutionContext): IOAmqpClient = apply {
-
-      val connection = Connection(config)
-      sys.addShutdownHook {
-        Try(Connection.close(connection))
-      }
-      val channel = Channel(connection)
-      sys.addShutdownHook {
-        Try(Channel.close(channel))
-      }
-      channel
-    }
+    def lifecycle(config: AmqpClientConfig)(implicit executionContext: ExecutionContext): Lifecycle[IOAmqpClient] =
+      for {
+        connection <- Connection.lifecycle(connection(config).unsafeRunSync())
+        channel    <- Channel.lifecycle(connection)
+      } yield IOAmqpClient(channel)
 
     def apply(channel: Id[RabbitChannel])(implicit executionContext: ExecutionContext): IOAmqpClient =
       new IOAmqpClient {
@@ -196,6 +187,18 @@ package object fs2 {
 
         }
       }
+  }
+
+  implicit class IOExt[A](value: IO[A]) {
+
+    def retry(delay: FiniteDuration,
+              nextDelay: FiniteDuration => FiniteDuration,
+              maxRetries: Int,
+              retriable: Throwable => Boolean = internal.NonFatal.apply)(implicit executionContext: ExecutionContext) =
+      Scheduler
+        .apply[IO](1)
+        .flatMap(_.retry(value, delay, nextDelay, maxRetries, retriable))
+        .runLast
   }
 
 }

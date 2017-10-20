@@ -98,7 +98,7 @@ package object utils {
       val exchange   = ExchangeName("")
       import com.itv.bucky.future.SameThreadExecutionContext.implicitly
 
-      Lifecycle.using(IOAmqpClientLifecycle(config)) { client =>
+      Lifecycle.using(IOAmqpClient.lifecycle(config)) { client =>
         val declaration = requeueStrategy match {
           case NoneRequeue(_) => defaultDeclaration(testQueueName)
           case SimpleRequeue(_) =>

@@ -7,11 +7,9 @@ import com.itv.bucky.fs2.utils.{IOEffectMonad, IOEffectVerification}
 import com.itv.bucky.suite.NetworkRecoveryIntegrationTest
 import com.itv.lifecycle.Lifecycle
 import fs2._
-import org.scalatest.Ignore
 
 import scala.concurrent.duration.FiniteDuration
 
-@Ignore
 class IONetworkRecoveryIntegrationTest
     extends NetworkRecoveryIntegrationTest[IO, Throwable, IOConsumer]
     with IOEffectVerification
@@ -24,7 +22,7 @@ class IONetworkRecoveryIntegrationTest
     }
 
   override def buildLifecycle(config: AmqpClientConfig): Lifecycle[AmqpClient[Id, IO, Throwable, IOConsumer]] =
-    IOAmqpClientLifecycle(config)
+    IOAmqpClient.lifecycle(config)
 
   override def defaultAmqpClientConfig: AmqpClientConfig = utils.config
 
