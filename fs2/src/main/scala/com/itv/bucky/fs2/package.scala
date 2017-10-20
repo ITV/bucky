@@ -10,11 +10,11 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
 package object fs2 {
+  type IOAmqpClient = AmqpClient[Id, IO, Throwable, Stream[IO, Unit]]
+
   type Register = (Either[Throwable, Unit]) => Unit
 
   type IOConsumer = Id[Stream[IO, Unit]]
-
-  type IOAmqpClient = AmqpClient[Id, IO, Throwable, Stream[IO, Unit]]
 
   implicit val ioMonadError = new MonadError[IO, Throwable] {
     override def raiseError[A](e: Throwable): IO[A] = IO.raiseError(e)
@@ -38,7 +38,7 @@ package object fs2 {
         io.unsafeRunTimed(duration) //FIXME Implement a better implementation
       }.attempt.flatMap(
         _.fold(
-          exception => timeout(exception.getMessage),
+          IO.raiseError,
           _.fold[IO[A]](timeout("unable to execute the task"))(IO.pure)
         ))
     }

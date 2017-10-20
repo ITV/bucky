@@ -1,17 +1,16 @@
-package itv.bucky.fs2
+package com.itv.bucky.fs2
 
 import java.util.concurrent.TimeoutException
 
 import com.itv.bucky.PublishCommandBuilder.publishCommandBuilder
 import com.itv.bucky._
-import com.itv.bucky.fs2.IOAmqpClient
 import com.rabbitmq.client.AMQP
 import com.typesafe.scalalogging.StrictLogging
 import org.scalatest.FunSuite
+import org.scalatest.Matchers._
 import org.scalatest.concurrent.ScalaFutures
 
 import scala.concurrent.duration._
-import org.scalatest.Matchers._
 
 class TimeoutPublisherTest extends FunSuite with ScalaFutures with StrictLogging {
   import com.itv.bucky.future.SameThreadExecutionContext.implicitly
