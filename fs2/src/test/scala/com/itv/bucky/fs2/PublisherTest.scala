@@ -22,7 +22,7 @@ class PublisherTest extends FunSuite {
   import TestIOExt._
 
   test("Publishing only returns success once publication is acknowledged with Id") {
-    withPublisher(timeout = 100.hours) { publisher =>
+    withPublisher() { publisher =>
       import publisher._
       channel.transmittedCommands should have size 1
       channel.transmittedCommands.last shouldBe an[AMQP.Confirm.Select]
@@ -68,7 +68,7 @@ class PublisherTest extends FunSuite {
   }
 
   test("Negative acknowledgements result in failed future") {
-    withPublisher(timeout = 100.hours) { publisher =>
+    withPublisher() { publisher =>
       import publisher._
       val task = publish(Any.publishCommand()).status
 
@@ -82,66 +82,46 @@ class PublisherTest extends FunSuite {
     }
   }
 
-  ignore("Only futures corresponding to acknowledged publications are completed") {
-    withPublisher(timeout = 100.hours) { publisher =>
+  test("Only futures corresponding to acknowledged publications are completed") {
+    withPublisher() { publisher =>
       import publisher._
-      val task1 = publish(Any.publishCommand()).status
-      val task2 = publish(Any.publishCommand()).status
-      val task3 = publish(Any.publishCommand()).status
 
-      task1 shouldBe 'running
-      task2 shouldBe 'running
-      task3 shouldBe 'running
+      val tasks = (1 to 3).map(_ => publish(Any.publishCommand()).status)
+
+      atLeast(3, tasks) shouldBe 'running
 
       channel.replyWith(new AMQImpl.Basic.Ack(2L, true))
 
       eventually {
-        task1 shouldBe 'completed
+        atLeast(2, tasks) shouldBe 'completed
       }
-      eventually {
-        task2 shouldBe 'completed
-      }
-      task3 should not be 'completed
+
+      atLeast(1, tasks) should not be 'completed
 
       channel.replyWith(new AMQImpl.Basic.Ack(3L, false))
 
-      eventually {
-        task1 shouldBe 'completed
-        task2 shouldBe 'completed
-        task3 shouldBe 'completed
-      }
+      atLeast(3, tasks) shouldBe 'completed
     }
   }
 
-  ignore("Only futures corresponding to acknowledged publications are completed: negative acknowledgment (nack)") {
-    withPublisher(timeout = 100.hours) { publisher =>
+  test("Only futures corresponding to acknowledged publications are completed: negative acknowledgment (nack)") {
+    withPublisher() { publisher =>
       import publisher._
-      val task1 = publish(Any.publishCommand()).status
-      val task2 = publish(Any.publishCommand()).status
-      val task3 = publish(Any.publishCommand()).status
+      val tasks = (1 to 3).map(_ => publish(Any.publishCommand()).status)
 
-      task1 should not be 'completed
-      task2 should not be 'completed
-      task3 should not be 'completed
+      atLeast(3, tasks) shouldBe 'running
 
       channel.replyWith(new AMQImpl.Basic.Nack(2L, true, false))
 
       eventually {
-        task1 shouldBe 'completed
-      }
-      eventually {
-        task2 shouldBe 'completed
+        atLeast(2, tasks) shouldBe 'completed
       }
 
-      task3 should not be 'completed
+      atLeast(1, tasks) should not be 'completed
 
       channel.replyWith(new AMQImpl.Basic.Ack(3L, false))
 
-      task1 shouldBe 'completed
-      task2 shouldBe 'completed
-      eventually {
-        task3 shouldBe 'completed
-      }
+      atLeast(3, tasks) shouldBe 'completed
     }
   }
 
@@ -157,7 +137,7 @@ class PublisherTest extends FunSuite {
         throw new IOException(expectedMsg)
 
     }
-    withPublisher(timeout = 100.hours, channel = mockCannel) { publisher =>
+    withPublisher(None, channel = mockCannel) { publisher =>
       import publisher._
       channel.transmittedCommands should have size 1
       channel.transmittedCommands.last shouldBe an[AMQP.Confirm.Select]
@@ -173,7 +153,7 @@ class PublisherTest extends FunSuite {
 
   test("Publisher times out if configured to do so") {
 
-    withPublisher(timeout = 10.millis) { publisher =>
+    withPublisher(timeout = Some(10.millis)) { publisher =>
       import publisher._
       val result = publish(Any.publishCommand()).status
 
@@ -185,12 +165,12 @@ class PublisherTest extends FunSuite {
 
   case class TestPublisher(channel: StubChannel, publish: Publisher[IO, PublishCommand])
 
-  def withPublisher(timeout: FiniteDuration = 1.second, channel: StubChannel = new StubChannel)(
+  def withPublisher(timeout: Option[FiniteDuration] = None, channel: StubChannel = new StubChannel)(
       f: TestPublisher => Unit): Unit = {
     import scala.concurrent.ExecutionContext.Implicits.global
 
     val client  = IOAmqpClient(channel)
-    val publish = client.publisher(timeout)
+    val publish = timeout.fold(client.publisher())(client.publisher)
     f(TestPublisher(channel, publish))
   }
 
