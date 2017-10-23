@@ -5,7 +5,6 @@ import java.util.concurrent.TimeoutException
 import cats.effect.IO
 import _root_.fs2._
 import com.itv.bucky.Monad.Id
-import com.itv.bucky.fs2.Foo.io
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
