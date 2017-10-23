@@ -5,6 +5,7 @@ import java.util.concurrent.TimeoutException
 import cats.effect.IO
 import _root_.fs2._
 import com.itv.bucky.Monad.Id
+import com.itv.bucky.fs2.Foo.io
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -32,15 +33,23 @@ package object fs2 {
   }
 
   implicit class IOExt[A](io: IO[A]) {
-    def timed(duration: Duration): IO[A] = {
-      def timeout(message: String) = IO.raiseError(new TimeoutException(s"Timed out after $duration because $message"))
-      IO {
-        io.unsafeRunTimed(duration) //FIXME Implement a better implementation
-      }.attempt.flatMap(
-        _.fold(
-          IO.raiseError,
-          _.fold[IO[A]](timeout("unable to execute the task"))(IO.pure)
-        ))
+    import AtomicRef._
+    def timed(duration: Duration)(implicit executionContext: ExecutionContext): IO[A] = duration match {
+      case finiteDuration: FiniteDuration =>
+        val scheduleTimeout =
+          Scheduler[IO](corePoolSize = 1).flatMap { scheduler =>
+            scheduler.sleep[IO](finiteDuration)
+          }.runLast
+
+        async
+          .race(scheduleTimeout, io)
+          .flatMap {
+            _.fold(
+              _ => IO.raiseError(new TimeoutException(s"Timed out after $duration")),
+              s => IO.pure(s)
+            )
+          }
+      case _ => io
     }
 
     def retry(delay: FiniteDuration,

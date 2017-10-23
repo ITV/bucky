@@ -1,7 +1,7 @@
 package com.itv.bucky.fs2
 
 import java.io.IOException
-import java.util.concurrent.TimeoutException
+import java.util.concurrent.{Executors, TimeoutException}
 
 import cats.effect.IO
 import com.itv.bucky._
@@ -14,10 +14,12 @@ import org.scalatest.Matchers._
 import org.scalatest.concurrent.Eventually
 import org.scalatest.concurrent.Eventually.eventually
 
+import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
 class PublisherTest extends FunSuite {
-  implicit val eventuallyPatienceConfig = Eventually.PatienceConfig(5.seconds, 100.millis)
+  implicit val eventuallyPatienceConfig = Eventually.PatienceConfig(1.seconds, 100.millis)
+  implicit val ec                       = ExecutionContext.fromExecutor(Executors.newWorkStealingPool(1))
 
   import TestIOExt._
 
@@ -33,8 +35,6 @@ class PublisherTest extends FunSuite {
         channel.transmittedCommands should have size 2
         channel.transmittedCommands.last shouldBe an[AMQP.Basic.Publish]
       }
-
-      task shouldBe 'running
 
       channel.replyWith(new AMQImpl.Basic.Ack(1L, false))
 
@@ -57,8 +57,6 @@ class PublisherTest extends FunSuite {
         channel.transmittedCommands.last shouldBe an[Publish]
       }
 
-      task shouldBe 'running
-
       channel.replyWith(new AMQImpl.Basic.Ack(1L, false))
 
       eventually {
@@ -72,7 +70,9 @@ class PublisherTest extends FunSuite {
       import publisher._
       val task = publish(Any.publishCommand()).status
 
-      task shouldBe 'running
+      eventually {
+        atLeast(1, channel.transmittedCommands) shouldBe an[AMQP.Basic.Publish]
+      }
 
       channel.replyWith(new AMQImpl.Basic.Nack(1L, false, false))
 
@@ -82,13 +82,15 @@ class PublisherTest extends FunSuite {
     }
   }
 
-  test("Only futures corresponding to acknowledged publications are completed") {
+  test(s"Only futures corresponding to acknowledged publications are completed") {
     withPublisher() { publisher =>
       import publisher._
 
       val tasks = (1 to 3).map(_ => publish(Any.publishCommand()).status)
 
-      atLeast(3, tasks) shouldBe 'running
+      eventually {
+        atLeast(tasks.size, channel.transmittedCommands) shouldBe an[AMQP.Basic.Publish]
+      }
 
       channel.replyWith(new AMQImpl.Basic.Ack(2L, true))
 
@@ -100,28 +102,37 @@ class PublisherTest extends FunSuite {
 
       channel.replyWith(new AMQImpl.Basic.Ack(3L, false))
 
-      atLeast(3, tasks) shouldBe 'completed
+      eventually {
+        atLeast(3, tasks) shouldBe 'completed
+      }
     }
+
   }
 
-  test("Only futures corresponding to acknowledged publications are completed: negative acknowledgment (nack)") {
-    withPublisher() { publisher =>
+  test(s"Only futures corresponding to acknowledged publications are completed: negative acknowledgment (nack)") {
+    withPublisher(timeout = Some(100.hours)) { publisher =>
       import publisher._
-      val tasks = (1 to 3).map(_ => publish(Any.publishCommand()).status)
 
-      atLeast(3, tasks) shouldBe 'running
+      val tasks = (1 to 3).map(_ => publish(Any.publishCommand())).map(_.status)
+
+      eventually {
+        atLeast(tasks.size, channel.transmittedCommands) shouldBe an[AMQP.Basic.Publish]
+      }
 
       channel.replyWith(new AMQImpl.Basic.Nack(2L, true, false))
 
       eventually {
         atLeast(2, tasks) shouldBe 'completed
+
       }
 
       atLeast(1, tasks) should not be 'completed
 
       channel.replyWith(new AMQImpl.Basic.Ack(3L, false))
 
-      atLeast(3, tasks) shouldBe 'completed
+      eventually {
+        atLeast(3, tasks) shouldBe 'completed
+      }
     }
   }
 
@@ -167,7 +178,6 @@ class PublisherTest extends FunSuite {
 
   def withPublisher(timeout: Option[FiniteDuration] = None, channel: StubChannel = new StubChannel)(
       f: TestPublisher => Unit): Unit = {
-    import scala.concurrent.ExecutionContext.Implicits.global
 
     val client  = IOAmqpClient(channel)
     val publish = timeout.fold(client.publisher())(client.publisher)

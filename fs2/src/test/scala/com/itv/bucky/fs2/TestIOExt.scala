@@ -1,7 +1,5 @@
 package com.itv.bucky.fs2
 
-import java.util.concurrent.{Executor, ExecutorService, Executors}
-
 import cats.effect.IO
 
 import scala.concurrent.ExecutionContext
@@ -12,12 +10,9 @@ object TestIOExt {
 
   type IOResult[A] = Either[Throwable, A]
   implicit class TestIOEXt[A](io: IO[A]) {
-    def status: IOStatus = {
+    def status(implicit executionContext: ExecutionContext): IOStatus = {
       import _root_.fs2._
       val status = IOStatus(Ref[Option[IOResult[Unit]]](None))
-
-      implicit val foo = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(4))
-
       async
         .unsafeRunAsync(io)(either => IO(status.complete(either.map(_ => ()))))
 
@@ -29,8 +24,6 @@ object TestIOExt {
     import org.scalatest.Matchers.fail
 
     def complete(result: Either[Throwable, Unit]) = ref.set(Some(result))
-
-    def isRunning = ref.get().isEmpty
 
     def isCompleted = ref.get().isDefined
 
