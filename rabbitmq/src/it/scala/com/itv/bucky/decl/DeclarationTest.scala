@@ -3,7 +3,7 @@ package com.itv.bucky.decl
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.PublishCommandBuilder._
 import com.itv.bucky._
-import com.itv.bucky.future.IntegrationUtils
+
 import com.itv.bucky.lifecycle._
 import com.itv.lifecycle.Lifecycle
 import com.typesafe.scalalogging.StrictLogging
@@ -25,7 +25,7 @@ class DeclarationTest extends FunSuite with ScalaFutures with StrictLogging {
   test("Should be able to declare a queue") {
     val queueName = "queue.declare" + Random.nextInt()
 
-    Lifecycle.using(AmqpClientLifecycle(IntegrationUtils.config)) { amqpClient =>
+    Lifecycle.using(AmqpClientLifecycle(utils.config)) { amqpClient =>
       amqpClient.performOps(Queue(QueueName(queueName),
                                   isDurable = true,
                                   isExclusive = true,
@@ -55,7 +55,7 @@ class DeclarationTest extends FunSuite with ScalaFutures with StrictLogging {
     val queueName    = QueueName("bindingq" + Random.nextInt())
     val routingKey   = RoutingKey("bindingr" + Random.nextInt())
 
-    Lifecycle.using(AmqpClientLifecycle(IntegrationUtils.config)) { amqpClient =>
+    Lifecycle.using(AmqpClientLifecycle(utils.config)) { amqpClient =>
       val declarations = List(
         Exchange(exchangeName, isDurable = false, shouldAutoDelete = true, isInternal = false, arguments = Map.empty),
         Queue(queueName, isDurable = false, isExclusive = true, shouldAutoDelete = false, Map.empty),
@@ -89,8 +89,8 @@ class DeclarationTest extends FunSuite with ScalaFutures with StrictLogging {
 
     val queueName = QueueName("bindingq" + Random.nextInt())
 
-    Lifecycle.using(AmqpClientLifecycle(IntegrationUtils.config)) { amqpClient =>
-      logger.info(s"AMQP Client started using config: ${IntegrationUtils.config}")
+    Lifecycle.using(AmqpClientLifecycle(utils.config)) { amqpClient =>
+      logger.info(s"AMQP Client started using config: ${utils.config}")
       val declarations = List(
         Exchange(destinationExchangeName,
                  isDurable = false,
@@ -150,7 +150,7 @@ class DeclarationTest extends FunSuite with ScalaFutures with StrictLogging {
     val declarations = List(testExchange, testBinding, testBadQueue, testGoodQueue)
 
     Try(Lifecycle.using(for {
-      amqpClient <- AmqpClientLifecycle(IntegrationUtils.config)
+      amqpClient <- AmqpClientLifecycle(utils.config)
       _          <- DeclarationLifecycle(declarations, amqpClient)
     } yield ()) { _ =>
       }) shouldBe 'success

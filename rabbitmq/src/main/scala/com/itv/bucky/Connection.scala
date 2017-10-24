@@ -2,6 +2,7 @@ package com.itv.bucky
 
 import com.itv.bucky.Monad.Id
 import com.itv.bucky.decl.{Binding, Exchange, ExchangeBinding, Queue}
+import com.itv.lifecycle.{Lifecycle, VanillaLifecycle}
 import com.rabbitmq.client.{Channel => RabbitChannel, Connection => RabbitConnection, _}
 import com.typesafe.scalalogging.StrictLogging
 
@@ -9,6 +10,15 @@ import scala.language.higherKinds
 import scala.util.{Failure, Success, Try}
 
 object Connection extends StrictLogging {
+
+  def lifecycle(connection: => RabbitConnection): Lifecycle[RabbitConnection] = new VanillaLifecycle[RabbitConnection] {
+    override def start(): RabbitConnection = connection
+
+    override def shutdown(instance: RabbitConnection): Unit = Connection.close(instance)
+  }
+
+  def lifecycle(config: AmqpClientConfig): Lifecycle[RabbitConnection] = lifecycle(Connection(config))
+
   def apply(config: AmqpClientConfig): Id[RabbitConnection] =
     Try {
       logger.info(s"Starting AmqpClient")
@@ -73,6 +83,12 @@ object Channel extends StrictLogging {
         logger.error(s"Failure when starting Channel because ${exception.getMessage}", exception)
         throw exception
     }
+
+  def lifecycle(connection: RabbitConnection): Lifecycle[RabbitChannel] = new VanillaLifecycle[RabbitChannel] {
+    override def start(): RabbitChannel = Channel(connection)
+
+    override def shutdown(instance: RabbitChannel): Unit = Channel.close(instance)
+  }
 }
 
 case class ChannelAmqpOps(channel: RabbitChannel) extends AmqpOps {

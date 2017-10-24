@@ -10,9 +10,9 @@ object Publisher extends StrictLogging {
   def publish[T](channel: Channel,
                  cmd: PublishCommand,
                  pendingConfirmation: T,
-                 pendingConfirmations: PendingConfirmations[T])(fail: (T, Exception) => Unit): Unit = {
-    logger.debug(s"Acquire the channel: $channel")
+                 pendingConfirmations: PendingConfirmations[T])(fail: (T, Exception) => Unit): Unit =
     channel.synchronized {
+      logger.debug(s"Acquire the channel: $channel")
       val deliveryTag = channel.getNextPublishSeqNo
       logger.debug("Publishing with delivery tag {}L to {}:{} with {}: {}",
                    box(deliveryTag),
@@ -34,9 +34,8 @@ object Publisher extends StrictLogging {
           pendingConfirmations.completeConfirmation(deliveryTag)(t => fail(t, exception))
 
       }
+      logger.debug(s"Release the channel: $channel")
     }
-    logger.debug(s"Release the channel: $channel")
-  }
 
   // Unfortunately explicit boxing seems necessary due to Scala inferring logger varargs as being of type AnyRef*
   @inline private def box(x: AnyVal): AnyRef = x.asInstanceOf[AnyRef]
@@ -78,7 +77,8 @@ object Publisher extends StrictLogging {
 
   }
 
-  def confirmListener[T](channel: Channel)(success: T => Unit)(fail: (T, Exception) => Unit): PendingConfirmations[T] = {
+  def confirmListener[T](channel: Channel)(success: T => Unit)(
+      fail: (T, Exception) => Unit): PendingConfirmations[T] = {
     channel.confirmSelect()
     val pendingConfirmations = new PendingConfirmations[T]()
     logger.info(s"Create confirm listener for channel $channel")

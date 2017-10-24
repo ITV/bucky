@@ -3,7 +3,7 @@ package com.itv.bucky
 import scala.concurrent.duration._
 
 /**
-  * AmqpClient configuration. Acts as a lifecycle factory for AmqpClient.
+  * AmqpClient configuration.
   */
 case class AmqpClientConfig(host: String,
                             port: Int,

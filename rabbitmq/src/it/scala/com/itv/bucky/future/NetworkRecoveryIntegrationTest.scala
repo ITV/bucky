@@ -3,22 +3,7 @@ package com.itv.bucky.future
 import com.itv.bucky.PublishCommandBuilder._
 import com.itv.bucky.decl.Queue
 import com.itv.bucky.lifecycle._
-import com.itv.bucky.{
-  AmqpClient,
-  ExchangeName,
-  HostPort,
-  Payload,
-  PayloadMarshaller,
-  Port,
-  Proxy,
-  ProxyLifecycle,
-  Publisher,
-  QueueName,
-  RoutingKey,
-  StubConsumeHandler,
-  UnmarshalResult,
-  Unmarshaller
-}
+import com.itv.bucky._
 import com.itv.lifecycle.Lifecycle
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
@@ -40,7 +25,7 @@ class NetworkRecoveryIntegrationTest extends FunSuite with ScalaFutures {
                                 Publisher[Future, Unit])] = {
     val queueA           = QueueName("proxy" + Random.nextInt())
     val queueB           = QueueName("proxy" + Random.nextInt())
-    val amqpClientConfig = IntegrationUtils.config
+    val amqpClientConfig = utils.config
 
     val marshaller: PayloadMarshaller[Unit] = PayloadMarshaller.lift(_ => Payload.from("hello"))
     val pcbA                                = publishCommandBuilder[Unit](marshaller) using ExchangeName("") using RoutingKey(queueA.value)

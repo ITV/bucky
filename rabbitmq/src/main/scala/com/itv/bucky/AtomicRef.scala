@@ -16,4 +16,8 @@ object AtomicRef {
 
     def get: A = atomic.get
   }
+
+  object Ref {
+    def apply[A](a: A) = new Ref[A](a)
+  }
 }

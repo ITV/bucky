@@ -6,21 +6,40 @@ import com.itv.bucky.Monad.Id
 import com.itv.bucky._
 import com.itv.bucky.decl._
 import com.itv.bucky.pattern.requeue._
+import com.itv.bucky.suite._
 import com.itv.lifecycle.Lifecycle
 import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.StrictLogging
 import org.scalatest.Assertion
 
 import scala.concurrent.duration._
-import scalaz.\/-
+import scalaz.{-\/, \/-}
 import scalaz.concurrent.{Strategy, Task}
 import scalaz.stream.Process
-
 import org.scalatest.Matchers._
+
+import scala.concurrent.ExecutionContextExecutor
 
 trait TaskEffectVerification extends EffectVerification[Task] {
 
   def verifySuccess(f: Task[Unit]): Assertion = f.unsafePerformSyncAttempt should ===(\/-(()))
+
+  def verifyFailure(f: Task[Unit]) =
+    f.unsafePerformSyncAttempt shouldBe 'left
+
+}
+
+trait TaskExecutorService {
+  implicit val pool: ExecutorService = ExecutionContextExecutorServiceBridge(new ExecutionContextExecutor {
+    override def execute(runnable: Runnable): Unit = runnable.run()
+
+    override def reportFailure(cause: Throwable): Unit = throw cause
+  })
+}
+
+trait TaskMonadEffect extends EffectMonad[Task, Throwable] with TaskExecutorService {
+
+  implicit def effectMonad: MonadError[Task, Throwable] = taskMonadError
 
 }
 

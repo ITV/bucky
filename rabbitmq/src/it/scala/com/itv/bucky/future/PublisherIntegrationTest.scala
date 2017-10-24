@@ -15,7 +15,7 @@ class PublisherIntegrationTest extends FunSuite with ScalaFutures with StrictLog
 
   import FutureExt._
   import TestLifecycle._
-  import IntegrationUtils._
+  import utils._
 
   test("Can publish messages to a (pre-existing) queue") {
     val testQueueName = "bucky-publisher-test"

@@ -2,15 +2,14 @@ package com.itv.bucky.future
 
 import com.itv.bucky._
 import com.itv.bucky.lifecycle.{AmqpClientLifecycle, DeclarationLifecycle}
+import com.itv.bucky.suite.{PublisherBaseTest, RequeueStrategy, TestFixture}
+import com.itv.bucky.utils.FutureEffectVerification
 import com.itv.lifecycle.Lifecycle
-import org.scalatest.Assertion
 import org.scalatest.concurrent.ScalaFutures
 
 import scala.concurrent.Future
 
-import org.scalatest.Matchers._
-
-trait FuturePublisherTest extends PublisherBaseTest[Future] with ScalaFutures {
+trait FuturePublisherTest extends PublisherBaseTest[Future] with ScalaFutures with FutureEffectVerification {
   import FutureExt._
 
   override def withPublisher(testQueueName: QueueName,
@@ -19,8 +18,8 @@ trait FuturePublisherTest extends PublisherBaseTest[Future] with ScalaFutures {
     val key          = RoutingKey(testQueueName.value)
     val exchangeName = ExchangeName("")
     val clientLifecycle = for {
-      client <- AmqpClientLifecycle(IntegrationUtils.config)
-      _      <- DeclarationLifecycle(IntegrationUtils.defaultDeclaration(testQueueName), client)
+      client <- AmqpClientLifecycle(utils.config)
+      _      <- DeclarationLifecycle(utils.defaultDeclaration(testQueueName), client)
     } yield client
 
     Lifecycle.using(clientLifecycle) { amqpClient =>
@@ -30,7 +29,5 @@ trait FuturePublisherTest extends PublisherBaseTest[Future] with ScalaFutures {
       }
     }
   }
-
-  override def verifySuccess(f: Future[Unit]): Assertion = f.asTry.futureValue shouldBe 'success
 
 }

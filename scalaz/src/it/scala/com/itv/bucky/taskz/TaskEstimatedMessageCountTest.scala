@@ -1,14 +1,11 @@
 package com.itv.bucky.taskz
 
 import com.itv.bucky
-import com.itv.bucky._
-import org.scalatest.{Assertion, FunSuite}
+import com.itv.bucky.suite.{EstimatedMessageCountTest, RequeueStrategy, TestFixture}
 
-import scalaz.\/-
 import scalaz.concurrent.Task
-import org.scalatest.Matchers._
 
-class TaskEstimatedMessageCountTest extends FunSuite with EstimatedMessageCountTest[Task] {
+class TaskEstimatedMessageCountTest extends EstimatedMessageCountTest[Task] with TaskEffectVerification {
 
   override def runAll(tasks: Seq[Task[Unit]]): Unit = Task.gatherUnordered(tasks).unsafePerformSync
 
@@ -16,8 +13,5 @@ class TaskEstimatedMessageCountTest extends FunSuite with EstimatedMessageCountT
                              requeueStrategy: RequeueStrategy[Task],
                              shouldDeclare: Boolean)(f: (TestFixture[Task]) => Unit): Unit =
     IntegrationUtils.withPublisher(testQueueName, requeueStrategy, shouldDeclare)(f)
-
-  override def verifySuccess(f: Task[Unit]): Assertion =
-    f.unsafePerformSyncAttempt should ===(\/-(()))
 
 }

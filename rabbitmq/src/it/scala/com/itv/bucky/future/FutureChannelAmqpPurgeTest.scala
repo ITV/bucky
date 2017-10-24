@@ -1,6 +1,6 @@
 package com.itv.bucky.future
 
-import com.itv.bucky.ChannelAmqpPurgeTest
+import com.itv.bucky.suite.ChannelAmqpPurgeTest
 
 import scala.concurrent.Future
 
