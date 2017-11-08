@@ -152,8 +152,8 @@ lazy val example = project
   .settings(name := "com.itv")
   .settings(moduleName := "bucky-example")
   .settings(kernelSettings: _*)
-  .aggregate(core, rabbitmq, scalaz, argonaut, circe)
-  .dependsOn(core, rabbitmq, scalaz, argonaut, circe)
+  .aggregate(core, rabbitmq, scalaz, fs2, argonaut, circe)
+  .dependsOn(core, rabbitmq, scalaz, fs2, argonaut, circe)
   .settings(
     libraryDependencies ++= Seq(
       "io.argonaut"                %% "argonaut"      % argonautVersion,
