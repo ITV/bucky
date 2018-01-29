@@ -13,7 +13,7 @@ val scalaLoggingVersion = "3.5.0"
 val scalaTestVersion    = "3.0.1"
 val mockitoVersion      = "1.9.0"
 val argonautVersion     = "6.2-RC2"
-val circeVersion        = "0.9.0-M1"
+val circeVersion        = "0.9.1"
 
 releaseProcess := Seq[ReleaseStep](
   checkSnapshotDependencies,
@@ -287,7 +287,7 @@ lazy val fs2 = project
   )
   .settings(
     libraryDependencies ++= Seq(
-      "co.fs2"            %% "fs2-core"      % "0.10.0-M6",
+      "co.fs2"            %% "fs2-core"      % "0.10.0-M11",
       "com.typesafe"      % "config"         % "1.2.1" % "it"
     )
   )

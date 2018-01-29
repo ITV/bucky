@@ -43,6 +43,6 @@ object StringConsumer extends App with StrictLogging {
         amqpClient.consumer(Declarations.queue.name,
                             AmqpClient.handlerOf(stringToLogHandler, StringPayloadUnmarshaller))
     }
-    .run
+    .compile.drain
     .unsafeRunSync()
 }
