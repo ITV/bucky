@@ -80,7 +80,7 @@ object IOAmqpClient extends StrictLogging {
     for {
       halted <- Stream.eval(async.signalOf[IO, Boolean](false))
       amqpClientAndRequestShutDown <- Stream.bracket(IOConnection(config))(
-        connnection => streamIOAmqpClient(connnection, halted),
+        connection => streamIOAmqpClient(connection, halted),
         connection =>
           for {
             _ <- IO {
@@ -118,7 +118,7 @@ object IOAmqpClient extends StrictLogging {
         val hook = requestShutdown.set(true).runAsync(_ => IO.unit) >>
           halted.discrete
             .takeWhile(_ == false)
-            .run
+            .compile.drain
         hook.unsafeRunSync()
       }
       ()

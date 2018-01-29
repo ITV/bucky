@@ -55,7 +55,7 @@ package object utils {
                 val dlqHandler   = new StubConsumeHandler[IO, Delivery]
                 val dlqQueueName = QueueName(s"${queueName.value}.dlq")
                 val consumer     = amqpClient.consumer(dlqQueueName, dlqHandler)
-                consumer.run.unsafeRunAsync { _ =>
+                consumer.compile.drain.unsafeRunAsync { _ =>
                   }
 
                 Some(dlqHandler)
@@ -71,7 +71,7 @@ package object utils {
               case NoneRequeue(handler)   => amqpClient.consumer(app.queueName, handler)
             }
 
-            consumer.run.unsafeRunAsync { _ =>
+            consumer.compile.drain.unsafeRunAsync { _ =>
               }
 
             f(app.copy(dlqHandler = dlqHandler))

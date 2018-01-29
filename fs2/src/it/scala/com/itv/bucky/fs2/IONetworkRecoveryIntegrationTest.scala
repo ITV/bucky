@@ -17,7 +17,7 @@ class IONetworkRecoveryIntegrationTest
   import com.itv.bucky.future.SameThreadExecutionContext.implicitly
 
   override def schedule(f: => Unit, duration: FiniteDuration): Unit =
-    Scheduler[IO](corePoolSize = 1).flatMap(_.delay(Stream.eval(IO(f)), duration)).run.unsafeRunAsync { _ =>
+    Scheduler[IO](corePoolSize = 1).flatMap(_.delay(Stream.eval(IO(f)), duration)).compile.drain.unsafeRunAsync { _ =>
       ()
     }
 
@@ -26,5 +26,5 @@ class IONetworkRecoveryIntegrationTest
 
   override def defaultAmqpClientConfig: AmqpClientConfig = utils.config
 
-  override def executeConsumer(c: IOConsumer): Unit = c.run.unsafeRunAsync(_ => ())
+  override def executeConsumer(c: IOConsumer): Unit = c.compile.drain.unsafeRunAsync(_ => ())
 }

@@ -112,7 +112,7 @@ class ConsumerTest extends FunSuite with StrictLogging {
     val handler = new StubConsumeHandler[IO, Delivery]()
 
     val queueName = QueueName("blah")
-    client.consumer(queueName, handler, prefetchCount = 12).run.unsafeRunAsync { result =>
+    client.consumer(queueName, handler, prefetchCount = 12).compile.drain.unsafeRunAsync { result =>
       logger.info(s"Close consumer for $queueName: $result")
     }
     f(TestConsumer(channel, handler))
