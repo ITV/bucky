@@ -10,10 +10,12 @@ crossScalaVersions := Seq("2.11.8", "2.12.1")
 val itvLifecycleVersion = "0.16"
 val amqpClientVersion   = "4.0.2"
 val scalaLoggingVersion = "3.5.0"
-val scalaTestVersion    = "3.0.1"
+val scalaTestVersion    = "3.0.4"
 val mockitoVersion      = "1.9.0"
-val argonautVersion     = "6.2-RC2"
+val argonautVersion     = "6.2"
 val circeVersion        = "0.9.1"
+val typeSafeVersion     = "1.3.1"
+val fs2Version          = "0.10.0"
 
 releaseProcess := Seq[ReleaseStep](
   checkSnapshotDependencies,
@@ -227,6 +229,7 @@ lazy val xml = project
     )
   )
 
+
 lazy val rabbitmq = project
   .settings(name := "com.itv")
   .settings(moduleName := "bucky-rabbitmq")
@@ -245,7 +248,7 @@ lazy val rabbitmq = project
       "com.rabbitmq"               % "amqp-client"    % amqpClientVersion,
       "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
       "org.scalatest"              %% "scalatest"     % scalaTestVersion % "test, it",
-      "com.typesafe"               % "config"         % "1.2.1" % "it",
+      "com.typesafe"               % "config"         % typeSafeVersion % "it",
       "org.mockito"                % "mockito-core"   % mockitoVersion % "test"
     )
   )
@@ -266,7 +269,7 @@ lazy val scalaz = project
   .settings(
     libraryDependencies ++= Seq(
       "org.scalaz.stream" %% "scalaz-stream" % "0.8.6a",
-      "com.typesafe"      % "config"         % "1.2.1" % "it"
+      "com.typesafe"      % "config"         % typeSafeVersion % "it"
     )
   )
 
@@ -287,8 +290,8 @@ lazy val fs2 = project
   )
   .settings(
     libraryDependencies ++= Seq(
-      "co.fs2"            %% "fs2-core"      % "0.10.0-M11",
-      "com.typesafe"      % "config"         % "1.2.1" % "it"
+      "co.fs2"            %% "fs2-core"      % fs2Version,
+      "com.typesafe"      % "config"         % typeSafeVersion % "it"
     )
   )
 
