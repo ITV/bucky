@@ -14,8 +14,8 @@ import com.rabbitmq.client.{
   Envelope => RabbitEnvelope
 }
 
-import scala.concurrent.ExecutionContext
-import scala.concurrent.duration.Duration
+import scala.concurrent.{ExecutionContext, TimeoutException}
+import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.util.Try
 
 object IOAmqpClient extends StrictLogging {
@@ -38,10 +38,25 @@ object IOAmqpClient extends StrictLogging {
         }(handleFailure)
 
         cmd =>
-          IO.async { pendingConfirmation: Register =>
-              Publisher.publish[Register](channel, cmd, pendingConfirmation, pendingConfirmations)(handleFailure)
-            }
-            .timed(timeout)
+          val publishing = IO.async { pendingConfirmation: Register =>
+            Publisher.publish[Register](channel, cmd, pendingConfirmation, pendingConfirmations)(handleFailure)
+          }
+          timeout match {
+            case fd: FiniteDuration =>
+              Scheduler[IO](2)
+                .flatMap { implicit s =>
+                  Stream.eval(
+                    publishing
+                      .timed(fd))
+                }
+                .attempt
+                .compile
+                .last
+                .flatMap(_.fold(IO.raiseError[Unit](new TimeoutException(s"Timed out after $fd")))(
+                  _.fold(IO.raiseError, _ => IO.unit)))
+            case _ => publishing
+          }
+
       }
 
       import _root_.fs2.async._
@@ -118,7 +133,8 @@ object IOAmqpClient extends StrictLogging {
         val hook = requestShutdown.set(true).runAsync(_ => IO.unit) >>
           halted.discrete
             .takeWhile(_ == false)
-            .compile.drain
+            .compile
+            .drain
         hook.unsafeRunSync()
       }
       ()

@@ -15,7 +15,7 @@ val mockitoVersion      = "1.9.0"
 val argonautVersion     = "6.2"
 val circeVersion        = "0.9.1"
 val typeSafeVersion     = "1.3.1"
-val fs2Version          = "0.10.0"
+val fs2Version          = "0.10.1"
 
 releaseProcess := Seq[ReleaseStep](
   checkSnapshotDependencies,

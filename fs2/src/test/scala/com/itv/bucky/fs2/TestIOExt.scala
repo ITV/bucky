@@ -11,23 +11,19 @@ object TestIOExt {
   type IOResult[A] = Either[Throwable, A]
 
   implicit class TestIOEXt[A](io: IO[A]) {
-    def status(implicit executionContext: ExecutionContext): IOStatus = {
+    def status(implicit executionContext: ExecutionContext): IOStatus[A] = {
       import _root_.fs2._
-      //needed for compatibility with scala 2.11
-      import cats.syntax.either._
-      val status = IOStatus(Ref[Option[IOResult[Unit]]](None))
-      async
-        .unsafeRunAsync(io)(either => IO(status.complete(either.map(_ => ()))))
-
-      status
+      val iOStatus = IOStatus(Ref[Option[IOResult[A]]](None))
+      io.runAsync(r => IO(iOStatus.complete(r))).unsafeRunSync()
+      iOStatus
     }
   }
 
-  case class IOStatus(ref: Ref[Option[IOResult[Unit]]]) {
+  case class IOStatus[A](ref: Ref[Option[IOResult[A]]]) {
 
     import org.scalatest.Matchers.fail
 
-    def complete(result: Either[Throwable, Unit]) = ref.set(Some(result))
+    def complete(result: Either[Throwable, A]) = ref.set(Some(result))
 
     def isCompleted = ref.get().isDefined
 

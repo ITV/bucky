@@ -51,6 +51,7 @@ object StringPublisher extends App {
           publish(s"Hello, world at ${new Date()}!")
         }
     }
-    .compile.last
+    .compile
+    .last
     .unsafeRunSync()
 }
