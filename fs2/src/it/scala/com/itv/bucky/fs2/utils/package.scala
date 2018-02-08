@@ -94,36 +94,48 @@ package object utils {
     def withPublisherAndAmqpClient(testQueueName: QueueName = Any.queue(),
                                    requeueStrategy: RequeueStrategy[IO] = NoneHandler,
                                    shouldDeclare: Boolean = true)(f: (IOAmqpClient, TestFixture[IO]) => Unit): Unit = {
+      import com.itv.bucky.future.SameThreadExecutionContext.implicitly
       val routingKey = RoutingKey(testQueueName.value)
       val exchange   = ExchangeName("")
-      import com.itv.bucky.future.SameThreadExecutionContext.implicitly
 
-      Lifecycle.using(IOAmqpClient.lifecycle(config)) { client =>
-        val declaration = requeueStrategy match {
-          case NoneRequeue(_) => defaultDeclaration(testQueueName)
-          case SimpleRequeue(_) =>
-            basicRequeueDeclarations(testQueueName, retryAfter = 1.second) collect {
-              case ex: Exchange => ex.autoDelete.expires(1.minute)
-              case q: Queue     => q.autoDelete.expires(1.minute)
-            }
-          case _ =>
-            logger.debug(s"Requeue declarations")
-            requeueDeclarations(testQueueName,
-                                RoutingKey(testQueueName.value),
-                                Exchange(ExchangeName(s"${testQueueName.value}.dlx")),
-                                retryAfter = 1.second) collect {
-              case ex: Exchange => ex.autoDelete.expires(1.minute)
-              case q: Queue     => q.autoDelete.expires(1.minute)
-            }
-        }
+      val declarations =
         if (shouldDeclare)
-          DeclarationExecutor(declaration, client, 5.seconds)
+          declarationsFor(testQueueName, requeueStrategy)
+        else List.empty
 
-        val publisher: Publisher[IO, PublishCommand] = client.publisher()
-        f(client, TestFixture(publisher, routingKey, exchange, testQueueName, client))
+      IOAmqpClient
+        .use(config, declarations) { client =>
+          Stream.eval(
+            IO {
+              val publisher: Publisher[IO, PublishCommand] = client.publisher()
+              f(client, TestFixture(publisher, routingKey, exchange, testQueueName, client))
+            }
+          )
+        }
+        .compile
+        .last
+        .unsafeRunSync()
+    }
 
-        logger.debug(s"Closing the the publisher")
+    private def declarationsFor(testQueueName: QueueName, requeueStrategy: RequeueStrategy[IO]) = {
+      val declarations = requeueStrategy match {
+        case NoneRequeue(_) => defaultDeclaration(testQueueName)
+        case SimpleRequeue(_) =>
+          basicRequeueDeclarations(testQueueName, retryAfter = 1.second) collect {
+            case ex: Exchange => ex.autoDelete.expires(1.minute)
+            case q: Queue     => q.autoDelete.expires(1.minute)
+          }
+        case _ =>
+          logger.debug(s"Requeue declarations")
+          requeueDeclarations(testQueueName,
+                              RoutingKey(testQueueName.value),
+                              Exchange(ExchangeName(s"${testQueueName.value}.dlx")),
+                              retryAfter = 1.second) collect {
+            case ex: Exchange => ex.autoDelete.expires(1.minute)
+            case q: Queue     => q.autoDelete.expires(1.minute)
+          }
       }
+      declarations.toList
     }
   }
 }

@@ -6,10 +6,9 @@ import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.PublishCommandBuilder._
 import com.itv.bucky._
 import com.itv.bucky.decl._
-import com.itv.bucky.fs2.IOAmqpClient
+import com.itv.bucky.fs2._
 import com.typesafe.config.ConfigFactory
 import _root_.fs2.Stream
-import cats.effect.IO
 import com.itv.bucky.future.SameThreadExecutionContext
 
 /*
@@ -43,15 +42,15 @@ object StringPublisher extends App {
   /** *
     * Create the task amqpClient with id and create a task to shutdown the client
     */
-  IOAmqpClient
-    .use(amqpClientConfig) { amqpClient =>
-      Stream.eval(IO(DeclarationExecutor(Declarations.all, amqpClient))) ++
-        Stream.eval {
-          val publish = amqpClient.publisherOf(publisherConfig)
-          publish(s"Hello, world at ${new Date()}!")
-        }
+  val p = for {
+    amqpClient <- clientFrom(amqpClientConfig, Declarations.all)
+    _ <- Stream.eval {
+      val publish = amqpClient.publisherOf(publisherConfig)
+      publish(s"Hello, world at ${new Date()}!")
     }
-    .compile
-    .last
+  } yield ()
+
+  p.compile.last
     .unsafeRunSync()
+
 }
