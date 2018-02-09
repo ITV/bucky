@@ -66,7 +66,6 @@ class GenericPublisherTest extends FunSuite with ScalaFutures {
     }
   }
 
-  private def createClient(): StubPublisher[Task, PublishCommand] = {
+  private def createClient(): StubPublisher[Task, PublishCommand] =
     new StubPublisher[Task, PublishCommand]()
-  }
 }

@@ -169,7 +169,6 @@ class PublisherTest extends FunSuite with ScalaFutures {
     }
   }
 
-  private def createClient(channel: StubChannel): FutureAmqpClient[Lifecycle] = {
+  private def createClient(channel: StubChannel): FutureAmqpClient[Lifecycle] =
     new LifecycleRawAmqpClient(NoOpLifecycle(channel))
-  }
 }

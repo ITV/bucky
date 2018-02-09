@@ -121,8 +121,7 @@ class GenericConsumerTest extends FunSuite with ScalaFutures {
     client.consumer(QueueName("blah"), of1, actionOnFailure).map(_ => TestFixture(channel, handler))
   }
 
-  private def createClient(channel: StubChannel): FutureAmqpClient[Lifecycle] = {
+  private def createClient(channel: StubChannel): FutureAmqpClient[Lifecycle] =
     new LifecycleRawAmqpClient(NoOpLifecycle(channel))
-  }
 
 }

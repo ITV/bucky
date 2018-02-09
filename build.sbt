@@ -146,6 +146,7 @@ lazy val test = project
       "org.apache.qpid"            % "qpid-broker"    % "6.0.4",
       "io.netty"                   % "netty"          % "3.4.2.Final",
       "org.scalatest"              %% "scalatest"     % scalaTestVersion,
+      "co.fs2"                     %% "fs2-core"      % fs2Version,
       "com.rabbitmq"               % "amqp-client"    % amqpClientVersion
     )
   )
@@ -229,7 +230,6 @@ lazy val xml = project
     )
   )
 
-
 lazy val rabbitmq = project
   .settings(name := "com.itv")
   .settings(moduleName := "bucky-rabbitmq")
@@ -273,8 +273,6 @@ lazy val scalaz = project
     )
   )
 
-
-
 lazy val fs2 = project
   .settings(name := "com.itv")
   .settings(moduleName := "bucky-fs2")
@@ -290,11 +288,10 @@ lazy val fs2 = project
   )
   .settings(
     libraryDependencies ++= Seq(
-      "co.fs2"            %% "fs2-core"      % fs2Version,
-      "com.typesafe"      % "config"         % typeSafeVersion % "it"
+      "co.fs2"       %% "fs2-core" % fs2Version,
+      "com.typesafe" % "config"    % typeSafeVersion % "it"
     )
   )
-
 
 lazy val root = (project in file("."))
   .aggregate(rabbitmq, scalaz, fs2, xml, circe, argonaut, example, test, core)

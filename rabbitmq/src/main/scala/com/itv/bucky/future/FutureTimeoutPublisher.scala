@@ -15,11 +15,10 @@ class FutureTimeoutPublisher(delegate: Publisher[Future, PublishCommand], timeou
     val promise = Promise[Unit]
     ec.schedule(
       new Runnable {
-        override def run(): Unit = {
+        override def run(): Unit =
           promise.failure(
             new TimeoutException(
               s"Timed out after $timeout waiting for AMQP server to acknowledge publication to ${cmd.description}"))
-        }
       },
       timeout.length,
       timeout.unit

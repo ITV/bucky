@@ -59,7 +59,6 @@ class GenericPublisherTest extends FunSuite with ScalaFutures {
     result shouldBe expectedException
   }
 
-  private def createClient(): StubPublisher[Future, PublishCommand] = {
+  private def createClient(): StubPublisher[Future, PublishCommand] =
     new StubPublisher[Future, PublishCommand]()
-  }
 }

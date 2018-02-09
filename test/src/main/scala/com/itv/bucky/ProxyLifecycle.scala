@@ -141,9 +141,8 @@ private class ClientChannelHandler(remoteAddress: InetSocketAddress,
     remoteChannel.foreach(Netty.closeOnFlush)
   }
 
-  override def messageReceived(ctx: ChannelHandlerContext, e: MessageEvent): Unit = {
+  override def messageReceived(ctx: ChannelHandlerContext, e: MessageEvent): Unit =
     remoteChannel.foreach(_.write(e.getMessage))
-  }
 }
 
 object Proxy extends StrictLogging {

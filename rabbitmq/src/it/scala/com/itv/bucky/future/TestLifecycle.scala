@@ -14,13 +14,12 @@ object TestLifecycle {
 
   def base(declarations: List[Declaration], config: AmqpClientConfig = defaultConfig)(
       implicit executionContext: ExecutionContext)
-    : Lifecycle[(AmqpClient[Lifecycle, Future, Throwable, Unit], Publisher[Future, PublishCommand])] = {
+    : Lifecycle[(AmqpClient[Lifecycle, Future, Throwable, Unit], Publisher[Future, PublishCommand])] =
     for {
       amqpClient <- AmqpClientLifecycle(config)
       _          <- DeclarationLifecycle(declarations, amqpClient)
       publisher  <- amqpClient.publisher()
     } yield (amqpClient, publisher)
-  }
 
   def rawConsumerWithDeclaration[T](
       queueName: QueueName,

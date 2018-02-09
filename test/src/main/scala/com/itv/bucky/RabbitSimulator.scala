@@ -115,9 +115,8 @@ class RabbitSimulator[B[_]](bindings: Bindings = IdentityBindings)(implicit M: M
     messages
   }
 
-  def waitForMessagesToBeProcessed()(implicit timeout: Duration): Unit = {
+  def waitForMessagesToBeProcessed()(implicit timeout: Duration): Unit =
     Await.result(Future.sequence(messagesBeingProcessed.values.map(_.consumeActionValue)), timeout)
-  }
 
   override def performOps(thunk: (AmqpOps) => Try[Unit]): Try[Unit] =
     Try(thunk(new AmqpOps {
@@ -134,10 +133,9 @@ class RabbitSimulator[B[_]](bindings: Bindings = IdentityBindings)(implicit M: M
       override def bindExchange(binding: ExchangeBinding): Try[Unit] = Try(())
     }))
 
-  override def estimatedMessageCount(queueName: QueueName): Try[Int] = {
+  override def estimatedMessageCount(queueName: QueueName): Try[Int] =
     //FIXME: implement
     ???
-  }
 
 }
 
