@@ -152,6 +152,29 @@ A very simple project using scalaz that:
     * The handle prints out the `String` and acknowledges the message
 
 
+Fs2 Publisher
+----
+
+[source code here](https://github.com/ITV/bucky/blob/master/example/src/main/scala/com/itv/bucky/example/fs2/StringPublisher.scala)
+
+A very simple project using fs2 that:
+* Declares an exchange
+* Adds a binding to the exchange
+* Publishes a message with a `String` payload to the exchange/binding
+
+
+Fs2 Consumer
+----
+
+[source code here](https://github.com/ITV/bucky/blob/master/example/src/main/scala/com/itv/bucky/example/fs2/StringConsumer.scala)
+
+A very simple project using fs2 that:
+* Declares an AMQP queue
+* Starts a consumer on the queue:
+    * Messages are deseriailized to a `String`
+    * The handle prints out the `String` and acknowledges the message
+
+
 Scalaz Publisher
 ----
 
@@ -161,6 +184,4 @@ A very simple project using scalaz that:
 * Declares an exchange
 * Adds a binding to the exchange
 * Publishes a message with a `String` payload to the exchange/binding
-
-
 
