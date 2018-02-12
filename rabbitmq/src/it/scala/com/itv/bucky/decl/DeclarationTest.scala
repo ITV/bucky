@@ -17,7 +17,7 @@ import scala.concurrent.duration._
 import scala.util.{Random, Try}
 
 class DeclarationTest extends FunSuite with ScalaFutures with StrictLogging {
-  import com.itv.bucky.future.FutureExt._
+  import future.Implicits._
 
   implicit val declarationPatienceConfig: Eventually.PatienceConfig =
     Eventually.PatienceConfig(timeout = 5.second, interval = 100.millis)

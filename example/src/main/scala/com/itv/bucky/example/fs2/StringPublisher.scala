@@ -12,7 +12,7 @@ import _root_.fs2.Stream
 import com.itv.bucky.future.SameThreadExecutionContext
 
 /*
-This example aims to give a minimal structure, using TaskAmqpClient, to:
+This example aims to give a minimal structure, using IOAmqpClient, to:
  * Declare a queue, exchange and binding
  * Publish a raw String to a routing key
 It is not very useful by itself, but hopefully reveals the structure of how Bucky components fit together
@@ -44,10 +44,8 @@ object StringPublisher extends App {
     */
   val p = for {
     amqpClient <- clientFrom(amqpClientConfig, Declarations.all)
-    _ <- Stream.eval {
-      val publish = amqpClient.publisherOf(publisherConfig)
-      publish(s"Hello, world at ${new Date()}!")
-    }
+    publish = amqpClient.publisherOf(publisherConfig)
+    _ <- Stream.eval(publish(s"Hello, world at ${new Date()}!"))
   } yield ()
 
   p.compile.last

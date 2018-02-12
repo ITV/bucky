@@ -19,7 +19,8 @@ import scala.concurrent.{Await, Future, Promise}
 import scala.util.{Failure, Success}
 
 class FutureTimeoutPublisherTest extends FunSuite with ScalaFutures with StrictLogging {
-  import FutureExt._
+  import Implicits._
+  import com.itv.bucky.ext.future._
 
   test("Returns result of delegate publisher if result occurs before timeout") {
     val command1         = Any.publishCommand()

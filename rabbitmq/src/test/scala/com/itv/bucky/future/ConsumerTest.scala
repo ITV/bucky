@@ -10,7 +10,7 @@ import org.scalatest.Matchers._
 import scala.concurrent.Future
 
 class ConsumerTest extends FunSuite {
-  import FutureExt._
+  import Implicits._
 
   test("Runs callback with delivered messages with Id") {
     val channel = new StubChannel()

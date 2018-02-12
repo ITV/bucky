@@ -16,7 +16,8 @@ import scala.util.Random
 
 class NetworkRecoveryIntegrationTest extends FunSuite with ScalaFutures {
 
-  import FutureExt._
+  import Implicits._
+  import com.itv.bucky.ext.future._
 
   def testLifecycle: Lifecycle[(Proxy,
                                 StubConsumeHandler[Future, Unit],

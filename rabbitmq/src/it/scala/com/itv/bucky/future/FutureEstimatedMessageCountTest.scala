@@ -3,7 +3,7 @@ package com.itv.bucky.future
 import org.scalatest.FunSuite
 
 import scala.concurrent.Future
-import FutureExt._
+import Implicits._
 import com.itv.bucky.suite.EstimatedMessageCountTest
 
 class FutureEstimatedMessageCountTest extends FunSuite with EstimatedMessageCountTest[Future] with FuturePublisherTest {

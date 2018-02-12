@@ -16,7 +16,8 @@ import scala.concurrent.duration._
 
 class PublisherTest extends FunSuite with ScalaFutures {
 
-  import FutureExt._
+  import Implicits._
+  import com.itv.bucky.ext.future._
 
   test("Publishing only returns success once publication is acknowledged with Id") {
     val channel = new StubChannel()
