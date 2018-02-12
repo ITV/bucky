@@ -59,7 +59,7 @@ Please note that you can connect to the local Postgres as user `postgres` with a
 
 Basic Consumer
 ---
-[source code here](https://github.com/ITV/bucky/blob/master/example/src/main/scala/com/com.itv/bucky/example/basic/StringConsumer.scala)
+[source code here](https://github.com/ITV/bucky/blob/master/example/src/main/scala/com/itv/bucky/example/basic/StringConsumer.scala)
 
 A very simple project that:
 * Declares an AMQP queue
@@ -69,7 +69,7 @@ A very simple project that:
     
 Basic Publisher
 ---
-[source code here](https://github.com/ITV/bucky/blob/master/example/src/main/scala/com/com.itv/bucky/example/basic/StringPublisher.scala)
+[source code here](https://github.com/ITV/bucky/blob/master/example/src/main/scala/com/itv/bucky/example/basic/StringPublisher.scala)
 
 A very simple project that:
 * Declares an exchange
@@ -79,7 +79,7 @@ A very simple project that:
 Unmarshalling Consumer
 ----
 
-[source code here](https://github.com/ITV/bucky/blob/master/example/src/main/scala/com/com.itv/bucky/example/marshalling/UnmarshallingConsumer.scala)
+[source code here](https://github.com/ITV/bucky/blob/master/example/src/main/scala/com/itv/bucky/example/marshalling/UnmarshallingConsumer.scala)
 
 In this project we aim to consume higher level message payloads as opposed to `String`
 
@@ -117,7 +117,7 @@ The behaviour of the project is not very dissimilar to the "Basic Consumer" proj
 Unmarshalling Publisher
 ----
 
-[source code here](https://github.com/ITV/bucky/blob/master/example/src/main/scala/com/com.itv/bucky/example/marshalling/MarshallingPublisher.scala)
+[source code here](https://github.com/ITV/bucky/blob/master/example/src/main/scala/com/itv/bucky/example/marshalling/MarshallingPublisher.scala)
 
 In this project we aim to publish higher level message payloads as opposed to `String`
 
@@ -143,7 +143,7 @@ The behaviour of the project is not very dissimilar to the "Basic Publisher" pro
 Scalaz Consumer
 ----
 
-[source code here](https://github.com/ITV/bucky/blob/master/example/src/main/scala/com/com.itv/bucky/example/scalaz/StringConsumer.scala)
+[source code here](https://github.com/ITV/bucky/blob/master/example/src/main/scala/com/itv/bucky/example/scalaz/StringConsumer.scala)
 
 A very simple project using scalaz that:
 * Declares an AMQP queue
@@ -155,7 +155,7 @@ A very simple project using scalaz that:
 Scalaz Publisher
 ----
 
-[source code here](https://github.com/ITV/bucky/blob/master/example/src/main/scala/com/com.itv/bucky/example/scalaz/StringPublisher.scala)
+[source code here](https://github.com/ITV/bucky/blob/master/example/src/main/scala/com/itv/bucky/example/scalaz/StringPublisher.scala)
 
 A very simple project using scalaz that:
 * Declares an exchange
