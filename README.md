@@ -152,6 +152,16 @@ A very simple project using scalaz that:
     * The handle prints out the `String` and acknowledges the message
 
 
+Scalaz Publisher
+----
+
+[source code here](https://github.com/ITV/bucky/blob/master/example/src/main/scala/com/itv/bucky/example/scalaz/StringPublisher.scala)
+
+A very simple project using scalaz that:
+* Declares an exchange
+* Adds a binding to the exchange
+* Publishes a message with a `String` payload to the exchange/binding
+
 Fs2 Publisher
 ----
 
@@ -175,13 +185,4 @@ A very simple project using fs2 that:
     * The handle prints out the `String` and acknowledges the message
 
 
-Scalaz Publisher
-----
-
-[source code here](https://github.com/ITV/bucky/blob/master/example/src/main/scala/com/itv/bucky/example/scalaz/StringPublisher.scala)
-
-A very simple project using scalaz that:
-* Declares an exchange
-* Adds a binding to the exchange
-* Publishes a message with a `String` payload to the exchange/binding
 
