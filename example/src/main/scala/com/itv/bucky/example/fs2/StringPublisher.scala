@@ -6,14 +6,13 @@ import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.PublishCommandBuilder._
 import com.itv.bucky._
 import com.itv.bucky.decl._
-import com.itv.bucky.fs2.IOAmqpClient
+import com.itv.bucky.fs2._
 import com.typesafe.config.ConfigFactory
 import _root_.fs2.Stream
-import cats.effect.IO
 import com.itv.bucky.future.SameThreadExecutionContext
 
 /*
-This example aims to give a minimal structure, using TaskAmqpClient, to:
+This example aims to give a minimal structure, using IOAmqpClient, to:
  * Declare a queue, exchange and binding
  * Publish a raw String to a routing key
 It is not very useful by itself, but hopefully reveals the structure of how Bucky components fit together
@@ -43,14 +42,13 @@ object StringPublisher extends App {
   /** *
     * Create the task amqpClient with id and create a task to shutdown the client
     */
-  IOAmqpClient
-    .use(amqpClientConfig) { amqpClient =>
-      Stream.eval(IO(DeclarationExecutor(Declarations.all, amqpClient))) ++
-        Stream.eval {
-          val publish = amqpClient.publisherOf(publisherConfig)
-          publish(s"Hello, world at ${new Date()}!")
-        }
-    }
-    .compile.last
+  val p = for {
+    amqpClient <- clientFrom(amqpClientConfig, Declarations.all)
+    publish = amqpClient.publisherOf(publisherConfig)
+    _ <- Stream.eval(publish(s"Hello, world at ${new Date()}!"))
+  } yield ()
+
+  p.compile.last
     .unsafeRunSync()
+
 }

@@ -22,7 +22,7 @@ case class FutureIdAmqpClient(channel: Id[RabbitChannel])(implicit executionCont
 object FutureIdAmqpClient {
   import Monad.toMonad
 
-  def apply(config: AmqpClientConfig)(implicit executionContext: ExecutionContext): Id[FutureIdAmqpClient] = {
+  def apply(config: AmqpClientConfig)(implicit executionContext: ExecutionContext): Id[FutureIdAmqpClient] =
     Connection(config)
       .flatMap(
         Channel(_)
@@ -30,6 +30,5 @@ object FutureIdAmqpClient {
       .flatMap(
         FutureIdAmqpClient(_)
       )
-  }
 
 }

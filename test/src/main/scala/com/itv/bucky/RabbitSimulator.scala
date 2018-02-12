@@ -7,6 +7,7 @@ import java.util.concurrent.atomic.AtomicLong
 import com.typesafe.scalalogging.StrictLogging
 import PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.decl.{Binding, Exchange, ExchangeBinding, Queue}
+import org.scalactic.source
 
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable.ListBuffer
@@ -21,6 +22,21 @@ case object IdentityBindings extends Bindings {
   override def isDefinedAt(key: RoutingKey): Boolean = true
 }
 
+trait AmqpSimulator[B[_], F[_], E, C] extends AmqpClient[B, F, E, C] {
+
+  def publish(publishCommand: PublishCommand): F[ConsumeAction]
+
+  def queueNameFor(publishCommand: PublishCommand): QueueName
+
+  def isDefinedAt(publishCommand: PublishCommand): Boolean
+
+  def existsConsumer(queueName: QueueName): Boolean
+
+  def watchQueue(queueName: QueueName): ListBuffer[Delivery]
+
+  def waitForMessagesToBeProcessed(): F[Iterable[ConsumeAction]]
+}
+
 /**
   * Provides an AmqpClient implementation that simulates RabbitMQ server with one main difference:
   * Messages are sent directly to the consumer when published, there is no intermediate queue.
@@ -32,7 +48,7 @@ case object IdentityBindings extends Bindings {
 class RabbitSimulator[B[_]](bindings: Bindings = IdentityBindings)(implicit M: Monad[B],
                                                                    X: MonadError[Future, Throwable],
                                                                    executionContext: ExecutionContext)
-    extends AmqpClient[B, Future, Throwable, Unit]
+    extends AmqpSimulator[B, Future, Throwable, Unit]
     with StrictLogging {
 
   override implicit def monad: Monad[B] = M
@@ -105,6 +121,9 @@ class RabbitSimulator[B[_]](bindings: Bindings = IdentityBindings)(implicit M: M
     declarations.isDefinedAt(publishCommand.exchange, publishCommand.routingKey) || bindings.isDefinedAt(
       publishCommand.routingKey)
 
+  def existsConsumer(queueName: QueueName): Boolean =
+    consumers.keys.exists(_.value == queueName.value)
+
   def watchQueue(queueName: QueueName): ListBuffer[Delivery] = {
     val messages = new ListBuffer[Delivery]()
     this.consumer(queueName, { delivery =>
@@ -115,9 +134,8 @@ class RabbitSimulator[B[_]](bindings: Bindings = IdentityBindings)(implicit M: M
     messages
   }
 
-  def waitForMessagesToBeProcessed()(implicit timeout: Duration): Unit = {
-    Await.result(Future.sequence(messagesBeingProcessed.values.map(_.consumeActionValue)), timeout)
-  }
+  def waitForMessagesToBeProcessed(): Future[Iterable[ConsumeAction]] =
+    Future.sequence(messagesBeingProcessed.values.map(_.consumeActionValue))
 
   override def performOps(thunk: (AmqpOps) => Try[Unit]): Try[Unit] =
     Try(thunk(new AmqpOps {
@@ -134,10 +152,9 @@ class RabbitSimulator[B[_]](bindings: Bindings = IdentityBindings)(implicit M: M
       override def bindExchange(binding: ExchangeBinding): Try[Unit] = Try(())
     }))
 
-  override def estimatedMessageCount(queueName: QueueName): Try[Int] = {
+  override def estimatedMessageCount(queueName: QueueName): Try[Int] =
     //FIXME: implement
     ???
-  }
 
 }
 

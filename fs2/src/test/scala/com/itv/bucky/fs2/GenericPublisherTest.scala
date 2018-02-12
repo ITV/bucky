@@ -20,7 +20,7 @@ class GenericPublisherTest extends FunSuite with ScalaFutures {
 
     val client = createClient()
 
-    val expectedExchange = ExchangeName("")
+    val expectedExchange   = ExchangeName("")
     val expectedRoutingKey = RoutingKey("mymessage")
     val expectedProperties = MessageProperties.textPlain
 
@@ -33,7 +33,7 @@ class GenericPublisherTest extends FunSuite with ScalaFutures {
       publishCommandBuilder(bananaMarshaller) using expectedExchange using expectedRoutingKey using expectedProperties
 
     val publisher = AmqpClient.publisherOf(bananaSerializer)(client)
-    val result = publisher(Banana)
+    val result    = publisher(Banana)
 
     eventually {
       val status = result.status
@@ -62,7 +62,7 @@ class GenericPublisherTest extends FunSuite with ScalaFutures {
     val client = createClient()
 
     val publisher = AmqpClient.publisherOf[IO, Banana.type](serializer)(client)
-    val result = publisher(Banana)
+    val result    = publisher(Banana)
 
     eventually {
       val status = result.status
@@ -72,7 +72,6 @@ class GenericPublisherTest extends FunSuite with ScalaFutures {
     }
   }
 
-  private def createClient(): StubPublisher[IO, PublishCommand] = {
+  private def createClient(): StubPublisher[IO, PublishCommand] =
     new StubPublisher[IO, PublishCommand]()
-  }
 }

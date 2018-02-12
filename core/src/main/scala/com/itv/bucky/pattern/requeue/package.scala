@@ -22,9 +22,8 @@ package object requeue {
                         retryAfter)
   }
 
-  def requeueDeclarations(queueName: QueueName, routingKey: RoutingKey): Iterable[Declaration] = {
+  def requeueDeclarations(queueName: QueueName, routingKey: RoutingKey): Iterable[Declaration] =
     requeueDeclarations(queueName, routingKey, Exchange(ExchangeName(s"${queueName.value}.dlx")))
-  }
 
   def requeueDeclarations(queueName: QueueName,
                           routingKey: RoutingKey,
@@ -53,7 +52,7 @@ package object requeue {
                             unmarshaller: PayloadUnmarshaller[T],
                             onFailure: RequeueConsumeAction = Requeue,
                             unmarshalFailureAction: RequeueConsumeAction = DeadLetter,
-                            prefetchCount: Int = 0): B[C] = {
+                            prefetchCount: Int = 0): B[C] =
       requeueDeliveryHandlerOf(queueName,
                                handler,
                                requeuePolicy,
@@ -61,7 +60,6 @@ package object requeue {
                                onFailure,
                                unmarshalFailureAction,
                                prefetchCount)
-    }
 
     def requeueDeliveryHandlerOf[T](queueName: QueueName,
                                     handler: RequeueHandler[F, T],

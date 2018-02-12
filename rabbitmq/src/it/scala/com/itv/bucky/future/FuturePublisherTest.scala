@@ -10,7 +10,7 @@ import org.scalatest.concurrent.ScalaFutures
 import scala.concurrent.Future
 
 trait FuturePublisherTest extends PublisherBaseTest[Future] with ScalaFutures with FutureEffectVerification {
-  import FutureExt._
+  import Implicits._
 
   override def withPublisher(testQueueName: QueueName,
                              requeueStrategy: RequeueStrategy[Future],

@@ -38,11 +38,10 @@ object StringConsumer extends App with StrictLogging {
     }
 
   IOAmqpClient
-    .use(amqpClientConfig) { amqpClient =>
-      Stream.eval(IO(DeclarationExecutor(Declarations.all, amqpClient))) ++
-        amqpClient.consumer(Declarations.queue.name,
-                            AmqpClient.handlerOf(stringToLogHandler, StringPayloadUnmarshaller))
+    .use(amqpClientConfig, Declarations.all) { amqpClient =>
+      amqpClient.consumer(Declarations.queue.name, AmqpClient.handlerOf(stringToLogHandler, StringPayloadUnmarshaller))
     }
-    .compile.drain
+    .compile
+    .drain
     .unsafeRunSync()
 }

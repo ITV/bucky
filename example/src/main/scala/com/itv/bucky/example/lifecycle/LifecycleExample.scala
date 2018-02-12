@@ -39,9 +39,8 @@ object ManualExample extends App {
 
   val queueName = "queue1"
 
-  def program(): Unit = {
+  def program(): Unit =
     println("Program running")
-  }
 
   val connection = AmqpConnection()
   try {
@@ -82,9 +81,8 @@ object OuterLifecycleExample {
         channel
       }
 
-      override def shutdown(channel: AmqpChannel): Unit = {
+      override def shutdown(channel: AmqpChannel): Unit =
         channel.stopConsuming(queueName)
-      }
     }
 
   //end snippet 4
@@ -92,9 +90,8 @@ object OuterLifecycleExample {
   //start snippet 5
   object LifecycleExample extends App {
 
-    def program(): Unit = {
+    def program(): Unit =
       println("Program running")
-    }
 
     val main =
       for {

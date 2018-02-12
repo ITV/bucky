@@ -17,9 +17,8 @@ class TimeoutPublisherTest extends FunSuite with ScalaFutures with StrictLogging
 
   test("Returns timeout of delegate publisher if result occurs after timeout") {
     val client = IOAmqpClient(new StubChannel {
-      override def deliver(delivery: AMQP.Basic.Deliver, body: Payload, properties: AMQP.BasicProperties): Unit = {
+      override def deliver(delivery: AMQP.Basic.Deliver, body: Payload, properties: AMQP.BasicProperties): Unit =
         while (true) {}
-      }
     })
 
     val marshaller: PayloadMarshaller[Unit] = PayloadMarshaller.lift(_ => Payload.from("hello"))

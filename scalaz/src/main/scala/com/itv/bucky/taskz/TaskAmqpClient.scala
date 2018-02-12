@@ -164,12 +164,11 @@ object ProcessAmqpClient extends StrictLogging {
     } yield TaskAmqpClient(channel))(closeAll)(f)
 
   def fromConnection(connection: RabbitConnection)(f: TaskAmqpClient => Process[Task, Unit])(
-      implicit pool: ExecutorService = Strategy.DefaultExecutorService): Process[Task, Unit] = {
+      implicit pool: ExecutorService = Strategy.DefaultExecutorService): Process[Task, Unit] =
     safeBracket(
       TaskAmqpClient
         .channel(connection)
         .map(TaskAmqpClient.apply))(closeChannel)(f)
-  }
 
   private def safeBracket[A, O](req: Task[A])(release: A => Task[Unit])(
       rcv: A => Process[Task, O]): Process[Task, O] = {

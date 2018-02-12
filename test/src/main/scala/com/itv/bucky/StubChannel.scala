@@ -35,17 +35,14 @@ class StubChannel
     transmittedCommands += method
   }
 
-  override def basicQos(prefetchCount: Int): Unit = {
+  override def basicQos(prefetchCount: Int): Unit =
     setPrefetchCount = prefetchCount
-  }
 
-  def replyWith(method: Method): Unit = {
+  def replyWith(method: Method): Unit =
     handleCompleteInboundCommand(new AMQCommand(method))
-  }
 
   def deliver(delivery: AMQP.Basic.Deliver,
               body: Payload,
-              properties: AMQP.BasicProperties = RMessageProperties.BASIC): Unit = {
+              properties: AMQP.BasicProperties = RMessageProperties.BASIC): Unit =
     handleCompleteInboundCommand(new AMQCommand(delivery, properties, body.value))
-  }
 }

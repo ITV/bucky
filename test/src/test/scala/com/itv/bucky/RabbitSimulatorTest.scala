@@ -14,6 +14,7 @@ import scala.concurrent.duration._
 class RabbitSimulatorTest extends FunSuite with ScalaFutures {
 
   import RabbitSimulator._
+  import com.itv.bucky.ext.future._
 
   implicit val executionContextExecutor = new ExecutionContextExecutor {
     override def execute(runnable: Runnable): Unit = runnable.run()
@@ -46,7 +47,7 @@ class RabbitSimulatorTest extends FunSuite with ScalaFutures {
     rabbit.publish(commandBuilder.toPublishCommand("Hello")).futureValue shouldBe Ack
     rabbit.publish(commandBuilder.toPublishCommand("world")).futureValue shouldBe Ack
 
-    rabbit.waitForMessagesToBeProcessed()(1.second)
+    rabbit.waitForMessagesToBeProcessed().timed(1.second)
     messages should have size 2
 
     messages.head.body.unmarshal[String] shouldBe "Hello".unmarshalSuccess
@@ -64,7 +65,7 @@ class RabbitSimulatorTest extends FunSuite with ScalaFutures {
     rabbit.publish(commandBuilder.toPublishCommand("Hello")).futureValue shouldBe Ack
     rabbit.publish(commandBuilder.toPublishCommand("world")).futureValue shouldBe Ack
 
-    rabbit.waitForMessagesToBeProcessed()(1.second)
+    rabbit.waitForMessagesToBeProcessed().timed(1.second)
     messages should have size 2
     messages2 should have size 2
 
@@ -97,7 +98,7 @@ class RabbitSimulatorTest extends FunSuite with ScalaFutures {
     rabbit.publish((commandBuilder using firstRoutingQueue).toPublishCommand("Hello")).futureValue shouldBe Ack
     rabbit.publish((commandBuilder using secondRoutingQueue).toPublishCommand("world")).futureValue shouldBe Ack
 
-    rabbit.waitForMessagesToBeProcessed()(1.second)
+    rabbit.waitForMessagesToBeProcessed().timed(1.second)
     firstMessages should have size 1
     secondMessages should have size 1
 
@@ -138,7 +139,7 @@ class RabbitSimulatorTest extends FunSuite with ScalaFutures {
     rabbit.publish((firstCommandBuilder using firstRoutingQueue).toPublishCommand("Hello")).futureValue shouldBe Ack
     rabbit.publish((secondCommandBuilder using secondRoutingQueue).toPublishCommand("world")).futureValue shouldBe Ack
 
-    rabbit.waitForMessagesToBeProcessed()(1.second)
+    rabbit.waitForMessagesToBeProcessed().timed(1.second)
     firstMessages should have size 1
     secondMessages should have size 1
 
@@ -175,7 +176,7 @@ class RabbitSimulatorTest extends FunSuite with ScalaFutures {
 
     rabbit.publish(commandBuilder.toPublishCommand("Hello")).futureValue shouldBe Ack
 
-    rabbit.waitForMessagesToBeProcessed()(1.second)
+    rabbit.waitForMessagesToBeProcessed().timed(1.second)
     messages should have size 1
 
     val head = messages.head
@@ -191,7 +192,7 @@ class RabbitSimulatorTest extends FunSuite with ScalaFutures {
 
     rabbit.publish(commandBuilder.toPublishCommand("Hello")).futureValue shouldBe Ack
 
-    rabbit.waitForMessagesToBeProcessed()(1.second)
+    rabbit.waitForMessagesToBeProcessed().timed(1.second)
     messages should have size 1
 
     val head = messages.head

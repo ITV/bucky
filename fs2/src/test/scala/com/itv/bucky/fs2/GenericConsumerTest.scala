@@ -117,7 +117,7 @@ class GenericConsumerTest extends FunSuite with StrictLogging {
     val handler = new StubConsumeHandler[IO, Payload]()
 
     val of1: Handler[IO, Delivery] = AmqpClient.handlerOf(handler, unmarshaller, unmarshalFailureAction)
-    val queueName                    = QueueName("blah")
+    val queueName                  = QueueName("blah")
     client.consumer(queueName, of1, actionOnFailure).compile.drain.unsafeRunAsync { result =>
       logger.info(s"Close consumer for $queueName: $result")
     }

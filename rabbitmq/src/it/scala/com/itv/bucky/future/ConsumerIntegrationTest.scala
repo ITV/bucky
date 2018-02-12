@@ -20,7 +20,7 @@ import scala.concurrent.duration._
 import scala.util.Random
 
 class ConsumerIntegrationTest extends FunSuite with ScalaFutures with StrictLogging {
-  import FutureExt._
+  import Implicits._
   import TestLifecycle._
 
   val consumerPatienceConfig: Eventually.PatienceConfig =

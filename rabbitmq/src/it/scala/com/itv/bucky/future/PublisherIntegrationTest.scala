@@ -13,7 +13,8 @@ import scala.concurrent.duration._
 class PublisherIntegrationTest extends FunSuite with ScalaFutures with StrictLogging {
   implicit val consumerPatienceConfig: Eventually.PatienceConfig = Eventually.PatienceConfig(timeout = 90.seconds)
 
-  import FutureExt._
+  import Implicits._
+  import com.itv.bucky.ext.future._
   import TestLifecycle._
   import utils._
 

@@ -13,7 +13,7 @@ import scala.concurrent.Future
 
 class GenericConsumerTest extends FunSuite with ScalaFutures {
 
-  import FutureExt._
+  import Implicits._
   import com.itv.bucky.UnmarshalResult._
 
   test("Runs callback with delivered messages with Id") {
@@ -121,8 +121,7 @@ class GenericConsumerTest extends FunSuite with ScalaFutures {
     client.consumer(QueueName("blah"), of1, actionOnFailure).map(_ => TestFixture(channel, handler))
   }
 
-  private def createClient(channel: StubChannel): FutureAmqpClient[Lifecycle] = {
+  private def createClient(channel: StubChannel): FutureAmqpClient[Lifecycle] =
     new LifecycleRawAmqpClient(NoOpLifecycle(channel))
-  }
 
 }

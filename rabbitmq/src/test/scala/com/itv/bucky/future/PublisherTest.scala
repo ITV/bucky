@@ -16,7 +16,8 @@ import scala.concurrent.duration._
 
 class PublisherTest extends FunSuite with ScalaFutures {
 
-  import FutureExt._
+  import Implicits._
+  import com.itv.bucky.ext.future._
 
   test("Publishing only returns success once publication is acknowledged with Id") {
     val channel = new StubChannel()
@@ -169,7 +170,6 @@ class PublisherTest extends FunSuite with ScalaFutures {
     }
   }
 
-  private def createClient(channel: StubChannel): FutureAmqpClient[Lifecycle] = {
+  private def createClient(channel: StubChannel): FutureAmqpClient[Lifecycle] =
     new LifecycleRawAmqpClient(NoOpLifecycle(channel))
-  }
 }

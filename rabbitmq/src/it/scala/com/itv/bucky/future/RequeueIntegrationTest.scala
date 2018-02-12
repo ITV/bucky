@@ -17,7 +17,8 @@ import scala.concurrent.duration._
 import scala.util.{Random, Success}
 
 class RequeueIntegrationTest extends FunSuite with ScalaFutures {
-  import FutureExt._
+  import Implicits._
+  import com.itv.bucky.ext.future._
 
   private val published = ()
 
