@@ -71,7 +71,9 @@ object Fs2AmqpSimulatorTest {
   def buildPorts(amqpClient: Fs2AmqpSimulator) =
     for {
       ref <- Stream.eval(async.refOf[IO, List[String]](List.empty))
-      app = App(amqpClient, (message: String) => ref.modify(_.:+(message)).map(_ => ()))
+      app = App(amqpClient, new Bar {
+        override def add(message: String): IO[Unit] = ref.modify(_.:+(message)).map(_ => ())
+      })
 
       messages <- amqpClient.consume(RmqConfig.Target.exchangeName,
                                      RmqConfig.Target.routingKey,
