@@ -66,13 +66,15 @@ object Publisher extends StrictLogging {
       }
 
     private def pop(deliveryTag: Long, multiple: Boolean) =
-      if (multiple) {
-        val entries       = unconfirmedPublications.headMap(deliveryTag + 1L)
-        val removedValues = entries.values().asScala.toList
-        entries.clear()
-        removedValues.flatten
-      } else {
-        Option(unconfirmedPublications.remove(deliveryTag)).toList.flatten
+      unconfirmedPublications.synchronized {
+        if (multiple) {
+          val entries       = unconfirmedPublications.headMap(deliveryTag + 1L)
+          val removedValues = entries.values().asScala.toList
+          entries.clear()
+          removedValues.flatten
+        } else {
+          Option(unconfirmedPublications.remove(deliveryTag)).toList.flatten
+        }
       }
 
   }
