@@ -147,6 +147,24 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
     }
   }
 
+  test("It should use onFailureAction the message after maximumProcessAttempts unsuccessful attempts to process") {
+    val handler = new StubRequeueHandler[Future, Int]
+
+    var testInt = 0
+
+    Lifecycle.using(testLifecycle(handler, requeuePolicy, intMessageDeserializer, (i: Int) => Future { testInt = i })) { app =>
+      handler.nextResponse = Future.successful(Requeue)
+      val payload = Payload.from(128)
+      app.publish(payload).futureValue shouldBe published
+
+      eventually {
+        handler.receivedMessages.size shouldBe requeuePolicy.maximumProcessAttempts
+        testInt shouldBe 128
+      }
+    }
+  }
+
+
   test("It should deadletter the message if requeued and maximumProcessAttempts is < 1") {
     val handler                              = new StubRequeueHandler[Future, Int]
     val negativeProcessAttemptsRequeuePolicy = RequeuePolicy(Random.nextInt(10) * -1, 1.second)
@@ -197,10 +215,12 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
 
   def testLifecycle[T](handler: RequeueHandler[Future, T],
                        requeuePolicy: RequeuePolicy,
-                       unmarshaller: PayloadUnmarshaller[T])(implicit M: Monad[Future]): Lifecycle[TestFixture] =
+                       unmarshaller: PayloadUnmarshaller[T],
+                       onFailureAction: T => Future[Unit] = (_: T) => Future.successful(())
+                      )(implicit M: Monad[Future]): Lifecycle[TestFixture] =
     for {
       testFixture <- baseTestLifecycle()
-      consumer    <- testFixture.amqpClient.requeueHandlerOf(testFixture.queueName, handler, requeuePolicy, unmarshaller)
+      consumer    <- testFixture.amqpClient.requeueHandlerWithFailureActionOf(testFixture.queueName, handler, requeuePolicy, unmarshaller, onFailureAction = onFailureAction)
     } yield testFixture
 
   def testLifecycle(handler: RequeueHandler[Future, Delivery], requeuePolicy: RequeuePolicy): Lifecycle[TestFixture] =

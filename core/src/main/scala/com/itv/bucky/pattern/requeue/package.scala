@@ -1,8 +1,7 @@
 package com.itv.bucky.pattern
 
-import com.itv.bucky.{AmqpClient, DeliveryUnmarshalHandler}
+import com.itv.bucky.{AmqpClient, ConsumeAction, DeliveryUnmarshalHandler, _}
 import com.itv.bucky.Unmarshaller._
-import com.itv.bucky._
 import com.itv.bucky.decl._
 
 import scala.concurrent.duration.{FiniteDuration, _}
@@ -54,40 +53,64 @@ package object requeue {
                             unmarshalFailureAction: RequeueConsumeAction = DeadLetter,
                             prefetchCount: Int = 0): B[C] =
       requeueDeliveryHandlerOf(queueName,
-                               handler,
-                               requeuePolicy,
-                               toDeliveryUnmarshaller(unmarshaller),
-                               onFailure,
-                               unmarshalFailureAction,
-                               prefetchCount)
+        handler,
+        requeuePolicy,
+        toDeliveryUnmarshaller(unmarshaller),
+        onFailure,
+        unmarshalFailureAction = unmarshalFailureAction,
+        prefetchCount = prefetchCount
+      )
+
+    def requeueHandlerWithFailureActionOf[T](queueName: QueueName,
+                                             handler: RequeueHandler[F, T],
+                                             requeuePolicy: RequeuePolicy,
+                                             unmarshaller: PayloadUnmarshaller[T],
+                                             onFailure: RequeueConsumeAction = Requeue,
+                                             onFailureAction: T => F[Unit],
+                                             unmarshalFailureAction: RequeueConsumeAction = DeadLetter,
+                                             prefetchCount: Int = 0): B[C] = {
+      requeueDeliveryHandlerOf(queueName,
+        handler,
+        requeuePolicy,
+        toDeliveryUnmarshaller(unmarshaller),
+        onFailure,
+        onFailureAction,
+        unmarshalFailureAction,
+        prefetchCount
+      )
+    }
 
     def requeueDeliveryHandlerOf[T](queueName: QueueName,
                                     handler: RequeueHandler[F, T],
                                     requeuePolicy: RequeuePolicy,
                                     unmarshaller: DeliveryUnmarshaller[T],
                                     onFailure: RequeueConsumeAction = Requeue,
+                                    onFailureAction: T => F[Unit] = (_: T) => amqpClient.effectMonad.apply(()),
                                     unmarshalFailureAction: RequeueConsumeAction = DeadLetter,
                                     prefetchCount: Int = 0): B[C] = {
       val deserializeHandler =
         new DeliveryUnmarshalHandler[F, T, RequeueConsumeAction](unmarshaller)(handler, unmarshalFailureAction)(
           amqpClient.effectMonad)
-      requeueOf(queueName, deserializeHandler, requeuePolicy, prefetchCount = prefetchCount)
+
+      val deserializeOnFailureAction: Delivery => F[Unit] =
+        new UnmarshalFailureAction[F, T](unmarshaller)(amqpClient.effectMonad)(onFailureAction)
+
+      requeueOf(queueName, deserializeHandler, requeuePolicy, onFailure, deserializeOnFailureAction, prefetchCount = prefetchCount)
     }
 
     def requeueOf(queueName: QueueName,
                   handler: RequeueHandler[F, Delivery],
                   requeuePolicy: RequeuePolicy,
                   onFailure: RequeueConsumeAction = Requeue,
+                  onFailureAction: Delivery => F[Unit] = (_: Delivery) => amqpClient.effectMonad.apply(()),
                   prefetchCount: Int = 0): B[C] = {
       val requeueExchange = ExchangeName(s"${queueName.value}.requeue")
       amqpClient.monad.flatMap(amqpClient.publisher()) { requeuePublish =>
         amqpClient.consumer(queueName,
-                            RequeueTransformer(requeuePublish, requeueExchange, requeuePolicy, onFailure)(handler)(
-                              amqpClient.effectMonad),
-                            prefetchCount = prefetchCount)
+          RequeueTransformer(requeuePublish, requeueExchange, requeuePolicy, onFailure, onFailureAction)(handler)(
+            amqpClient.effectMonad),
+          prefetchCount = prefetchCount)
       }
     }
-
   }
-
 }
