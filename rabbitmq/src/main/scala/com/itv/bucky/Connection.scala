@@ -75,11 +75,11 @@ object Channel extends StrictLogging {
     Try {
       logger.info(s"Starting Channel")
       val channel = connection.createChannel()
-      channel.addShutdownListener( (cause: ShutdownSignalException) =>
-        logger.info(s"Channel shut down, cause reason: ${cause.getReason.protocolMethodName()}, " +
-          s"is hard error: ${cause.isHardError}, is initiated by application: ${cause.isInitiatedByApplication}",
-          cause.getStackTrace)
-      )
+      channel.addShutdownListener(new ShutdownListener() {
+        override def shutdownCompleted(cause: ShutdownSignalException): Unit =
+          logger.info(s"Channel shut down, cause reason: ${cause.getReason.protocolMethodName()}, " +
+            s"is hard error: ${cause.isHardError}, is initiated by application: ${cause.isInitiatedByApplication}", cause.getStackTrace)
+      })
       channel
     } match {
       case Success(channel) =>
