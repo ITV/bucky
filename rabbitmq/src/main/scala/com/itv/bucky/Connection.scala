@@ -74,7 +74,13 @@ object Channel extends StrictLogging {
   def apply(connection: RabbitConnection): Id[RabbitChannel] =
     Try {
       logger.info(s"Starting Channel")
-      connection.createChannel()
+      val channel = connection.createChannel()
+      channel.addShutdownListener( (cause: ShutdownSignalException) =>
+        logger.info(s"Channel shut down, cause reason: ${cause.getReason.protocolMethodName()}, " +
+          s"is hard error: ${cause.isHardError}, is initiated by application: ${cause.isInitiatedByApplication}",
+          cause.getStackTrace)
+      )
+      channel
     } match {
       case Success(channel) =>
         logger.info(s"Channel has been started successfully!")
