@@ -5,6 +5,8 @@ import com.typesafe.scalalogging.StrictLogging
 import scala.language.higherKinds
 import com.rabbitmq.client._
 
+import scala.collection.immutable.TreeMap
+
 object Publisher extends StrictLogging {
 
   def publish[T](channel: Channel,
@@ -40,10 +42,10 @@ object Publisher extends StrictLogging {
   // Unfortunately explicit boxing seems necessary due to Scala inferring logger varargs as being of type AnyRef*
   @inline private def box(x: AnyVal): AnyRef = x.asInstanceOf[AnyRef]
 
-  case class PendingConfirmations[T](
-      unconfirmedPublications: java.util.TreeMap[Long, List[T]] = new java.util.TreeMap[Long, List[T]]()) {
+  class PendingConfirmations[T] {
 
-    import scala.collection.JavaConverters._
+    import AtomicRef._
+    private val unconfirmedPublicationsRef = Ref[TreeMap[Long, List[T]]](TreeMap.empty)
 
     def completeConfirmation(deliveryTag: Long, multiple: Boolean)(complete: T => Unit): Unit =
       pop(deliveryTag, multiple).foreach(complete)
@@ -58,22 +60,21 @@ object Publisher extends StrictLogging {
       confirmationToComplete.foreach(complete)
     }
 
-    def addPendingConfirmation(deliveryTag: Long, pendingConfirmation: T) =
-      unconfirmedPublications.synchronized {
-        unconfirmedPublications.put(
-          deliveryTag,
-          Option(unconfirmedPublications.get(deliveryTag)).toList.flatten.+:(pendingConfirmation))
+    def addPendingConfirmation(deliveryTag: Long, pendingConfirmation: T): Unit =
+      unconfirmedPublicationsRef.update { x =>
+        x + (deliveryTag -> x.get(deliveryTag).toList.flatten.+:(pendingConfirmation))
       }
 
-    private def pop(deliveryTag: Long, multiple: Boolean) =
-      if (multiple) {
-        val entries       = unconfirmedPublications.headMap(deliveryTag + 1L)
-        val removedValues = entries.values().asScala.toList
-        entries.clear()
-        removedValues.flatten
-      } else {
-        Option(unconfirmedPublications.remove(deliveryTag)).toList.flatten
-      }
+    private def pop(deliveryTag: Long, multiple: Boolean): List[T] =
+      unconfirmedPublicationsRef.modify { x =>
+        if (multiple) {
+          val entries = x.until(deliveryTag + 1L).toList
+          entries.flatMap(_._2).toList -> (x -- entries.map(_._1))
+
+        } else {
+          x.get(deliveryTag).toList.flatten -> (x - deliveryTag)
+        }
+      }._1
 
   }
 
