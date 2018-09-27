@@ -5,17 +5,20 @@ import com.typesafe.sbt.pgp.PgpKeys.{publishSigned, publishLocalSigned}
 
 name := "bucky"
 
-crossScalaVersions := Seq("2.11.8", "2.12.1")
+crossScalaVersions := Seq("2.11.8", "2.12.7")
 
 val itvLifecycleVersion = "0.16"
 val amqpClientVersion   = "4.0.2"
-val scalaLoggingVersion = "3.5.0"
-val scalaTestVersion    = "3.0.4"
+val scalaLoggingVersion = "3.9.0"
+val scalaTestVersion    = "3.0.5"
 val mockitoVersion      = "1.9.0"
-val argonautVersion     = "6.2"
-val circeVersion        = "0.9.1"
-val typeSafeVersion     = "1.3.1"
-val fs2Version          = "0.10.1"
+val argonautVersion     = "6.2.2"
+val circeVersion        = "0.9.3"
+val typeSafeVersion     = "1.3.2"
+val fs2Version          = "0.10.4"
+val scalaXmlVersion     = "1.1.0"
+val qpidVersion         = "6.0.4"
+val scalazStreamVersion = "0.8.6a"
 
 releaseProcess := Seq[ReleaseStep](
   checkSnapshotDependencies,
@@ -143,7 +146,7 @@ lazy val test = project
     libraryDependencies ++= Seq(
       "com.itv"                    %% "lifecycle"     % itvLifecycleVersion,
       "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
-      "org.apache.qpid"            % "qpid-broker"    % "6.0.4",
+      "org.apache.qpid"            % "qpid-broker"    % qpidVersion,
       "io.netty"                   % "netty"          % "3.4.2.Final",
       "org.scalatest"              %% "scalatest"     % scalaTestVersion,
       "co.fs2"                     %% "fs2-core"      % fs2Version,
@@ -162,9 +165,9 @@ lazy val example = project
       "io.argonaut"                %% "argonaut"      % argonautVersion,
       "com.itv"                    %% "lifecycle"     % itvLifecycleVersion,
       "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
-      "org.apache.qpid"            % "qpid-broker"    % "6.0.4",
+      "org.apache.qpid"            % "qpid-broker"    % qpidVersion,
       "org.scalatest"              %% "scalatest"     % scalaTestVersion,
-      "com.typesafe"               % "config"         % "1.2.1"
+      "com.typesafe"               % "config"         % typeSafeVersion
     )
   )
 
@@ -224,7 +227,7 @@ lazy val xml = project
   )
   .settings(
     libraryDependencies ++= Seq(
-      "org.scala-lang.modules"     %% "scala-xml"     % "1.0.6",
+      "org.scala-lang.modules"     %% "scala-xml"     % scalaXmlVersion,
       "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
       "org.scalatest"              %% "scalatest"     % scalaTestVersion % "test, it"
     )
@@ -268,7 +271,7 @@ lazy val scalaz = project
   )
   .settings(
     libraryDependencies ++= Seq(
-      "org.scalaz.stream" %% "scalaz-stream" % "0.8.6a",
+      "org.scalaz.stream" %% "scalaz-stream" % scalazStreamVersion,
       "com.typesafe"      % "config"         % typeSafeVersion % "it"
     )
   )
