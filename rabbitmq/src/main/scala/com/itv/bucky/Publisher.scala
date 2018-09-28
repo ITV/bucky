@@ -13,7 +13,7 @@ object Publisher extends StrictLogging {
                  cmd: PublishCommand,
                  pendingConfirmation: T,
                  pendingConfirmations: PendingConfirmations[T])(fail: (T, Exception) => Unit): Unit =
-    channel.synchronized {
+    channel.synchronized { //FIXME we should try to use atomic ref
       logger.debug(s"Acquire the channel: $channel")
       val deliveryTag = channel.getNextPublishSeqNo
       logger.debug("Publishing with delivery tag {}L to {}:{} with {}: {}",
