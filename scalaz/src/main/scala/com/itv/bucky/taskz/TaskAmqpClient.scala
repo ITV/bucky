@@ -41,15 +41,16 @@ case class TaskAmqpClient(channel: Id[RabbitChannel])(implicit pool: ExecutorSer
 
   override def publisher(timeout: Duration): Id[Publisher[Task, PublishCommand]] = {
     logger.info(s"Creating publisher")
-    val handleFailure = (f: Register, e: Exception) => f.apply(-\/(e))
-    val pendingConfirmations = Publisher.confirmListener[Register](channel) {
+    val handleFailure    = (f: Register, e: Exception) => f.apply(-\/(e))
+    val channelPublisher = ChannelPublisher(channel)
+    val pendingConfirmations = channelPublisher.confirmListener[Register] {
       _.apply(\/-(()))
     }(handleFailure)
 
     cmd =>
       Task
         .async { pendingConfirmation: Register =>
-          Publisher.publish[Register](channel, cmd, pendingConfirmation, pendingConfirmations)(handleFailure)
+          channelPublisher.publish[Register](cmd, pendingConfirmation, pendingConfirmations)(handleFailure)
         }
         .timed(timeout)
   }

@@ -6,14 +6,13 @@ import scala.language.higherKinds
 import com.rabbitmq.client._
 
 import scala.collection.immutable.TreeMap
+import AtomicRef._
 
-object Publisher extends StrictLogging {
+class ChannelPublisher private (channelRef: Ref[Channel]) extends StrictLogging {
 
-  def publish[T](channel: Channel,
-                 cmd: PublishCommand,
-                 pendingConfirmation: T,
-                 pendingConfirmations: PendingConfirmations[T])(fail: (T, Exception) => Unit): Unit =
-    channel.synchronized { //FIXME we should try to use atomic ref
+  def publish[T](cmd: PublishCommand, pendingConfirmation: T, pendingConfirmations: PendingConfirmations[T])(
+      fail: (T, Exception) => Unit): Unit =
+    channelRef.update { channel =>
       logger.debug(s"Acquire the channel: $channel")
       val deliveryTag = channel.getNextPublishSeqNo
       logger.debug("Publishing with delivery tag {}L to {}:{} with {}: {}",
@@ -37,6 +36,7 @@ object Publisher extends StrictLogging {
 
       }
       logger.debug(s"Release the channel: $channel")
+      channel
     }
 
   // Unfortunately explicit boxing seems necessary due to Scala inferring logger varargs as being of type AnyRef*
@@ -44,7 +44,6 @@ object Publisher extends StrictLogging {
 
   class PendingConfirmations[T] {
 
-    import AtomicRef._
     private val unconfirmedPublicationsRef = Ref[TreeMap[Long, List[T]]](TreeMap.empty)
 
     def completeConfirmation(deliveryTag: Long, multiple: Boolean)(complete: T => Unit): Unit =
@@ -78,26 +77,30 @@ object Publisher extends StrictLogging {
 
   }
 
-  def confirmListener[T](channel: Channel)(success: T => Unit)(
-      fail: (T, Exception) => Unit): PendingConfirmations[T] = {
-    channel.confirmSelect()
-    val pendingConfirmations = new PendingConfirmations[T]()
-    logger.info(s"Create confirm listener for channel $channel")
-    channel.addConfirmListener(new ConfirmListener {
-      override def handleAck(deliveryTag: Long, multiple: Boolean): Unit = {
-        logger.debug("Publish acknowledged with delivery tag {}L, multiple = {}", box(deliveryTag), box(multiple))
-        pendingConfirmations.completeConfirmation(deliveryTag, multiple)(success)
-      }
+  def confirmListener[T](success: T => Unit)(fail: (T, Exception) => Unit): PendingConfirmations[T] =
+    channelRef.modify { channel =>
+      channel.confirmSelect()
+      val pendingConfirmations = new PendingConfirmations[T]()
+      logger.info(s"Create confirm listener for channel $channel")
+      channel.addConfirmListener(new ConfirmListener {
+        override def handleAck(deliveryTag: Long, multiple: Boolean): Unit = {
+          logger.debug("Publish acknowledged with delivery tag {}L, multiple = {}", box(deliveryTag), box(multiple))
+          pendingConfirmations.completeConfirmation(deliveryTag, multiple)(success)
+        }
 
-      override def handleNack(deliveryTag: Long, multiple: Boolean): Unit = {
-        logger.error("Publish negatively acknowledged with delivery tag {}L, multiple = {}",
-                     box(deliveryTag),
-                     box(multiple))
-        pendingConfirmations.completeConfirmation(deliveryTag, multiple)(
-          fail(_, new RuntimeException("AMQP server returned Nack for publication")))
-      }
-    })
-    pendingConfirmations
-  }
+        override def handleNack(deliveryTag: Long, multiple: Boolean): Unit = {
+          logger.error("Publish negatively acknowledged with delivery tag {}L, multiple = {}",
+                       box(deliveryTag),
+                       box(multiple))
+          pendingConfirmations.completeConfirmation(deliveryTag, multiple)(
+            fail(_, new RuntimeException("AMQP server returned Nack for publication")))
+        }
+      })
+      pendingConfirmations -> channel
+    }._1
 
+}
+
+object ChannelPublisher {
+  def apply(channel: Channel): ChannelPublisher = new ChannelPublisher(Ref(channel))
 }
