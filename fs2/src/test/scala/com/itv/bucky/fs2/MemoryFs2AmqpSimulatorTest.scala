@@ -13,9 +13,9 @@ import org.scalactic.TypeCheckedTripleEquals
 import scala.collection.mutable.ListBuffer
 import examples._
 
-class IOFs2AmqpSimulatorTest extends FlatSpec with TypeCheckedTripleEquals with StrictLogging {
+class MemoryFs2AmqpSimulatorTest extends FlatSpec with TypeCheckedTripleEquals with StrictLogging {
   import UnmarshalResultOps._
-  import IOFs2AmqpSimulatorTest._
+  import MemoryFs2AmqpSimulatorTest._
   import App._
   import cats.syntax.traverse._
   import cats.instances.list._
@@ -83,29 +83,36 @@ class IOFs2AmqpSimulatorTest extends FlatSpec with TypeCheckedTripleEquals with 
     withApp { app =>
       val publishCommand: PublishCommand =
         RmqConfig.InvalidBinding.stringPublishCommandBuilder.toPublishCommand("no_binding")
-      app.amqpClient.publishAndWait(publishCommand, 100.millis).map(_ should ===(publishCommand.notBindingFound))
+      app.amqpClient
+        .publishAndWait(publishCommand, 100.millis)
+        .map(_ should ===(publishCommand.notBindingFound(MemoryFs2AmqpSimulatorTest.retryPolicy)))
     }
   }
 
-  it should "return explain why it it is not able to finish when there is not cosumer" in {
+  it should "return explain why it it is not able to finish when there is not consumer" in {
     withApp { app =>
       val publishCommand: PublishCommand =
         RmqConfig.NoConsumer.stringPublishCommandBuilder.toPublishCommand("no_consumer")
-      app.amqpClient.publishAndWait(publishCommand, 100.millis).map(_ should ===(publishCommand.notConsumerFound))
+      app.amqpClient
+        .publishAndWait(publishCommand, 100.millis)
+        .map(_ should ===(publishCommand.notConsumerFound(MemoryFs2AmqpSimulatorTest.retryPolicy)))
     }
   }
 
 }
 
-object IOFs2AmqpSimulatorTest {
+object MemoryFs2AmqpSimulatorTest {
   import App._
   import com.itv.bucky.future.SameThreadExecutionContext.implicitly
+  import scala.concurrent.duration._
   implicit val futureMonad = future.futureMonad
 
   case class Ports(amqpClient: MemoryAmqpSimulator[IO], targetMessages: ListBuffer[Delivery], bar: IO[List[String]])
 
+  val retryPolicy = MemoryAmqpSimulator.RetryPolicy(5, 10.millis)
+
   def withApp(f: Ports => IO[Assertion]): Unit =
-    withMemorySimulator(RmqConfig.all)(buildPorts)(f)
+    withMemorySimulator(RmqConfig.all, MemoryAmqpSimulator.Config(retryPolicy))(buildPorts)(f)
 
   def buildPorts(amqpClient: MemoryAmqpSimulator[IO]) =
     Scheduler[IO](2).flatMap { implicit scheduler =>
