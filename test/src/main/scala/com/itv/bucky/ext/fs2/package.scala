@@ -133,7 +133,7 @@ package object fs2 {
                       futureMonad: MonadError[Future, Throwable]): Fs2AmqpSimulator =
     old.rabbitSimulator
 
-  def memorySimulator(config: MemoryAmqpSimulator.Config = MemoryAmqpSimulator.Config.default)(
+  def rabbitSimulator(config: MemoryAmqpSimulator.Config = MemoryAmqpSimulator.Config.default)(
       implicit executionContext: ExecutionContext,
       scheduler: Scheduler,
       idMonad: Monad[Id],
@@ -185,34 +185,30 @@ package object fs2 {
                                 ioMonadError: MonadError[IO, Throwable],
                                 futureMonad: MonadError[Future, Throwable]): Unit = {
     val amqpClient = rabbitSimulator
-    val p = for {
+    simulate(declarations, amqpClient, ports(amqpClient), test).compile.last.unsafeRunSync()
+  }
+
+  def withSafeSimulator[P](declarations: Iterable[Declaration] = List.empty,
+                           config: MemoryAmqpSimulator.Config = MemoryAmqpSimulator.Config.default)(
+      ports: MemoryAmqpSimulator[IO] => Stream[IO, P])(test: P => IO[Assertion])(
+      implicit executionContext: ExecutionContext,
+      scheduler: Scheduler,
+      ioMonadError: MonadError[IO, Throwable]): Stream[IO, Unit] =
+    for {
+      amqpClient <- Stream.eval(rabbitSimulator(config))
+      _          <- simulate(declarations, amqpClient, ports(amqpClient), test)
+    } yield ()
+
+  private def simulate[P](declarations: Iterable[Declaration] = List.empty,
+                          amqpClient: AmqpClient[Id, IO, Throwable, Stream[IO, Unit]],
+                          ports: Stream[IO, P],
+                          test: P => IO[Assertion])(implicit executionContext: ExecutionContext): Stream[IO, Unit] =
+    for {
       halted <- Stream.eval(async.signalOf[IO, Boolean](false))
       _      <- Stream.eval(IO(DeclarationExecutor(declarations, amqpClient)))
-      ports  <- ports(amqpClient).interruptWhen(halted)
+      ports  <- ports.interruptWhen(halted)
       _      <- Stream.eval(test(ports))
       _      <- Stream.eval(halted.set(true))
     } yield ()
-    p.compile.last.unsafeRunSync()
-  }
 
-  def withMemorySimulator[P](declarations: Iterable[Declaration] = List.empty,
-                             config: MemoryAmqpSimulator.Config = MemoryAmqpSimulator.Config.default)(
-      ports: MemoryAmqpSimulator[IO] => Stream[IO, P])(test: P => IO[Assertion])(
-      implicit executionContext: ExecutionContext,
-      ioMonadError: MonadError[IO, Throwable]): Unit =
-    Scheduler[IO](2)
-      .flatMap { implicit s =>
-        for {
-          amqpClient <- Stream.eval(memorySimulator(config))
-          halted     <- Stream.eval(async.signalOf[IO, Boolean](false))
-          _          <- Stream.eval(IO(DeclarationExecutor(declarations, amqpClient)))
-          ports      <- ports(amqpClient).interruptWhen(halted)
-          _          <- Stream.eval(test(ports))
-          _          <- Stream.eval(halted.set(true))
-        } yield ()
-
-      }
-      .compile
-      .last
-      .unsafeRunSync()
 }

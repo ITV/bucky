@@ -112,7 +112,13 @@ object MemoryFs2AmqpSimulatorTest {
   val retryPolicy = MemoryAmqpSimulator.RetryPolicy(5, 10.millis)
 
   def withApp(f: Ports => IO[Assertion]): Unit =
-    withMemorySimulator(RmqConfig.all, MemoryAmqpSimulator.Config(retryPolicy))(buildPorts)(f)
+    Scheduler[IO](2)
+      .flatMap { implicit s =>
+        withSafeSimulator(RmqConfig.all, MemoryAmqpSimulator.Config(retryPolicy))(buildPorts)(f)
+      }
+      .compile
+      .drain
+      .unsafeRunSync()
 
   def buildPorts(amqpClient: MemoryAmqpSimulator[IO]) =
     Scheduler[IO](2).flatMap { implicit scheduler =>
