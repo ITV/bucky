@@ -17,21 +17,26 @@ import scala.concurrent.duration._
 package object fs2 extends StrictLogging {
   type IOAmqpClient = AmqpClient[Id, IO, Throwable, Stream[IO, Unit]]
 
-  type Register = (Either[Throwable, Unit]) => Unit
+  type Register = Either[Throwable, Unit] => Unit
 
   type IOConsumer = Id[Stream[IO, Unit]]
 
   def clientFrom(config: AmqpClientConfig, declarations: List[Declaration] = List.empty)(
       implicit executionContext: ExecutionContext): Stream[IO, IOAmqpClient] =
+    closeableClientFrom(config, declarations).map(_.client)
+
+  def closeableClientFrom(config: AmqpClientConfig, declarations: List[Declaration] = List.empty)(
+      implicit executionContext: ExecutionContext)
+    : Stream[IO, AmqpClient.WithCloseable[Id, IO, Throwable, Stream[IO, Unit]]] =
     for {
       halted          <- Stream.eval(async.signalOf[IO, Boolean](false))
       requestShutdown <- Stream.eval(async.signalOf[IO, Boolean](false))
       _               <- addShutdownHook(requestShutdown, halted)
       connection      <- connection(config, halted)
       channel         <- channel(connection)
-      client          <- client(channel, halted).interruptWhen(requestShutdown)
+      client          <- client(channel).interruptWhen(requestShutdown)
       _               <- declare(declarations)(client)
-    } yield client
+    } yield AmqpClient.WithCloseable[Id, IO, Throwable, Stream[IO, Unit]](client, close(requestShutdown, halted))
 
   implicit val ioMonadError = new MonadError[IO, Throwable] {
     override def raiseError[A](e: Throwable): IO[A] = IO.raiseError(e)
@@ -99,27 +104,28 @@ package object fs2 extends StrictLogging {
       }
     )
 
-  def client(channel: Id[RabbitChannel], halted: Signal[IO, Boolean])(
-      implicit executionContext: ExecutionContext): Stream[IO, IOAmqpClient] =
+  def client(channel: Id[RabbitChannel])(implicit executionContext: ExecutionContext): Stream[IO, IOAmqpClient] =
     Stream.eval(for {
       _ <- IO { logger.info(s"Using connection $channel") }
     } yield IOAmqpClient(channel))
 
-  def declare(declarations: List[Declaration])(amqpClient: IOAmqpClient) =
+  def declare(declarations: List[Declaration])(amqpClient: IOAmqpClient): Stream[IO, Unit] =
     Stream.eval(IO(DeclarationExecutor(declarations, amqpClient)))
 
   private def addShutdownHook(requestShutdown: Signal[IO, Boolean], halted: Signal[IO, Boolean]): Stream[IO, Unit] =
     Stream.eval(IO {
       sys.addShutdownHook {
-        val hook = requestShutdown.set(true).runAsync(_ => IO.unit) >>
-          halted.discrete
-            .takeWhile(_ == false)
-            .compile
-            .drain
-        hook.unsafeRunSync()
+        close(requestShutdown, halted).unsafeRunSync()
       }
       ()
     })
+
+  private def close(requestShutdown: Signal[IO, Boolean], halted: Signal[IO, Boolean]): IO[Unit] =
+    requestShutdown.set(true).runAsync(_ => IO.unit) >>
+      halted.discrete
+        .takeWhile(_ == false)
+        .compile
+        .drain
 
   object IOConnection {
     def apply(config: AmqpClientConfig)(implicit executionContext: ExecutionContext): IO[RabbitConnection] =

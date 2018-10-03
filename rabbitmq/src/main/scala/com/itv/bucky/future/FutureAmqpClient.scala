@@ -33,8 +33,9 @@ abstract class FutureAmqpClient[B[_]](channelFactory: B[RabbitChannel])(implicit
       monad.apply(
         Try {
           logger.info(s"Creating publisher")
+          val channelPublisher = ChannelPublisher(channel)
 
-          val unconfirmedPublications = Publisher.confirmListener[Promise[Unit]](channel) //
+          val unconfirmedPublications = channelPublisher.confirmListener[Promise[Unit]] //
           {
             _.success(())
           } //
@@ -44,7 +45,7 @@ abstract class FutureAmqpClient[B[_]](channelFactory: B[RabbitChannel])(implicit
 
           publisherWrapperLifecycle(timeout) { cmd =>
             val promise = Promise[Unit]()
-            Publisher.publish(channel, cmd, promise, unconfirmedPublications) { (t, e) =>
+            channelPublisher.publish(cmd, promise, unconfirmedPublications) { (t, e) =>
               t.failure(e)
             }
             promise.future

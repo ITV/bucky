@@ -35,6 +35,10 @@ trait EffectMonad[F[_], E] {
   implicit def effectMonad: MonadError[F, E]
 }
 
+trait ParallelEffectMonad[F[_]] {
+  def sequence[A](list: Seq[F[A]]): F[Seq[A]]
+}
+
 trait PublisherBaseTest[F[_]] extends EffectVerification[F] {
   def withPublisher(testQueueName: QueueName = Any.queue(),
                     requeueStrategy: RequeueStrategy[F] = NoneHandler,

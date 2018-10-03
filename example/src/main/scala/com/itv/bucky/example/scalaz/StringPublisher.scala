@@ -39,14 +39,16 @@ object StringPublisher extends App {
   /** *
     * Create the task amqpClient with id and create a task to shutdown the client
     */
-  val amqpClient = TaskAmqpClient.fromConfig(amqpClientConfig)
-  val shutdown   = TaskAmqpClient.closeAll(amqpClient)
+  val amqpClient = TaskAmqpClient.closeableClient(amqpClientConfig)
 
-  DeclarationExecutor(Declarations.all, amqpClient)
-  val publish = amqpClient.publisherOf(publisherConfig)
+
+  DeclarationExecutor(Declarations.all, amqpClient.client)
+  val publish = amqpClient.client.publisherOf(publisherConfig)
   val task    = publish(s"Hello, world at ${new Date()}!")
 
   val foo = task.unsafePerformSync
 
-  shutdown.unsafePerformSync
+  amqpClient.close.unsafePerformSync
+
+  println("Hello world!")
 }

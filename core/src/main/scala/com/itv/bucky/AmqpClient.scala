@@ -42,6 +42,10 @@ trait AmqpOps {
 
 object AmqpClient extends StrictLogging {
 
+  type Closeable[F[_]] = F[Unit]
+
+  case class WithCloseable[B[_], F[_], E, C](client: AmqpClient[B, F, E, C], close: Closeable[F])
+
   def publisherOf[F[_], T](commandBuilder: PublishCommandBuilder[T])(publisher: Publisher[F, PublishCommand])(
       implicit F: Monad[F]): Publisher[F, T] =
     (message: T) =>

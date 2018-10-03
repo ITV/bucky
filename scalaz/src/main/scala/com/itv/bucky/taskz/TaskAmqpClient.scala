@@ -41,15 +41,16 @@ case class TaskAmqpClient(channel: Id[RabbitChannel])(implicit pool: ExecutorSer
 
   override def publisher(timeout: Duration): Id[Publisher[Task, PublishCommand]] = {
     logger.info(s"Creating publisher")
-    val handleFailure = (f: Register, e: Exception) => f.apply(-\/(e))
-    val pendingConfirmations = Publisher.confirmListener[Register](channel) {
+    val handleFailure    = (f: Register, e: Exception) => f.apply(-\/(e))
+    val channelPublisher = ChannelPublisher(channel)
+    val pendingConfirmations = channelPublisher.confirmListener[Register] {
       _.apply(\/-(()))
     }(handleFailure)
 
     cmd =>
       Task
         .async { pendingConfirmation: Register =>
-          Publisher.publish[Register](channel, cmd, pendingConfirmation, pendingConfirmations)(handleFailure)
+          channelPublisher.publish[Register](cmd, pendingConfirmation, pendingConfirmations)(handleFailure)
         }
         .timed(timeout)
   }
@@ -103,6 +104,8 @@ object TaskAmqpClient extends StrictLogging {
   import Monad._
   import scala.concurrent.duration._
 
+  type Closeable =  AmqpClient.WithCloseable[Id, Task, Throwable, Process[Task, Unit]]
+
   def connection(config: AmqpClientConfig)(implicit pool: ExecutorService): Task[RabbitConnection] = {
     val value = Task.delay {
       Connection(config)
@@ -142,7 +145,6 @@ object TaskAmqpClient extends StrictLogging {
     channel =>
       val client = TaskAmqpClient(channel)
       sys.addShutdownHook {
-        logger.info(s"Closing $client")
         TaskAmqpClient.closeAll(client).unsafePerformSync
       }
       client
@@ -151,6 +153,13 @@ object TaskAmqpClient extends StrictLogging {
   def fromConfig(config: AmqpClientConfig)(
       implicit pool: ExecutorService = Strategy.DefaultExecutorService): TaskAmqpClient =
     fromConnection(connection(config).unsafePerformSync)
+
+
+  def closeableClient(config: AmqpClientConfig)(
+    implicit pool: ExecutorService = Strategy.DefaultExecutorService): TaskAmqpClient.Closeable = {
+    val client = fromConfig(config)
+    AmqpClient.WithCloseable(client, closeAll(client))
+  }
 }
 
 object ProcessAmqpClient extends StrictLogging {

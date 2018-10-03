@@ -29,14 +29,15 @@ object IOAmqpClient extends StrictLogging {
 
       override def publisher(timeout: Duration): Id[Publisher[IO, PublishCommand]] = {
         logger.info(s"Creating publisher")
-        val handleFailure = (f: Register, e: Exception) => f.apply(Left(e))
-        val pendingConfirmations = Publisher.confirmListener[Register](channel) {
+        val handleFailure    = (f: Register, e: Exception) => f.apply(Left(e))
+        val channelPublisher = ChannelPublisher(channel)
+        val pendingConfirmations = channelPublisher.confirmListener[Register] {
           _.apply(Right(()))
         }(handleFailure)
 
         cmd =>
           val publishing = IO.async { pendingConfirmation: Register =>
-            Publisher.publish[Register](channel, cmd, pendingConfirmation, pendingConfirmations)(handleFailure)
+            channelPublisher.publish[Register](cmd, pendingConfirmation, pendingConfirmations)(handleFailure)
           }
           timeout match {
             case fd: FiniteDuration =>

@@ -65,7 +65,7 @@ object IntegrationUtils extends StrictLogging {
   protected def withPublihserAndAmqpClient(
       testQueueName: QueueName = Any.queue(),
       requeueStrategy: RequeueStrategy[Task] = NoneHandler,
-      shouldDeclare: Boolean = true)(f: (TaskAmqpClient, TestFixture[Task]) => Unit): Unit = {
+      shouldDeclare: Boolean = true)(f: (AmqpClient[Id, Task, Throwable, Process[Task, Unit]], TestFixture[Task]) => Unit): Unit = {
     val routingKey                     = RoutingKey(testQueueName.value)
     val exchange                       = ExchangeName("")
     implicit val pool: ExecutorService = Strategy.DefaultExecutorService
@@ -107,7 +107,7 @@ object IntegrationUtils extends StrictLogging {
   def withPublisherAndConsumer(queueName: QueueName = Any.queue(), requeueStrategy: RequeueStrategy[Task])(
       f: TestFixture[Task] => Unit): Unit =
     withPublihserAndAmqpClient(queueName, requeueStrategy) {
-      case (amqpClient: AmqpClient[Id, Task, Throwable, Process[Task, Unit]], t) =>
+      case (amqpClient, t) =>
         withPublisher(queueName, requeueStrategy = requeueStrategy) { app =>
           import TaskExt._
 

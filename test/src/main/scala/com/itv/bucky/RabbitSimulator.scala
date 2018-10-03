@@ -83,7 +83,7 @@ class RabbitSimulator[B[_]](bindings: Bindings = IdentityBindings)(implicit M: M
   }
 
   def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): B[Publisher[Future, PublishCommand]] =
-    monad.apply { (command: PublishCommand) =>
+    monad.apply { command: PublishCommand =>
       {
         publish(command).map(_ => ())
       }

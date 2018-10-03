@@ -2,11 +2,8 @@ package com.itv.bucky.fs2
 
 import cats.effect.IO
 import _root_.fs2._
-
 import com.itv.bucky._
 import com.itv.bucky.ext.fs2._
-import com.itv.bucky.decl._
-import com.itv.bucky.pattern.requeue._
 
 import org.scalatest.{Assertion, FlatSpec}
 import org.scalatest.concurrent.Eventually._
@@ -14,6 +11,7 @@ import org.scalatest.Matchers._
 import org.scalactic.TypeCheckedTripleEquals
 
 import scala.collection.mutable.ListBuffer
+import examples._
 
 class Fs2AmqpSimulatorTest extends FlatSpec with TypeCheckedTripleEquals {
   import UnmarshalResultOps._
@@ -69,74 +67,21 @@ object Fs2AmqpSimulatorTest {
     withSimulator(RmqConfig.all)(buildPorts)(f)
 
   def buildPorts(amqpClient: Fs2AmqpSimulator) =
-    for {
-      ref <- Stream.eval(async.refOf[IO, List[String]](List.empty))
-      app = App(amqpClient, new Bar {
-        override def add(message: String): IO[Unit] = ref.modify(_.:+(message)).map(_ => ())
-      })
+    Scheduler[IO](2).flatMap { implicit scheduler =>
+      for {
+        ref <- Stream.eval(async.refOf[IO, List[String]](List.empty))
+        app = App(amqpClient, new Bar {
+          override def add(message: String): IO[Unit] = ref.modify(_.:+(message)).map(_ => ())
+        })
 
-      messages <- amqpClient.consume(RmqConfig.Target.exchangeName,
-                                     RmqConfig.Target.routingKey,
-                                     RmqConfig.Target.queueName)
+        messages <- amqpClient.consume(RmqConfig.Target.exchangeName,
+                                       RmqConfig.Target.routingKey,
+                                       RmqConfig.Target.queueName)
 
-      ports <- Stream
-        .eval(IO(Ports(amqpClient, messages, ref.get)))
-        .concurrently(app.amqp)
-    } yield ports
-
-}
-
-trait App {
-  def amqp: Stream[IO, Unit]
-}
-
-object App {
-
-  import UnmarshalResultOps._
-
-  trait Bar {
-    def add(message: String): IO[Unit]
-  }
-
-  def apply(amqpClient: IOAmqpClient, bar: Bar): App = new App {
-    override def amqp = amqpClient.consumer(
-      RmqConfig.Source.queueName,
-      Handler[IO, Delivery] {
-        _.body.unmarshal[String].success match {
-          case s if s.startsWith("bar") => bar.add(s).map(_ => Ack)
-          case other =>
-            amqpClient
-              .publisher()(RmqConfig.Target.stringPublishCommandBuilder.toPublishCommand(other))
-              .map(_ => Ack)
-        }
-      }
-    )
-  }
-
-  object RmqConfig {
-
-    object Source {
-      val exchangeName = ExchangeName("source")
-      val routingKey   = RoutingKey("go.to.source")
-      val queueName    = QueueName("q.go.to.source")
-      val declaration = Exchange(exchangeName, exchangeType = Topic)
-        .binding(routingKey -> queueName)
-      val requeueDeclaration = requeueDeclarations(queueName, routingKey)
-
-      val stringPublishCommandBuilder = RabbitSimulator.stringPublishCommandBuilder using exchangeName using routingKey
+        ports <- Stream
+          .eval(IO(Ports(amqpClient, messages, ref.get)))
+          .concurrently(app.amqp)
+      } yield ports
     }
-
-    object Target {
-
-      val exchangeName = ExchangeName("target")
-      val routingKey   = RoutingKey("go.to.target")
-      val queueName    = QueueName("q.go.to.target")
-
-      val stringPublishCommandBuilder = RabbitSimulator.stringPublishCommandBuilder using exchangeName using routingKey
-
-    }
-
-    val all = Source.requeueDeclaration ++ List(Source.declaration)
-  }
 
 }
