@@ -104,6 +104,8 @@ object TaskAmqpClient extends StrictLogging {
   import Monad._
   import scala.concurrent.duration._
 
+  type Closeable =  AmqpClient.WithCloseable[Id, Task, Throwable, Process[Task, Unit]]
+
   def connection(config: AmqpClientConfig)(implicit pool: ExecutorService): Task[RabbitConnection] = {
     val value = Task.delay {
       Connection(config)
@@ -143,7 +145,6 @@ object TaskAmqpClient extends StrictLogging {
     channel =>
       val client = TaskAmqpClient(channel)
       sys.addShutdownHook {
-        logger.info(s"Closing $client")
         TaskAmqpClient.closeAll(client).unsafePerformSync
       }
       client
@@ -152,6 +153,13 @@ object TaskAmqpClient extends StrictLogging {
   def fromConfig(config: AmqpClientConfig)(
       implicit pool: ExecutorService = Strategy.DefaultExecutorService): TaskAmqpClient =
     fromConnection(connection(config).unsafePerformSync)
+
+
+  def closeableClient(config: AmqpClientConfig)(
+    implicit pool: ExecutorService = Strategy.DefaultExecutorService): TaskAmqpClient.Closeable = {
+    val client = fromConfig(config)
+    AmqpClient.WithCloseable(client, closeAll(client))
+  }
 }
 
 object ProcessAmqpClient extends StrictLogging {
