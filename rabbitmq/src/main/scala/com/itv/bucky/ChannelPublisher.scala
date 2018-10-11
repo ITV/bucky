@@ -8,11 +8,11 @@ import com.rabbitmq.client._
 import scala.collection.immutable.TreeMap
 import AtomicRef._
 
-class ChannelPublisher private (channelRef: Ref[Channel]) extends StrictLogging {
+class ChannelPublisher private (channel: Channel) extends StrictLogging {
 
   def publish[T](cmd: PublishCommand, pendingConfirmation: T, pendingConfirmations: PendingConfirmations[T])(
       fail: (T, Exception) => Unit): Unit =
-    channelRef.update { channel =>
+    channel.synchronized {
       logger.debug(s"Acquire the channel: $channel")
       val deliveryTag = channel.getNextPublishSeqNo
       logger.debug("Publishing with delivery tag {}L to {}:{} with {}: {}",
@@ -77,8 +77,7 @@ class ChannelPublisher private (channelRef: Ref[Channel]) extends StrictLogging 
 
   }
 
-  def confirmListener[T](success: T => Unit)(fail: (T, Exception) => Unit): PendingConfirmations[T] =
-    channelRef.modify { channel =>
+  def confirmListener[T](success: T => Unit)(fail: (T, Exception) => Unit): PendingConfirmations[T] = {
       channel.confirmSelect()
       val pendingConfirmations = new PendingConfirmations[T]()
       logger.info(s"Create confirm listener for channel $channel")
@@ -96,11 +95,11 @@ class ChannelPublisher private (channelRef: Ref[Channel]) extends StrictLogging 
             fail(_, new RuntimeException("AMQP server returned Nack for publication")))
         }
       })
-      pendingConfirmations -> channel
-    }._1
+      pendingConfirmations
+    }
 
 }
 
 object ChannelPublisher {
-  def apply(channel: Channel): ChannelPublisher = new ChannelPublisher(Ref(channel))
+  def apply(channel: Channel): ChannelPublisher = new ChannelPublisher(channel)
 }
