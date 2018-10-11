@@ -11,13 +11,16 @@ import com.rabbitmq.client._
 import com.rabbitmq.client.impl.AMQImpl
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
-import org.scalatest.concurrent.{Eventually, ScalaFutures}
+import org.scalatest.concurrent.Eventually
+import org.scalatest.time.{Millis, Seconds, Span}
 
+import scala.language.postfixOps
 import scala.concurrent.duration._
 
-class PublisherTest extends FunSuite with ScalaFutures {
+class PublisherTest extends FunSuite with Eventually {
 
-  import Eventually._
+  override implicit val patienceConfig =
+    PatienceConfig(timeout = scaled(Span(10, Seconds)), interval = scaled(Span(5, Millis)))
 
   test("Publishing only returns success once publication is acknowledged with Id") {
     withPublisher(timeout = 100.hours) { publisher =>
@@ -28,14 +31,17 @@ class PublisherTest extends FunSuite with ScalaFutures {
 
       val task = resultFrom(publish(Any.publishCommand()))
 
-      channel.transmittedCommands should have size 2
-      channel.transmittedCommands.last shouldBe an[AMQP.Basic.Publish]
+      eventually {
+        channel.transmittedCommands should have size 2
+        channel.transmittedCommands.last shouldBe an[AMQP.Basic.Publish]
+      }
 
       task shouldBe 'running
 
-      channel.replyWith(new AMQImpl.Basic.Ack(1L, false))
-
-      task shouldBe 'success
+      eventually {
+        channel.replyWith(new AMQImpl.Basic.Ack(1L, false))
+        task shouldBe 'success
+      }
     }
   }
 
@@ -48,14 +54,17 @@ class PublisherTest extends FunSuite with ScalaFutures {
 
       val task = resultFrom(publish(Any.publishCommand()))
 
-      channel.transmittedCommands should have size 2
-      channel.transmittedCommands.last shouldBe an[Publish]
+      eventually {
+        channel.transmittedCommands should have size 2
+        channel.transmittedCommands.last shouldBe an[Publish]
+      }
 
       task shouldBe 'running
 
-      channel.replyWith(new AMQImpl.Basic.Ack(1L, false))
-
-      task shouldBe 'success
+      eventually {
+        channel.replyWith(new AMQImpl.Basic.Ack(1L, false))
+        task shouldBe 'success
+      }
     }
   }
 
@@ -67,61 +76,11 @@ class PublisherTest extends FunSuite with ScalaFutures {
 
       task shouldBe 'running
 
-      channel.replyWith(new AMQImpl.Basic.Nack(1L, false, false))
+      eventually {
+        channel.replyWith(new AMQImpl.Basic.Nack(1L, false, false))
+        task.failure.getMessage should include("Nack")
+      }
 
-      task.failure.getMessage should include("Nack")
-    }
-  }
-
-  test("Only futures corresponding to acknowledged publications are completed") {
-    withPublisher(timeout = 100.hours) { publisher =>
-      import publisher._
-
-      val task1 = resultFrom(publish(Any.publishCommand()))
-      val task2 = resultFrom(publish(Any.publishCommand()))
-      val task3 = resultFrom(publish(Any.publishCommand()))
-
-      task1 shouldBe 'running
-      task2 shouldBe 'running
-      task3 shouldBe 'running
-
-      channel.replyWith(new AMQImpl.Basic.Ack(2L, true))
-
-      task1 shouldBe 'completed
-      task2 shouldBe 'completed
-      task3 should not be 'completed
-
-      channel.replyWith(new AMQImpl.Basic.Ack(3L, false))
-
-      task1 shouldBe 'completed
-      task2 shouldBe 'completed
-      task3 shouldBe 'completed
-    }
-  }
-
-  test("Only futures corresponding to acknowledged publications are completed: negative acknowledgment (nack)") {
-    withPublisher(timeout = 100.hours) { publisher =>
-      import publisher._
-
-      val task1 = resultFrom(publish(Any.publishCommand()))
-      val task2 = resultFrom(publish(Any.publishCommand()))
-      val task3 = resultFrom(publish(Any.publishCommand()))
-
-      task1 should not be 'completed
-      task2 should not be 'completed
-      task3 should not be 'completed
-
-      channel.replyWith(new AMQImpl.Basic.Nack(2L, true, false))
-
-      task1 shouldBe 'completed
-      task2 shouldBe 'completed
-      task3 should not be 'completed
-
-      channel.replyWith(new AMQImpl.Basic.Ack(3L, false))
-
-      task1 shouldBe 'completed
-      task2 shouldBe 'completed
-      task3 shouldBe 'completed
     }
   }
 

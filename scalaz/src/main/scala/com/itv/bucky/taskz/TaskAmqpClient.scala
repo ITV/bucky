@@ -2,9 +2,11 @@ package com.itv.bucky.taskz
 
 import java.util.concurrent.ExecutorService
 
+import com.itv.bucky.ChannelPublisher.PendingConfirmations
 import com.itv.bucky.Monad._
 import com.itv.bucky.taskz.AbstractTaskAmqpClient.TaskConsumer
 import com.itv.bucky.{Channel, _}
+import com.rabbitmq.client
 import com.rabbitmq.client.AMQP.BasicProperties
 import com.rabbitmq.client.{
   DefaultConsumer,
@@ -33,26 +35,103 @@ object AbstractTaskAmqpClient {
 case class TaskAmqpClient(channel: Id[RabbitChannel])(implicit pool: ExecutorService = Strategy.DefaultExecutorService)
     extends AbstractTaskAmqpClient.TaskAmqpClient
     with StrictLogging {
-  type Register = (\/[Throwable, Unit]) => Unit
 
   override implicit def monad: Monad[Id] = idMonad
 
   override implicit def effectMonad: MonadError[Task, Throwable] = taskMonadError(pool)
+  type PublishResult = Option[Throwable \/ Unit]
+
+  case class PublishRequest(command: PublishCommand, signal: Signal[PublishResult], timeout: Duration)
+  private val publishQueue = async.boundedQueue[PublishRequest](10)
+
+  private val handleFailure = (f: Signal[PublishResult], e: Throwable) => f.set(Some(-\/(e))).unsafePerformSync
+  private val pendingConfirmations = ChannelPublisher(channel)
+    .confirmListener[Signal[PublishResult]](_.set(Some(\/-(()))).unsafePerformSync)((s, t) =>
+      s.set(Some(-\/(t))).unsafePerformSync)
+
+  private def debug(message: String): Task[Unit] = Task {
+    logger.debug(message)
+  }
+  private val process = publishQueue.dequeue
+    .evalMap { request =>
+      val x: Task[Unit] = for {
+        _ <- debug(s"Publish and listen $request")
+        pendingPublication <- publishWithPendingPublication(request.command, request.signal, pendingConfirmations)(
+          channel)
+        _ <- debug(s"Wait for signal $request")
+        _ <- waitForSignal(pendingPublication.signal)
+          .onFailure(_ => Process.emit(()))
+          .run
+          .timed(request.timeout)
+          .handleWith {
+            case exception: Exception =>
+              debug(s"Notify the failure: ${exception.getMessage}").flatMap(_ =>
+                Task {
+                  pendingConfirmations.completeConfirmation(pendingPublication.deliveryTag)(x =>
+                    handleFailure(x, exception))
+
+              })
+          }
+        _ <- debug(s"Done $request!")
+      } yield ()
+      x.handleWith {
+        case exception: Exception =>
+          debug(s"Notify the failure: ${exception.getMessage}").flatMap(_ => request.signal.set(Some(-\/(exception))))
+      }
+    }
+  process.run.unsafePerformAsync(_ => ())
 
   override def publisher(timeout: Duration): Id[Publisher[Task, PublishCommand]] = {
     logger.info(s"Creating publisher")
-    val handleFailure    = (f: Register, e: Exception) => f.apply(-\/(e))
-    val channelPublisher = ChannelPublisher(channel)
-    val pendingConfirmations = channelPublisher.confirmListener[Register] {
-      _.apply(\/-(()))
-    }(handleFailure)
 
     cmd =>
-      Task
-        .async { pendingConfirmation: Register =>
-          channelPublisher.publish[Register](cmd, pendingConfirmation, pendingConfirmations)(handleFailure)
-        }
-        .timed(timeout)
+      {
+        val result: Signal[PublishResult] = async.signalOf(None)
+        publishQueue.enqueueOne(PublishRequest(cmd, result, timeout)).flatMap(_ => waitForSignal(result).run)
+      }
+  }
+
+  private def waitForSignal(signal: Signal[PublishResult]): Process[Task, Unit] =
+    Process.eval(signal.get).flatMap {
+      _.fold {
+        waitForSignal(signal)
+      }(_.fold(Process.fail, Process.emit))
+    }
+
+  case class PendingPublication(deliveryTag: Long, signal: Signal[PublishResult])
+  private def publishWithPendingPublication(cmd: PublishCommand,
+                                            listener: Signal[PublishResult],
+                                            pendingConfirmations: PendingConfirmations[Signal[PublishResult]])(
+      channel: client.Channel): Task[PendingPublication] = Task {
+    channel.synchronized {
+      logger.debug(s"Acquire the channel: $channel")
+      val deliveryTag = channel.getNextPublishSeqNo
+
+      logger.debug("Publishing with delivery tag {}L to {}:{} with {}: {}",
+                   ChannelPublisher.box(deliveryTag),
+                   cmd.exchange,
+                   cmd.routingKey,
+                   cmd.basicProperties,
+                   cmd.body)
+
+      val pendingPublication = PendingPublication(deliveryTag, listener)
+      pendingConfirmations.addPendingConfirmation(pendingPublication.deliveryTag, pendingPublication.signal)
+
+      try {
+        channel.basicPublish(cmd.exchange.value,
+                             cmd.routingKey.value,
+                             false,
+                             false,
+                             MessagePropertiesConverters(cmd.basicProperties),
+                             cmd.body.value)
+        logger.debug(s"Release the channel: $channel")
+      } catch {
+        case exception: Exception =>
+          logger.error(s"Failed to publish message with delivery tag ${deliveryTag}L to ${cmd.description}", exception)
+          pendingConfirmations.completeConfirmation(deliveryTag)(t => handleFailure(t, exception))
+      }
+      pendingPublication
+    }
   }
 
   override def consumer(queueName: QueueName,
@@ -104,7 +183,7 @@ object TaskAmqpClient extends StrictLogging {
   import Monad._
   import scala.concurrent.duration._
 
-  type Closeable =  AmqpClient.WithCloseable[Id, Task, Throwable, Process[Task, Unit]]
+  type Closeable = AmqpClient.WithCloseable[Id, Task, Throwable, Process[Task, Unit]]
 
   def connection(config: AmqpClientConfig)(implicit pool: ExecutorService): Task[RabbitConnection] = {
     val value = Task.delay {
@@ -154,9 +233,8 @@ object TaskAmqpClient extends StrictLogging {
       implicit pool: ExecutorService = Strategy.DefaultExecutorService): TaskAmqpClient =
     fromConnection(connection(config).unsafePerformSync)
 
-
   def closeableClient(config: AmqpClientConfig)(
-    implicit pool: ExecutorService = Strategy.DefaultExecutorService): TaskAmqpClient.Closeable = {
+      implicit pool: ExecutorService = Strategy.DefaultExecutorService): TaskAmqpClient.Closeable = {
     val client = fromConfig(config)
     AmqpClient.WithCloseable(client, closeAll(client))
   }

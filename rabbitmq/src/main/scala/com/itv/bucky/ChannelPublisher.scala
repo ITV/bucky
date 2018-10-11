@@ -9,6 +9,7 @@ import scala.collection.immutable.TreeMap
 import AtomicRef._
 
 class ChannelPublisher private (channel: Channel) extends StrictLogging {
+  import ChannelPublisher._
 
   def publish[T](cmd: PublishCommand, pendingConfirmation: T, pendingConfirmations: PendingConfirmations[T])(
       fail: (T, Exception) => Unit): Unit =
@@ -39,8 +40,34 @@ class ChannelPublisher private (channel: Channel) extends StrictLogging {
       channel
     }
 
+  def confirmListener[T](success: T => Unit)(fail: (T, Exception) => Unit): PendingConfirmations[T] = {
+    channel.confirmSelect()
+    val pendingConfirmations = new PendingConfirmations[T]()
+    logger.info(s"Create confirm listener for channel $channel")
+    channel.addConfirmListener(new ConfirmListener {
+      override def handleAck(deliveryTag: Long, multiple: Boolean): Unit = {
+        pendingConfirmations.completeConfirmation(deliveryTag, multiple)(success)
+        logger.debug("Publish acknowledged with delivery tag {}L, multiple = {}", box(deliveryTag), box(multiple))
+      }
+
+      override def handleNack(deliveryTag: Long, multiple: Boolean): Unit = {
+        logger.error("Publish negatively acknowledged with delivery tag {}L, multiple = {}",
+                     box(deliveryTag),
+                     box(multiple))
+        pendingConfirmations.completeConfirmation(deliveryTag, multiple)(
+          fail(_, new RuntimeException("AMQP server returned Nack for publication")))
+      }
+    })
+    pendingConfirmations
+  }
+
+}
+
+object ChannelPublisher {
+  def apply(channel: Channel): ChannelPublisher = new ChannelPublisher(channel)
+
   // Unfortunately explicit boxing seems necessary due to Scala inferring logger varargs as being of type AnyRef*
-  @inline private def box(x: AnyVal): AnyRef = x.asInstanceOf[AnyRef]
+  @inline def box(x: AnyVal): AnyRef = x.asInstanceOf[AnyRef]
 
   class PendingConfirmations[T] {
 
@@ -76,30 +103,4 @@ class ChannelPublisher private (channel: Channel) extends StrictLogging {
       }._1
 
   }
-
-  def confirmListener[T](success: T => Unit)(fail: (T, Exception) => Unit): PendingConfirmations[T] = {
-      channel.confirmSelect()
-      val pendingConfirmations = new PendingConfirmations[T]()
-      logger.info(s"Create confirm listener for channel $channel")
-      channel.addConfirmListener(new ConfirmListener {
-        override def handleAck(deliveryTag: Long, multiple: Boolean): Unit = {
-          logger.debug("Publish acknowledged with delivery tag {}L, multiple = {}", box(deliveryTag), box(multiple))
-          pendingConfirmations.completeConfirmation(deliveryTag, multiple)(success)
-        }
-
-        override def handleNack(deliveryTag: Long, multiple: Boolean): Unit = {
-          logger.error("Publish negatively acknowledged with delivery tag {}L, multiple = {}",
-                       box(deliveryTag),
-                       box(multiple))
-          pendingConfirmations.completeConfirmation(deliveryTag, multiple)(
-            fail(_, new RuntimeException("AMQP server returned Nack for publication")))
-        }
-      })
-      pendingConfirmations
-    }
-
-}
-
-object ChannelPublisher {
-  def apply(channel: Channel): ChannelPublisher = new ChannelPublisher(channel)
 }
