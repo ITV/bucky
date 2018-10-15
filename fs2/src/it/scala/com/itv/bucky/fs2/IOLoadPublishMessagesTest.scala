@@ -14,7 +14,7 @@ class IOLoadPublishMessagesTest
     with IOPublisherConsumerBaseTest
     with IOEffectVerification
     with IOEffectMonad {
-//  override val numberRequestInParallel = 1000
+//  override val numberRequestInParallel = 20000
 
   override def sequence[A](list: Seq[IO[A]]): IO[Seq[A]] = async.parallelSequence(list.toList)
 }

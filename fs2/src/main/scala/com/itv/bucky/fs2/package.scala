@@ -106,8 +106,9 @@ package object fs2 extends StrictLogging {
 
   def client(channel: Id[RabbitChannel])(implicit executionContext: ExecutionContext): Stream[IO, IOAmqpClient] =
     Stream.eval(for {
-      _ <- IO { logger.info(s"Using connection $channel") }
-    } yield IOAmqpClient(channel))
+      _      <- IO { logger.info(s"Using connection $channel") }
+      client <- IOAmqpClient.io(channel)
+    } yield client)
 
   def declare(declarations: List[Declaration])(amqpClient: IOAmqpClient): Stream[IO, Unit] =
     Stream.eval(IO(DeclarationExecutor(declarations, amqpClient)))
