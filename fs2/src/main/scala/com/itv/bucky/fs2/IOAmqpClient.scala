@@ -13,74 +13,91 @@ import com.rabbitmq.client.{
   Envelope => RabbitEnvelope
 }
 
-import scala.concurrent.{ExecutionContext, TimeoutException}
-import scala.concurrent.duration.{Duration, FiniteDuration}
+import scala.concurrent.ExecutionContext
+import scala.concurrent.duration._
 import scala.util.Try
 
 object IOAmqpClient extends StrictLogging {
   import com.itv.bucky.Monad._
   import _root_.fs2._
 
+  case class PublishRequest(command: PublishCommand, promise: async.Promise[IO, IO[Unit]])
+
+  val handleFailure = (f: Register, e: Exception) => f.apply(Left(e))
+
   def apply(channel: Id[RabbitChannel])(implicit executionContext: ExecutionContext): IOAmqpClient =
-    new IOAmqpClient {
-      override implicit def monad: Monad[Id] = Monad.idMonad
+    IOAmqpClient.io(channel).unsafeRunSync()
 
-      override implicit def effectMonad: MonadError[IO, Throwable] = ioMonadError
+  def io(channel: Id[RabbitChannel])(implicit executionContext: ExecutionContext): IO[IOAmqpClient] = {
 
-      override def publisher(timeout: Duration): Id[Publisher[IO, PublishCommand]] = {
-        logger.info(s"Creating publisher")
-        val handleFailure    = (f: Register, e: Exception) => f.apply(Left(e))
-        val channelPublisher = ChannelPublisher(channel)
-        val pendingConfirmations = channelPublisher.confirmListener[Register] {
-          _.apply(Right(()))
-        }(handleFailure)
+    val channelPublisher = ChannelPublisher(channel)
+    val pendingConfirmations = channelPublisher.confirmListener[Register] {
+      _.apply(Right(()))
+    }(handleFailure)
 
-        cmd =>
-          val publishing = IO.async { pendingConfirmation: Register =>
-            channelPublisher.publish[Register](cmd, pendingConfirmation, pendingConfirmations)(handleFailure)
+    for {
+      publishQueue <- async.boundedQueue[IO, PublishRequest](10)
+      _ <- async.fork(
+        publishQueue.dequeue
+          .evalMap { request =>
+            request.promise.complete(IO.async { pendingConfirmation: Register =>
+              channelPublisher.publish[Register](request.command, pendingConfirmation, pendingConfirmations)(
+                handleFailure)
+            })
           }
-          timeout match {
-            case fd: FiniteDuration =>
-              Scheduler[IO](2)
-                .flatMap { implicit s =>
-                  Stream.eval(
-                    publishing
-                      .timed(fd))
-                }
-                .attempt
-                .compile
-                .last
-                .flatMap(_.fold(IO.raiseError[Unit](new TimeoutException(s"Timed out after $fd")))(
-                  _.fold(IO.raiseError, _ => IO.unit)))
-            case _ => publishing
-          }
+          .attempt
+          .compile
+          .drain)
 
+    } yield
+      new IOAmqpClient {
+        override implicit def monad: Monad[Id] = Monad.idMonad
+
+        override implicit def effectMonad: MonadError[IO, Throwable] = ioMonadError
+
+        override def publisher(timeout: Duration): Id[Publisher[IO, PublishCommand]] =
+          cmd =>
+            for {
+              promise <- async.promise[IO, IO[Unit]]
+              _       <- publishQueue.enqueue1(PublishRequest(cmd, promise))
+              _ <- timeout match {
+                case d: FiniteDuration =>
+                  Scheduler[IO](2)
+                    .evalMap { implicit s =>
+                      promise.get.flatMap(identity).timed(d)
+                    }
+                    .compile
+                    .drain
+                case _ => promise.get.flatMap(identity)
+              }
+
+            } yield ()
+
+        import _root_.fs2.async._
+        override def consumer(queueName: QueueName,
+                              handler: Handler[IO, Delivery],
+                              actionOnFailure: ConsumeAction = DeadLetter,
+                              prefetchCount: Int = 0): IOConsumer =
+          for {
+            messages <- Stream.eval(async.unboundedQueue[IO, Delivery])
+            buildConsumer = Stream eval IO {
+              val consumer = IOConsumer(channel, queueName, messages)
+              Consumer[IO, Throwable](channel, queueName, consumer, prefetchCount)(ioMonadError)
+              consumer
+            }
+            _ <- buildConsumer
+            process <- messages.dequeue to Sink { delivery =>
+              Consumer.processDelivery(channel, queueName, handler, actionOnFailure, delivery)(ioMonadError)
+            }
+
+          } yield process
+
+        def performOps(thunk: AmqpOps => Try[Unit]): Try[Unit] = thunk(ChannelAmqpOps(channel))
+
+        def estimatedMessageCount(queueName: QueueName): Try[Int] =
+          Channel.estimateMessageCount(channel, queueName)
       }
-
-      import _root_.fs2.async._
-      override def consumer(queueName: QueueName,
-                            handler: Handler[IO, Delivery],
-                            actionOnFailure: ConsumeAction = DeadLetter,
-                            prefetchCount: Int = 0): IOConsumer =
-        for {
-          messages <- Stream.eval(async.unboundedQueue[IO, Delivery])
-          buildConsumer = Stream eval IO {
-            val consumer = IOConsumer(channel, queueName, messages)
-            Consumer[IO, Throwable](channel, queueName, consumer, prefetchCount)(ioMonadError)
-            consumer
-          }
-          _ <- buildConsumer
-          process <- messages.dequeue to Sink { delivery =>
-            Consumer.processDelivery(channel, queueName, handler, actionOnFailure, delivery)(ioMonadError)
-          }
-
-        } yield process
-
-      def performOps(thunk: (AmqpOps) => Try[Unit]): Try[Unit] = thunk(ChannelAmqpOps(channel))
-
-      def estimatedMessageCount(queueName: QueueName): Try[Int] =
-        Channel.estimateMessageCount(channel, queueName)
-    }
+  }
 
   def lifecycle(config: AmqpClientConfig)(implicit executionContext: ExecutionContext): Lifecycle[IOAmqpClient] =
     for {
