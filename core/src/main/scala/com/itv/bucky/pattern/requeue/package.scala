@@ -17,7 +17,7 @@ package object requeue {
 
     requeueDeclarations(queueName,
                         RoutingKey(queueName.value),
-                        Exchange(dlxExchangeName).binding(RoutingKey(queueName.value) -> deadLetterQueueName),
+                        Exchange(dlxExchangeName, exchangeType = Topic).binding(RoutingKey(queueName.value) -> deadLetterQueueName),
                         retryAfter)
   }
 
@@ -38,8 +38,8 @@ package object requeue {
       Queue(deadLetterQueueName),
       Queue(requeueQueueName).deadLetterExchange(redeliverExchangeName).messageTTL(retryAfter),
       deadletterExchange.binding(routingKey              -> deadLetterQueueName),
-      Exchange(requeueExchangeName).binding(routingKey   -> requeueQueueName),
-      Exchange(redeliverExchangeName).binding(routingKey -> queueName)
+      Exchange(requeueExchangeName, exchangeType = Topic).binding(routingKey   -> requeueQueueName),
+      Exchange(redeliverExchangeName, exchangeType = Topic).binding(routingKey -> queueName)
     )
   }
 
