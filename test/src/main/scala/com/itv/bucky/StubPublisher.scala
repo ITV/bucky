@@ -13,7 +13,9 @@ class StubPublisher[F[_], A](implicit F: Monad[F]) extends Publisher[F, A] {
     nextResponse = expectedResult
 
   override def apply(event: A): F[Unit] = {
-    publishedEvents += event
-    nextResponse
+    for {
+      _ <- F.apply(publishedEvents += event)
+      response <- nextResponse
+    } yield response
   }
 }
