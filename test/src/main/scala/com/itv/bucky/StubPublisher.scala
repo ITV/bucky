@@ -3,7 +3,7 @@ package com.itv.bucky
 import scala.collection.mutable.ListBuffer
 import scala.language.higherKinds
 
-class StubPublisher[F[_], A](implicit F: Monad[F]) extends Publisher[F, A] {
+class StubPublisher[F[_]: Monad, A](implicit F: Monad[F]) extends Publisher[F, A] {
 
   val publishedEvents = ListBuffer[A]()
 
@@ -13,9 +13,6 @@ class StubPublisher[F[_], A](implicit F: Monad[F]) extends Publisher[F, A] {
     nextResponse = expectedResult
 
   override def apply(event: A): F[Unit] = {
-    for {
-      _ <- F.apply(publishedEvents += event)
-      response <- nextResponse
-    } yield response
+    F.flatMap(F.apply(publishedEvents += event)) {_ => nextResponse}
   }
 }
