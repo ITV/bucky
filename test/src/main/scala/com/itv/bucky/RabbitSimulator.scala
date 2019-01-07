@@ -74,7 +74,7 @@ class RabbitSimulator[B[_]](bindings: Bindings = IdentityBindings)(implicit M: M
       consumeActionValue.onComplete { _ =>
         val publication = messagesBeingProcessed(key)
         messagesBeingProcessed -= key
-        logger.debug(s"Consume message [${publication.message.unmarshal[String]}] from ${publication.queueName}")
+        logger.info(s"Consume message [${publication.message.unmarshal[String]}] from ${publication.queueName}")
       }
       consumeActionValue
     }
@@ -90,7 +90,7 @@ class RabbitSimulator[B[_]](bindings: Bindings = IdentityBindings)(implicit M: M
     }
 
   def publish(publishCommand: PublishCommand): Future[ConsumeAction] = {
-    logger.debug(
+    logger.info(
       s"Publish message [${publishCommand.body.unmarshal[String]}] with ${publishCommand.exchange} ${publishCommand.routingKey}")
     if (isDefinedAt(publishCommand)) {
       val queueName = queueNameFor(publishCommand)
@@ -164,5 +164,4 @@ object RabbitSimulator {
 
   val stringPublishCommandBuilder  = publishCommandBuilder(StringPayloadMarshaller)
   val defaultPublishCommandBuilder = stringPublishCommandBuilder using ExchangeName("")
-
 }

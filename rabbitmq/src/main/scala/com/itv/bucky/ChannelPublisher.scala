@@ -16,7 +16,7 @@ class ChannelPublisher private (channel: Channel) extends StrictLogging {
     channel.synchronized {
       logger.debug(s"Acquire the channel: $channel")
       val deliveryTag = channel.getNextPublishSeqNo
-      logger.debug("Publishing with delivery tag {}L to {}:{} with {}: {}",
+      logger.info("Publishing with delivery tag {}L to {}:{} with {}: {}",
                    box(deliveryTag),
                    cmd.exchange,
                    cmd.routingKey,

@@ -45,13 +45,13 @@ object Consumer extends StrictLogging {
                                actionOnFailure: ConsumeAction,
                                delivery: Delivery)(implicit F: MonadError[F, E]) =
     F.map {
-      logger.debug("Received {} on {}", delivery, queueName)
+      logger.info("Received {} on {}", delivery, queueName)
       F.handleError(F.flatMap(F.apply(handler(delivery)))(identity)) { error =>
         logger.error(s"Unhandled exception processing delivery ${delivery.envelope.deliveryTag}L on $queueName", error)
         F.apply(actionOnFailure)
       }
     } { action =>
-      logger.debug("Responding with {} to {} on {}", action, delivery, queueName)
+      logger.info("Responding with {} to {} on {}", action, delivery, queueName)
       action match {
         case Ack                => channel.basicAck(delivery.envelope.deliveryTag, false)
         case DeadLetter         => channel.basicNack(delivery.envelope.deliveryTag, false, false)
