@@ -23,6 +23,10 @@ trait AmqpClient[B[_], F[_], E, C] extends BaseAmqpClient {
                      timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): B[Publisher[F, T]] =
     monad.map(publisher(timeout))(p => AmqpClient.publisherOf(builder)(p)(effectMonad))
 
+  def publisherWithHeadersOf[T](builder: PublishCommandBuilder[T],
+                                timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): B[PublisherWithHeaders[F, T]] =
+    monad.map(publisher(timeout))(p => AmqpClient.publisherWithHeadersOf(builder)(p)(effectMonad))
+
   def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): B[Publisher[F, PublishCommand]]
 
   def consumer(queueName: QueueName,
@@ -51,6 +55,17 @@ object AmqpClient extends StrictLogging {
     (message: T) =>
       F.flatMap(F.apply {
         commandBuilder.toPublishCommand(message)
+      }) { publisher }
+
+  def publisherWithHeadersOf[F[_], T](commandBuilder: PublishCommandBuilder[T])(publisher: Publisher[F, PublishCommand])(
+      implicit F: Monad[F]): PublisherWithHeaders[F, T] =
+    (message: T, headers: Map[String, AnyRef]) =>
+      F.flatMap(F.apply {
+        val command = commandBuilder.toPublishCommand(message)
+
+        command.copy(basicProperties = headers.foldLeft(command.basicProperties) {
+          case (props, (headerName, headerValue)) => props.withHeader(headerName -> headerValue)
+        })
       }) { publisher }
 
   def deliveryHandlerOf[F[_], T](

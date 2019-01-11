@@ -38,9 +38,10 @@ package object bucky {
     implicit def toMonad[F[_], A](fa: F[A])(implicit M: Monad[F]) = new MonadOps(fa)
   }
 
-  type Publisher[F[_], -T]      = T => F[Unit]
-  type Handler[F[_], -T]        = T => F[ConsumeAction]
-  type RequeueHandler[F[_], -T] = T => F[RequeueConsumeAction]
+  type Publisher[F[_], -T]            = T => F[Unit]
+  type PublisherWithHeaders[F[_], -T] = (T, Map[String, AnyRef]) => F[Unit]
+  type Handler[F[_], -T]              = T => F[ConsumeAction]
+  type RequeueHandler[F[_], -T]       = T => F[RequeueConsumeAction]
 
   object Handler {
     def apply[F[_], T](f: T => F[ConsumeAction]): Handler[F, T] = new Handler[F, T] {

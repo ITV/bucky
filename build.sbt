@@ -301,8 +301,26 @@ lazy val fs2 = project
     )
   )
 
+lazy val wiring = project
+  .settings(name := "com.itv")
+  .settings(moduleName := "bucky-wiring")
+  .settings(kernelSettings: _*)
+  .dependsOn(test, core, rabbitmq, fs2, fs2 % "test,it", test % "test,it")
+  .configs(IntegrationTest)
+  .settings(Defaults.itSettings)
+  .settings(
+    internalDependencyClasspath in IntegrationTest += Attributed.blank((classDirectory in Test).value),
+    parallelExecution in IntegrationTest := false,
+    parallelExecution in Test := false
+  )
+  .settings(
+    libraryDependencies ++= Seq(
+      "com.typesafe" % "config" % typeSafeVersion % "it"
+    )
+  )
+
 lazy val root = (project in file("."))
-  .aggregate(rabbitmq, scalaz, fs2, xml, circe, argonaut, example, test, core)
+  .aggregate(wiring, rabbitmq, scalaz, fs2, xml, circe, argonaut, example, test, core)
   .settings(publishArtifact := false)
 
 lazy val readme = scalatex
