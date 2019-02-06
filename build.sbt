@@ -7,16 +7,17 @@ name := "bucky"
 
 crossScalaVersions := Seq("2.11.8", "2.12.7")
 
-val itvLifecycleVersion = "0.16"
-val amqpClientVersion   = "4.0.2"
-val scalaLoggingVersion = "3.9.0"
+val itvLifecycleVersion = "1.0.0-RC5"
+val amqpClientVersion   = "5.6.0" //
+val scalaLoggingVersion = "3.9.2"
 val scalaTestVersion    = "3.0.5"
-val mockitoVersion      = "1.9.0"
+val mockitoVersion      = "2.24.0"
 val argonautVersion     = "6.2.2"
-val circeVersion        = "0.10.0"
-val typeSafeVersion     = "1.3.2"
-val fs2Version          = "0.10.6"
-val scalaXmlVersion     = "1.1.0"
+val circeVersion        = "0.11.1"
+val typeSafeVersion     = "1.3.3"
+val fs2Version          = "1.0.3" //1.0.3
+val catsEffectsVersion  = "1.2.0"
+val scalaXmlVersion     = "1.1.1"
 val qpidVersion         = "6.0.4"
 val scalazStreamVersion = "0.8.6a"
 
@@ -149,7 +150,10 @@ lazy val test = project
       "io.netty"                   % "netty"          % "3.4.2.Final",
       "org.scalatest"              %% "scalatest"     % scalaTestVersion,
       "co.fs2"                     %% "fs2-core"      % fs2Version,
-      "com.rabbitmq"               % "amqp-client"    % amqpClientVersion
+      "co.fs2"                     %% "fs2-io"      % fs2Version,
+      "org.typelevel"              %% "cats-effect"   % catsEffectsVersion,
+      "com.rabbitmq"               % "amqp-client"    % amqpClientVersion,
+      "org.mockito"                % "mockito-core"   % mockitoVersion
     )
   )
 
@@ -291,6 +295,8 @@ lazy val fs2 = project
   .settings(
     libraryDependencies ++= Seq(
       "co.fs2"       %% "fs2-core" % fs2Version,
+      "co.fs2"       %% "fs2-io" % fs2Version,
+      "org.typelevel" %% "cats-effect" % catsEffectsVersion ,
       "com.typesafe" % "config"    % typeSafeVersion % "it"
     )
   )

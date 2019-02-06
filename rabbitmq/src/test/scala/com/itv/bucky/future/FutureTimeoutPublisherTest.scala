@@ -5,7 +5,7 @@ import java.util.concurrent.{ScheduledExecutorService, TimeoutException}
 import com.itv.bucky.{Any, PublishCommand, Publisher}
 import com.itv.lifecycle.{ExecutorLifecycles, Lifecycle}
 import com.typesafe.scalalogging.StrictLogging
-import org.mockito.Matchers.any
+import org.mockito.ArgumentMatchers.any
 import org.mockito.Mockito.when
 import org.mockito.invocation.InvocationOnMock
 import org.mockito.stubbing.Answer
