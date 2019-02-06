@@ -10,6 +10,7 @@ import org.scalatest.{Assertion, FlatSpec}
 import org.scalatest.concurrent.Eventually._
 import org.scalatest.Matchers._
 import org.scalactic.TypeCheckedTripleEquals
+import scala.concurrent.duration._
 
 import scala.collection.mutable.ListBuffer
 import examples._
@@ -51,12 +52,13 @@ class Fs2AmqpSimulatorTest extends FlatSpec with TypeCheckedTripleEquals {
     }
   }
 
+
+  import com.itv.bucky.future.SameThreadExecutionContext.implicitly
+
   private def waitForConsumer(app: Ports) =
     IO {
-      eventually {
-        app.amqpClient.existsConsumer(RmqConfig.Source.queueName) shouldBe true
-      }
-    }
+      app.amqpClient.existsConsumer(RmqConfig.Source.queueName) shouldBe true
+    }.retry(10.millis, _ => 500.millis, 5, _ => true)
 }
 
 object Fs2AmqpSimulatorTest {
