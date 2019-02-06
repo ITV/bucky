@@ -12,7 +12,7 @@ object TestIOExt {
 
   implicit class TestIOEXt[A](io: IO[A]) {
     def status(implicit executionContext: ExecutionContext): IOStatus[A] = {
-      import _root_.fs2._
+      import _root_.fs2.{io => _, _}
       val iOStatus = IOStatus(Ref[Option[IOResult[A]]](None))
       io.runAsync(r => IO(iOStatus.complete(r))).unsafeRunSync()
       iOStatus
