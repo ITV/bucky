@@ -1,6 +1,6 @@
 package com.itv.bucky.fs2
 
-import cats.effect.{IO, Timer}
+import cats.effect.{ContextShift, IO, Timer}
 import _root_.fs2._
 import cats.effect.concurrent.Ref
 import cats.instances.future
@@ -10,8 +10,8 @@ import org.scalatest.{Assertion, FlatSpec}
 import org.scalatest.concurrent.Eventually._
 import org.scalatest.Matchers._
 import org.scalactic.TypeCheckedTripleEquals
-import scala.concurrent.duration._
 
+import scala.concurrent.duration._
 import scala.collection.mutable.ListBuffer
 import examples._
 
@@ -68,6 +68,7 @@ object Fs2AmqpSimulatorTest {
   implicit val futureMonad: MonadError[Future, Throwable] = com.itv.bucky.future.futureMonad
 
   implicit val IOTimer: Timer[IO] = IO.timer(implicitly)
+  implicit val contextShift: ContextShift[IO] = IO.contextShift(implicitly)
 
   case class Ports(amqpClient: Fs2AmqpSimulator, targetMessages: ListBuffer[Delivery], bar: IO[List[String]])
 

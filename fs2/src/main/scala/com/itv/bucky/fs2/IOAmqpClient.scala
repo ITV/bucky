@@ -33,6 +33,8 @@ object IOAmqpClient extends StrictLogging {
 
   def io(channel: Id[RabbitChannel])(implicit executionContext: ExecutionContext): IO[IOAmqpClient] = {
 
+    implicit val contextShift: ContextShift[IO] = IO.contextShift(executionContext)
+
     val channelPublisher = ChannelPublisher(channel)
     val pendingConfirmations = channelPublisher.confirmListener[Register] {
       _.apply(Right(()))

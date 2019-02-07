@@ -1,6 +1,6 @@
 package com.itv.bucky.fs2
 
-import cats.effect.{IO, Timer}
+import cats.effect.{ContextShift, IO, Timer}
 import _root_.fs2._
 import cats.effect.concurrent.Ref
 import com.itv.bucky._
@@ -110,6 +110,8 @@ object MemoryFs2AmqpSimulatorTest {
   implicit val futureMonad: MonadError[Future, Throwable] = com.itv.bucky.future.futureMonad
 
   implicit val IOTimer: Timer[IO] = IO.timer(implicitly)
+
+  implicit val contextShift: ContextShift[IO] = IO.contextShift(implicitly)
 
   case class Ports(amqpClient: MemoryAmqpSimulator[IO], targetMessages: ListBuffer[Delivery], bar: IO[List[String]])
 

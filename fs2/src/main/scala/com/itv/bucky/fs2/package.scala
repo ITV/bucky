@@ -17,9 +17,6 @@ import scala.concurrent.duration._
 import scala.util.control.NonFatal
 
 package object fs2 extends StrictLogging {
-  //Implicit conversion to get a contextShift from an ExecutionContext; needed to create a
-  // ConcurrentEffect[IO] which gets used by Stream.eval and other methods
-  implicit def toContextShift(implicit ec: ExecutionContext): ContextShift[IO] = IO.contextShift(ec)
 
   type IOAmqpClient = AmqpClient[Id, IO, Throwable, Stream[IO, Unit]]
 
@@ -33,7 +30,8 @@ package object fs2 extends StrictLogging {
 
   def closeableClientFrom(config: AmqpClientConfig, declarations: List[Declaration] = List.empty)(
       implicit executionContext: ExecutionContext)
-    : Stream[IO, AmqpClient.WithCloseable[Id, IO, Throwable, Stream[IO, Unit]]] =
+    : Stream[IO, AmqpClient.WithCloseable[Id, IO, Throwable, Stream[IO, Unit]]] = {
+    implicit val contextShift: ContextShift[IO] = IO.contextShift(executionContext)
     for {
       halted          <- Stream.eval(SignallingRef[IO, Boolean](false))
       requestShutdown <- Stream.eval(SignallingRef[IO, Boolean](false))
@@ -43,6 +41,7 @@ package object fs2 extends StrictLogging {
       client          <- client(channel).interruptWhen(requestShutdown)
       _               <- declare(declarations)(client)
     } yield AmqpClient.WithCloseable[Id, IO, Throwable, Stream[IO, Unit]](client, close(requestShutdown, halted))
+  }
 
   implicit val ioMonadError = new MonadError[IO, Throwable] {
     override def raiseError[A](e: Throwable): IO[A] = IO.raiseError(e)
@@ -123,7 +122,8 @@ package object fs2 extends StrictLogging {
       config.networkRecoveryIntervalOnStart.fold(IO(Connection(config))) { c =>
         IO(Connection(config))
           .retry(c.interval, _ => c.interval, c.numberOfRetries.toInt, _ => true)
-          .flatMap { f => IO(f.get)
+          .flatMap { f =>
+            IO(f.get)
           }
       }
   }
