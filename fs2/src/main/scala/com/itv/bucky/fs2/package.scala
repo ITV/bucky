@@ -61,18 +61,6 @@ package object fs2 extends StrictLogging {
 
   implicit class IOExt[A](io: IO[A]) {
 
-    def timed(timeoutDuration: FiniteDuration)(implicit timer: Timer[IO], ec: ExecutionContext): IO[A] =
-      for {
-        _       <- IO.shift(ec)
-        promise <- Deferred[IO, Either[Throwable, A]]
-        _       <- io.attempt.flatMap(promise.complete) //TODO: Fix the fork
-        result <- promise.get.timeout(timeoutDuration).recoverWith {
-          case _: TimeoutException => IO.raiseError(new JavaTimeoutException(s"Timed out after $timeoutDuration"))
-        }
-        value <- IO.fromEither(result)
-
-      } yield value
-
     def retry(delay: FiniteDuration,
               nextDelay: FiniteDuration => FiniteDuration,
               maxRetries: Int,

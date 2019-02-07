@@ -87,6 +87,8 @@ protected[fs2] object io extends StrictLogging {
             _ <- retryOrHandler.fold(
               retryOrFail,
               handle(message, _)
+                .runAsync(_ => IO.unit)
+                .toIO
             )
           } yield ()
 

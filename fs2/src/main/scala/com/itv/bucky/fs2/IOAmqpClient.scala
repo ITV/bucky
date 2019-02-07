@@ -50,6 +50,8 @@ object IOAmqpClient extends StrictLogging {
         .attempt
         .compile
         .drain
+        .runAsync(_ => IO.unit)
+        .toIO
 
     } yield
       new IOAmqpClient {
@@ -64,7 +66,7 @@ object IOAmqpClient extends StrictLogging {
               _       <- publishQueue.enqueue1(PublishRequest(cmd, promise))
               _ <- timeout match {
                 case d: FiniteDuration =>
-                  promise.get.flatMap(identity).timed(d)(IO.timer(executionContext), implicitly)
+                  promise.get.flatMap(identity).timeout(d)(IO.timer(executionContext), implicitly)
                 case _ => promise.get.flatMap(identity)
               }
 
