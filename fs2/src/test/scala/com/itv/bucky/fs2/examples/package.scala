@@ -35,7 +35,7 @@ package object examples {
                   .awakeEvery[IO](10.millis)
                   .evalMap(_ =>
                     IO {
-                      logger.info(s"$s")
+                      logger.debug(s"$s")
                   })
                   .compile
                   .last
