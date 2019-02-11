@@ -1,6 +1,6 @@
 package com.itv.bucky.fs2
 
-import cats.effect.IO
+import cats.effect.{ContextShift, IO, Timer}
 import com.itv.bucky.Monad.Id
 import com.itv.bucky.{AmqpClient, AmqpClientConfig}
 import com.itv.bucky.fs2.utils.{IOEffectMonad, IOEffectVerification}
@@ -16,10 +16,11 @@ class IONetworkRecoveryIntegrationTest
     with IOEffectMonad {
   import com.itv.bucky.future.SameThreadExecutionContext.implicitly
 
+  implicit val contextShift: ContextShift[IO] = IO.contextShift(implicitly)
+  implicit val timer: Timer[IO] = IO.timer(implicitly)
+
   override def schedule(f: => Unit, duration: FiniteDuration): Unit =
-    Scheduler[IO](corePoolSize = 1).flatMap(_.delay(Stream.eval(IO(f)), duration)).compile.drain.unsafeRunAsync { _ =>
-      ()
-    }
+    Stream.fixedDelay(duration).map(_ => f).head.compile.drain.unsafeRunAsync(_ => ())
 
   override def buildLifecycle(config: AmqpClientConfig): Lifecycle[AmqpClient[Id, IO, Throwable, IOConsumer]] =
     IOAmqpClient.lifecycle(config)

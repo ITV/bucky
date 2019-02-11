@@ -1,20 +1,23 @@
 package com.itv.bucky
 
-import java.util.concurrent.TimeoutException
+import java.util.concurrent.{TimeoutException => JavaTimeoutException}
 
-import cats.effect.IO
+import cats.effect.{ContextShift, IO, Timer}
 import _root_.fs2._
-import _root_.fs2.async.mutable._
-import cats.implicits._
+import _root_.fs2.concurrent.SignallingRef
+import cats.effect.concurrent.Deferred
 import com.itv.bucky.Monad.Id
 import com.itv.bucky.decl.{Declaration, DeclarationExecutor}
 import com.rabbitmq.client.{Channel => RabbitChannel, Connection => RabbitConnection}
 import com.typesafe.scalalogging.StrictLogging
+import cats.implicits._
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, TimeoutException}
 import scala.concurrent.duration._
+import scala.util.control.NonFatal
 
 package object fs2 extends StrictLogging {
+
   type IOAmqpClient = AmqpClient[Id, IO, Throwable, Stream[IO, Unit]]
 
   type Register = Either[Throwable, Unit] => Unit
@@ -27,16 +30,18 @@ package object fs2 extends StrictLogging {
 
   def closeableClientFrom(config: AmqpClientConfig, declarations: List[Declaration] = List.empty)(
       implicit executionContext: ExecutionContext)
-    : Stream[IO, AmqpClient.WithCloseable[Id, IO, Throwable, Stream[IO, Unit]]] =
+    : Stream[IO, AmqpClient.WithCloseable[Id, IO, Throwable, Stream[IO, Unit]]] = {
+    implicit val contextShift: ContextShift[IO] = IO.contextShift(executionContext)
     for {
-      halted          <- Stream.eval(async.signalOf[IO, Boolean](false))
-      requestShutdown <- Stream.eval(async.signalOf[IO, Boolean](false))
+      halted          <- Stream.eval(SignallingRef[IO, Boolean](false))
+      requestShutdown <- Stream.eval(SignallingRef[IO, Boolean](false))
       _               <- addShutdownHook(requestShutdown, halted)
       connection      <- connection(config, halted)
       channel         <- channel(connection)
       client          <- client(channel).interruptWhen(requestShutdown)
       _               <- declare(declarations)(client)
     } yield AmqpClient.WithCloseable[Id, IO, Throwable, Stream[IO, Unit]](client, close(requestShutdown, halted))
+  }
 
   implicit val ioMonadError = new MonadError[IO, Throwable] {
     override def raiseError[A](e: Throwable): IO[A] = IO.raiseError(e)
@@ -55,65 +60,47 @@ package object fs2 extends StrictLogging {
 
   implicit class IOExt[A](io: IO[A]) {
 
-    def timed(timeout: FiniteDuration)(implicit s: Scheduler, ec: ExecutionContext): IO[A] =
-      for {
-        promise <- async.promise[IO, Either[Throwable, A]]
-        _       <- async.fork(io.attempt.flatMap(promise.complete))
-        a <- promise
-          .timedGet(timeout, s)
-          .flatMap(
-            _.fold[IO[A]](IO.raiseError(new TimeoutException(s"Timed out after $timeout")))(
-              _.fold(IO.raiseError[A], a => IO(a))))
-      } yield a
-
     def retry(delay: FiniteDuration,
               nextDelay: FiniteDuration => FiniteDuration,
               maxRetries: Int,
-              retriable: Throwable => Boolean = internal.NonFatal.apply)(implicit executionContext: ExecutionContext) =
-      Scheduler
-        .apply[IO](1)
-        .flatMap(_.retry(io, delay, nextDelay, maxRetries, retriable))
+              retriable: Throwable => Boolean = NonFatal.apply)(implicit executionContext: ExecutionContext) =
+      Stream
+        .retry(io, delay, nextDelay, maxRetries, retriable)(IO.timer(executionContext), implicitly)
         .compile
         .last
   }
 
-  def connection(config: AmqpClientConfig, halted: Signal[IO, Boolean])(
+  def connection(config: AmqpClientConfig, halted: SignallingRef[IO, Boolean])(
       implicit executionContext: ExecutionContext): Stream[IO, RabbitConnection] =
     for {
-      connection <- Stream.bracket(IOConnection(config))(
-        connection => Stream.emit(connection),
-        connection =>
-          for {
-            _ <- IO {
-              logger.info(s"Closing connection ...")
-              Connection.close(connection)
-            }
-            _ <- halted.set(true)
-          } yield ()
-      )
+      connection <- Stream.bracket(IOConnection(config))(connection =>
+        for {
+          _ <- IO {
+            logger.info(s"Closing connection ...")
+            Connection.close(connection)
+          }
+          _ <- halted.set(true)
+        } yield ())
     } yield connection
 
-  def channel(connnection: Id[RabbitConnection])(
-      implicit executionContext: ExecutionContext): Stream[IO, RabbitChannel] =
-    Stream.bracket(IO(Channel(connnection)))(
-      channel => Stream.emit(channel),
-      channel =>
-        IO {
-          logger.info(s"Closing channel ...")
-          Channel.close(channel)
-      }
-    )
+  def channel(connection: RabbitConnection)(implicit executionContext: ExecutionContext): Stream[IO, RabbitChannel] =
+    Stream.bracket(IO(Channel(connection)))(channel =>
+      IO {
+        logger.info(s"Closing channel ...")
+        Channel.close(channel)
+    })
 
   def client(channel: Id[RabbitChannel])(implicit executionContext: ExecutionContext): Stream[IO, IOAmqpClient] =
     Stream.eval(for {
-      _      <- IO { logger.info(s"Using connection $channel") }
+      _      <- IO(logger.info(s"Using connection $channel"))
       client <- IOAmqpClient.io(channel)
     } yield client)
 
   def declare(declarations: List[Declaration])(amqpClient: IOAmqpClient): Stream[IO, Unit] =
     Stream.eval(IO(DeclarationExecutor(declarations, amqpClient)))
 
-  private def addShutdownHook(requestShutdown: Signal[IO, Boolean], halted: Signal[IO, Boolean]): Stream[IO, Unit] =
+  private def addShutdownHook(requestShutdown: SignallingRef[IO, Boolean],
+                              halted: SignallingRef[IO, Boolean]): Stream[IO, Unit] =
     Stream.eval(IO {
       sys.addShutdownHook {
         close(requestShutdown, halted).unsafeRunSync()
@@ -121,12 +108,14 @@ package object fs2 extends StrictLogging {
       ()
     })
 
-  private def close(requestShutdown: Signal[IO, Boolean], halted: Signal[IO, Boolean]): IO[Unit] =
-    requestShutdown.set(true).runAsync(_ => IO.unit) >>
-      halted.discrete
+  private def close(requestShutdown: SignallingRef[IO, Boolean], halted: SignallingRef[IO, Boolean]): IO[Unit] =
+    for {
+      _ <- requestShutdown.set(true).runAsync(_ => IO.unit).toIO
+      _ <- halted.discrete
         .takeWhile(_ == false)
         .compile
         .drain
+    } yield ()
 
   object IOConnection {
     def apply(config: AmqpClientConfig)(implicit executionContext: ExecutionContext): IO[RabbitConnection] =

@@ -4,45 +4,44 @@ import com.itv.bucky.Monad.Id
 import com.itv.bucky._
 import com.itv.bucky.decl._
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, TimeoutException}
 import scala.concurrent.duration._
 import scala.util.Try
-
 import com.typesafe.scalalogging.StrictLogging
-
-import _root_.fs2._
-import _root_.fs2.async
-
+import cats.effect.concurrent.{Deferred, Ref}
 import cats.data.EitherT
-import cats.effect.IO
 import cats.effect._
+import fs2.concurrent.SignallingRef
+import fs2._
 import cats.implicits._
+import cats.effect._
 
 protected[fs2] object io extends StrictLogging {
 
   import Message._
 
   def apply(config: MemoryAmqpSimulator.Config)(implicit executionContext: ExecutionContext,
-                                                scheduler: Scheduler,
+                                                timer: Timer[IO],
                                                 idMonad: Monad[Id],
                                                 ioMonadError: MonadError[IO, Throwable],
-                                                F: Sync[IO]): IO[MemoryAmqpSimulator[IO]] =
+                                                F: Sync[IO]): IO[MemoryAmqpSimulator[IO]] = {
+    implicit val cs: ContextShift[IO] = IO.contextShift(executionContext)
     for {
-      sourceMessages <- async.refOf(List.empty[Message.Source])
-      bindings       <- async.refOf(List.empty[Binding])
-      consumers      <- async.refOf(Map.empty[QueueName, Handler[IO, Delivery]])
-      deliveryTagInc <- async.signalOf[IO, Int](0)
+      sourceMessages <- Ref.of(List.empty[Message.Source])
+      bindings       <- Ref.of(List.empty[Binding])
+      consumers      <- Ref.of(Map.empty[QueueName, Handler[IO, Delivery]])
+      deliveryTagInc <- SignallingRef[IO, Int](0)
     } yield
       new MemoryAmqpSimulator[IO] {
 
         override implicit def effectMonad: MonadError[IO, Throwable] = ioMonadError
         override implicit def monad: Monad[Id]                       = idMonad
 
-        override def publish(publishCommand: PublishCommand): IO[async.Promise[IO, ConsumeActionResult]] =
+        override def publish(publishCommand: PublishCommand): IO[Deferred[IO, ConsumeActionResult]] =
           for {
-            promise <- async.promise[IO, ConsumeActionResult]
+            promise <- Deferred[IO, ConsumeActionResult]
             message = Message.Source(publishCommand, promise)
-            _ <- sourceMessages.modify(_.+:(message))
+            _ <- sourceMessages.update(_.+:(message))
             _ <- IO { logger.info(s"Message published: ${publishCommand.show}") }
             _ <- processNext(message)
           } yield promise
@@ -55,7 +54,7 @@ protected[fs2] object io extends StrictLogging {
         override def waitForMessagesToBeProcessed(timeout: FiniteDuration): IO[List[ConsumeActionResult]] =
           sourceMessages.get.flatMap(
             _.traverse(
-              message => completePromiseOrTimeout(message.promise, message.publishCommand, timeout)
+              message => completePromiseOrTimeout(message.deferred, message.publishCommand, timeout)
             ))
 
         override def publisher(timeout: Duration): Publisher[IO, PublishCommand] =
@@ -66,20 +65,20 @@ protected[fs2] object io extends StrictLogging {
                               exceptionalAction: ConsumeAction,
                               prefetchCount: Int): Stream[IO, Unit] =
           Stream
-            .eval(consumers.modify(_ + (queueName -> handler)).void)
-            .observe1(_ => IO { logger.info(s"Consumer ready in $queueName") })
+            .eval(consumers.update(_ + (queueName -> handler)).void)
+            .evalTap(_ => IO { logger.info(s"Consumer ready in $queueName") })
 
         override def performOps(thunk: AmqpOps => Try[Unit]): Try[Unit] =
           thunk(amqpOpsFor(x => Try { addBinding(x).unsafeRunSync() }))
 
         override def estimatedMessageCount(queueName: QueueName): Try[Int] = Try(0)
 
-        private def addBinding(binding: Binding) = bindings.modify(_.+:(binding))
+        private def addBinding(binding: Binding) = bindings.update(_.+:(binding))
 
         private def bindingFor(message: Message): List[Binding] => Option[Binding] = _.find { b =>
           val publishCommand = Message.sourceFrom(message).publishCommand
           publishCommand.routingKey == b.routingKey &&
-          publishCommand.exchange == b.exchangeName
+            publishCommand.exchange == b.exchangeName
         }
 
         private def processNext(message: Message): IO[Unit] =
@@ -88,6 +87,8 @@ protected[fs2] object io extends StrictLogging {
             _ <- retryOrHandler.fold(
               retryOrFail,
               handle(message, _)
+                .runAsync(_ => IO.unit)
+                .toIO
             )
           } yield ()
 
@@ -121,37 +122,35 @@ protected[fs2] object io extends StrictLogging {
               }
             )
           else
-            (scheduler.sleep_[IO](config.retryPolicy.sleep) ++ Stream.eval(processNext(message))).compile.last.void
+            (Stream.sleep_[IO](config.retryPolicy.sleep) ++ Stream.eval(processNext(message))).compile.last.void
 
         private def handle(message: Message, handler: Handler[IO, Delivery]): IO[Unit] =
           for {
-            next <- deliveryTagInc.modify(_ + 1)
-            _ <- async.fork(
-              handler(deliveryFor(next, Message.sourceFrom(message)))
-                .flatMap(x => completePromise(message, x.result)))
+            next <- deliveryTagInc.modify(dt => (dt + 1, dt + 1))
+            p    <- handler(deliveryFor(next, Message.sourceFrom(message)))
+            _    <- completePromise(message, p.result)
           } yield ()
 
-        private def deliveryFor(next: async.Ref.Change[Int], source: Message.Source): Delivery =
+        private def deliveryFor(next: Int, source: Message.Source): Delivery =
           Delivery(
             source.publishCommand.body,
             ConsumerTag("ctag"),
-            Envelope(next.now, redeliver = false, source.publishCommand.exchange, source.publishCommand.routingKey),
+            Envelope(next, redeliver = false, source.publishCommand.exchange, source.publishCommand.routingKey),
             source.publishCommand.basicProperties
           )
 
-        private def completePromiseOrTimeout(promise: async.Promise[IO, ConsumeActionResult],
+        private def completePromiseOrTimeout(promise: Deferred[IO, ConsumeActionResult],
                                              publishCommand: PublishCommand,
                                              timeout: FiniteDuration): IO[ConsumeActionResult] =
-          promise
-            .timedGet(timeout, scheduler)
-            .flatMap(
-              _.fold(timeoutFor(publishCommand, timeout))(
-                IO.pure
-              ))
+          promise.get
+            .timeout(timeout)
+            .recoverWith {
+              case _: TimeoutException => timeoutFor(publishCommand, timeout)
+            }
 
         private def completePromise(message: Message, consumeActionResult: ConsumeActionResult): IO[Unit] =
           for {
-            _ <- Message.sourceFrom(message).promise.complete(consumeActionResult)
+            _ <- Message.sourceFrom(message).deferred.complete(consumeActionResult)
             _ <- showResult(Message.sourceFrom(message).publishCommand, consumeActionResult)
           } yield ()
 
@@ -165,5 +164,7 @@ protected[fs2] object io extends StrictLogging {
           }
 
       }
+  }
+
 
 }

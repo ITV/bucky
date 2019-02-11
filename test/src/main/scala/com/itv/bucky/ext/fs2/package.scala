@@ -2,12 +2,12 @@ package com.itv.bucky.ext
 
 import _root_.fs2._
 import cats.Show
+import cats.effect.concurrent.Deferred
 import cats.implicits._
-import cats.effect.{IO, Sync}
+import cats.effect._
 import com.itv.bucky.Monad.Id
 import com.itv.bucky._
 import com.itv.bucky.decl._
-
 import com.typesafe.scalalogging.StrictLogging
 import org.scalatest.Assertion
 
@@ -16,11 +16,12 @@ import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Random, Try}
 import scala.language.higherKinds
+import _root_.fs2.concurrent.SignallingRef
 
 package object fs2 {
 
   trait MemoryAmqpSimulator[F[_]] extends AmqpClient[Id, IO, Throwable, Stream[IO, Unit]] {
-    def publish(publishCommand: PublishCommand): F[async.Promise[F, ConsumeActionResult]]
+    def publish(publishCommand: PublishCommand): F[Deferred[F, ConsumeActionResult]]
 
     def publishAndWait(publishCommand: PublishCommand, timeout: FiniteDuration): F[ConsumeActionResult]
 
@@ -80,8 +81,8 @@ package object fs2 {
 
   protected[fs2] object Message {
 
-    case class Source(publishCommand: PublishCommand, promise: async.Promise[IO, ConsumeActionResult]) extends Message
-    case class Retry(source: Source, retries: Int, issue: Issue)                                       extends Message
+    case class Source(publishCommand: PublishCommand, deferred: Deferred[IO, ConsumeActionResult]) extends Message
+    case class Retry(source: Source, retries: Int, issue: Issue)                                   extends Message
 
     def sourceFrom(message: Message): Message.Source = message match {
       case Retry(source, _, _)   => source
@@ -135,7 +136,7 @@ package object fs2 {
 
   def rabbitSimulator(config: MemoryAmqpSimulator.Config = MemoryAmqpSimulator.Config.default)(
       implicit executionContext: ExecutionContext,
-      scheduler: Scheduler,
+      timer: Timer[IO],
       idMonad: Monad[Id],
       ioMonadError: MonadError[IO, Throwable],
       F: Sync[IO]): IO[MemoryAmqpSimulator[IO]] =
@@ -147,9 +148,11 @@ package object fs2 {
                 routingKey: RoutingKey,
                 queueName: QueueName = QueueName(s"queue-${Random.nextInt(1000)}"))(
         implicit executionContext: ExecutionContext,
-        ioMonadError: MonadError[IO, Throwable]): Stream[IO, ListBuffer[Delivery]] = {
-      val stubConsumeHandler = new StubConsumeHandler[IO, Delivery]()(ioMonadError)
-
+        ioMonadError: MonadError[IO, Throwable],
+        F: Sync[IO]
+    ): Stream[IO, ListBuffer[Delivery]] = {
+      val stubConsumeHandler            = new StubConsumeHandler[IO, Delivery]()(ioMonadError)
+      implicit val cs: ContextShift[IO] = IO.contextShift(executionContext)
       Stream
         .eval(IO(stubConsumeHandler.receivedMessages))
         .concurrently(
@@ -183,7 +186,8 @@ package object fs2 {
   def withSimulator[P](declarations: Iterable[Declaration] = List.empty)(ports: Fs2AmqpSimulator => Stream[IO, P])(
       test: P => IO[Assertion])(implicit executionContext: ExecutionContext,
                                 ioMonadError: MonadError[IO, Throwable],
-                                futureMonad: MonadError[Future, Throwable]): Unit = {
+                                futureMonad: MonadError[Future, Throwable],
+                                F: Sync[IO]): Unit = {
     val amqpClient = rabbitSimulator
     simulate(declarations, amqpClient, ports(amqpClient), test).compile.last.unsafeRunSync()
   }
@@ -192,23 +196,30 @@ package object fs2 {
                            config: MemoryAmqpSimulator.Config = MemoryAmqpSimulator.Config.default)(
       ports: MemoryAmqpSimulator[IO] => Stream[IO, P])(test: P => IO[Assertion])(
       implicit executionContext: ExecutionContext,
-      scheduler: Scheduler,
-      ioMonadError: MonadError[IO, Throwable]): Stream[IO, Unit] =
+      timer: Timer[IO],
+      ioMonadError: MonadError[IO, Throwable],
+      F: Sync[IO]
+  ): Stream[IO, Unit] =
     for {
       amqpClient <- Stream.eval(rabbitSimulator(config))
       _          <- simulate(declarations, amqpClient, ports(amqpClient), test)
     } yield ()
 
-  private def simulate[P](declarations: Iterable[Declaration] = List.empty,
-                          amqpClient: AmqpClient[Id, IO, Throwable, Stream[IO, Unit]],
-                          ports: Stream[IO, P],
-                          test: P => IO[Assertion])(implicit executionContext: ExecutionContext): Stream[IO, Unit] =
+  private def simulate[P](
+      declarations: Iterable[Declaration] = List.empty,
+      amqpClient: AmqpClient[Id, IO, Throwable, Stream[IO, Unit]],
+      ports: Stream[IO, P],
+      test: P => IO[Assertion])(implicit executionContext: ExecutionContext, F: Sync[IO]): Stream[IO, Unit] = {
+    implicit val cs: ContextShift[IO] = IO.contextShift(executionContext)
+
     for {
-      halted <- Stream.eval(async.signalOf[IO, Boolean](false))
+      halted <- Stream.eval(SignallingRef[IO, Boolean](false))
       _      <- Stream.eval(IO(DeclarationExecutor(declarations, amqpClient)))
       ports  <- ports.interruptWhen(halted)
       _      <- Stream.eval(test(ports))
       _      <- Stream.eval(halted.set(true))
     } yield ()
+  }
+
 
 }

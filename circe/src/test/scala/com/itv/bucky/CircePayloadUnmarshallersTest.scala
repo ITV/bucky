@@ -5,6 +5,7 @@ import io.circe.generic.auto._
 import io.circe.syntax._
 import PayloadMarshaller.StringPayloadMarshaller
 import Unmarshaller.StringPayloadUnmarshaller
+import com.itv.bucky.UnmarshalResult.Failure
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 
@@ -27,9 +28,8 @@ class CircePayloadUnmarshallersTest extends FunSuite {
 
   test("it should not parse an invalid json") {
     val payload = invalidJson()
-    val failure = unmarshallerFromDecodeJson[Json].unmarshal(payload).failure
+    unmarshallerFromDecodeJson[Json].unmarshal(payload) shouldBe a[Failure]
 
-    failure should include("< (line 1, column 1)")
   }
 
   test(s"it should convert to a type") {
@@ -42,9 +42,8 @@ class CircePayloadUnmarshallersTest extends FunSuite {
 
   test("it should not parse to a type with an invalid json") {
     val payload    = invalidJson()
-    val jsonResult = unmarshallerFromDecodeJson[Some].unmarshal(payload).failure
+    unmarshallerFromDecodeJson[Some].unmarshal(payload) shouldBe a[Failure]
 
-    jsonResult should include("< (line 1, column 1)")
   }
 
   test("can implicitly unmarshal a json") {

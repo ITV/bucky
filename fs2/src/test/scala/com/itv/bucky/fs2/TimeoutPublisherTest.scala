@@ -31,7 +31,7 @@ class TimeoutPublisherTest extends FunSuite with ScalaFutures with StrictLogging
       .fold(
         exception => {
           exception shouldBe a[TimeoutException]
-          exception.getMessage should include("Timed out").and(include("10 milliseconds"))
+          exception.getMessage should include("10 milliseconds")
         },
         _ => fail("It should not publish the message")
       )

@@ -1,17 +1,21 @@
 package com.itv.bucky.fs2
 
-import cats.effect.IO
+import cats.effect.{ContextShift, IO, Timer}
 import _root_.fs2._
+import cats.effect.concurrent.Ref
+import cats.instances.future
 import com.itv.bucky._
 import com.itv.bucky.ext.fs2._
-
 import org.scalatest.{Assertion, FlatSpec}
 import org.scalatest.concurrent.Eventually._
 import org.scalatest.Matchers._
 import org.scalactic.TypeCheckedTripleEquals
 
+import scala.concurrent.duration._
 import scala.collection.mutable.ListBuffer
 import examples._
+
+import scala.concurrent.{ExecutionContext, Future}
 
 class Fs2AmqpSimulatorTest extends FlatSpec with TypeCheckedTripleEquals {
   import UnmarshalResultOps._
@@ -48,18 +52,23 @@ class Fs2AmqpSimulatorTest extends FlatSpec with TypeCheckedTripleEquals {
     }
   }
 
+
+  import com.itv.bucky.future.SameThreadExecutionContext.implicitly
+
   private def waitForConsumer(app: Ports) =
     IO {
-      eventually {
-        app.amqpClient.existsConsumer(RmqConfig.Source.queueName) shouldBe true
-      }
-    }
+      app.amqpClient.existsConsumer(RmqConfig.Source.queueName) shouldBe true
+    }.retry(10.millis, _ => 500.millis, 5, _ => true)
 }
 
 object Fs2AmqpSimulatorTest {
   import App._
+
   import com.itv.bucky.future.SameThreadExecutionContext.implicitly
-  implicit val futureMonad = future.futureMonad
+  implicit val futureMonad: MonadError[Future, Throwable] = com.itv.bucky.future.futureMonad
+
+  implicit val IOTimer: Timer[IO] = IO.timer(implicitly)
+  implicit val contextShift: ContextShift[IO] = IO.contextShift(implicitly)
 
   case class Ports(amqpClient: Fs2AmqpSimulator, targetMessages: ListBuffer[Delivery], bar: IO[List[String]])
 
@@ -67,21 +76,19 @@ object Fs2AmqpSimulatorTest {
     withSimulator(RmqConfig.all)(buildPorts)(f)
 
   def buildPorts(amqpClient: Fs2AmqpSimulator) =
-    Scheduler[IO](2).flatMap { implicit scheduler =>
-      for {
-        ref <- Stream.eval(async.refOf[IO, List[String]](List.empty))
-        app = App(amqpClient, new Bar {
-          override def add(message: String): IO[Unit] = ref.modify(_.:+(message)).map(_ => ())
-        })
+    for {
+      ref <- Stream.eval(Ref.of[IO, List[String]](List.empty))
+      app = App(amqpClient, new Bar {
+        override def add(message: String): IO[Unit] = ref.modify(messages => messages.:+(message) -> messages.:+(message) ).map(_ => ())
+      })
 
-        messages <- amqpClient.consume(RmqConfig.Target.exchangeName,
-                                       RmqConfig.Target.routingKey,
-                                       RmqConfig.Target.queueName)
+      messages <- amqpClient.consume(RmqConfig.Target.exchangeName,
+        RmqConfig.Target.routingKey,
+        RmqConfig.Target.queueName)
 
-        ports <- Stream
-          .eval(IO(Ports(amqpClient, messages, ref.get)))
-          .concurrently(app.amqp)
-      } yield ports
-    }
+      ports <- Stream
+        .eval(IO(Ports(amqpClient, messages, ref.get)))
+        .concurrently(app.amqp)
+    } yield ports
 
 }

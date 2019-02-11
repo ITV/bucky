@@ -1,9 +1,8 @@
 package com.itv.bucky.fs2
 
-import cats.effect.IO
+import cats.effect.{ContextShift, IO}
 import com.itv.bucky.fs2.utils._
 import com.itv.bucky.suite.LoadPublishMessagesTest
-import _root_.fs2.async
 
 import scala.language.higherKinds
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -16,5 +15,7 @@ class IOLoadPublishMessagesTest
     with IOEffectMonad {
 //  override val numberRequestInParallel = 20000
 
-  override def sequence[A](list: Seq[IO[A]]): IO[Seq[A]] = async.parallelSequence(list.toList)
+  implicit val contextShift: ContextShift[IO] = IO.contextShift(implicitly)
+
+  override def sequence[A](list: Seq[IO[A]]): IO[Seq[A]] = list.toList.parSequence
 }

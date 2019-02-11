@@ -3,13 +3,25 @@ package com.itv.bucky
 import com.google.common.util.concurrent.MoreExecutors
 import com.rabbitmq.client.impl.AMQImpl.Basic.ConsumeOk
 import com.rabbitmq.client.impl.AMQImpl.Confirm.SelectOk
-import com.rabbitmq.client.impl.{AMQCommand, ChannelN, ConsumerWorkService}
-import com.rabbitmq.client.{AMQP, Method, MessageProperties => RMessageProperties}
+import com.rabbitmq.client.impl._
+import com.rabbitmq.client.{AMQP, Method, TrafficListener, MessageProperties => RMessageProperties}
+import org.scalatest.Matchers
+import org.scalatest.mockito.MockitoSugar
 
 import scala.collection.mutable.ListBuffer
 
+private[this] object StubConnection extends MockitoSugar with Matchers {
+  import org.mockito.Mockito.when
+  val stubConnection: AMQConnection = mock[com.rabbitmq.client.impl.AMQConnection]
+  when(stubConnection.getChannelRpcTimeout).thenReturn(1)
+  when(stubConnection.getTrafficListener).thenReturn(TrafficListener.NO_OP)
+
+}
+
 class StubChannel
-    extends ChannelN(null, 0, new ConsumerWorkService(MoreExecutors.newDirectExecutorService(), null, 1)) {
+    extends ChannelN(StubConnection.stubConnection,
+                     0,
+                     new ConsumerWorkService(MoreExecutors.newDirectExecutorService(), null, 1)) {
 
   val transmittedCommands: ListBuffer[Method]   = ListBuffer.empty
   val consumers: ListBuffer[AMQP.Basic.Consume] = ListBuffer.empty

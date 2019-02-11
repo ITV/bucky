@@ -1,10 +1,9 @@
 package com.itv.bucky.fs2
-import cats.effect.{IO, Sync}
+import cats.effect.{IO, Sync, Timer}
 import com.itv.bucky._
 import com.itv.bucky.decl.{Exchange, Topic}
 import com.itv.bucky.pattern.requeue.requeueDeclarations
-import _root_.fs2.{Scheduler, Stream}
-
+import _root_.fs2.Stream
 import com.typesafe.scalalogging.StrictLogging
 
 import scala.concurrent.ExecutionContext
@@ -24,7 +23,7 @@ package object examples {
     }
 
     def apply(amqpClient: IOAmqpClient,
-              bar: Bar)(implicit executionContext: ExecutionContext, scheduler: Scheduler, F: Sync[IO]) =
+              bar: Bar)(implicit executionContext: ExecutionContext, timer: Timer[IO], F: Sync[IO]) =
       new App with StrictLogging {
         override def amqp = amqpClient.consumer(
           RmqConfig.Source.queueName,
@@ -32,7 +31,7 @@ package object examples {
             _.body.unmarshal[String].success match {
               case s if s.startsWith("bar") => bar.add(s).map(_ => Ack)
               case s if s.startsWith("no_end") =>
-                scheduler
+                Stream
                   .awakeEvery[IO](10.millis)
                   .evalMap(_ =>
                     IO {
