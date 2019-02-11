@@ -9,7 +9,7 @@ crossScalaVersions := Seq("2.11.8", "2.12.7")
 
 val itvLifecycleVersion = "1.0.0-RC5"
 val amqpClientVersion   = "5.6.0" //
-val scalaLoggingVersion = "3.9.2"
+val scalaLoggingVersion = "3.9.0"
 val scalaTestVersion    = "3.0.5"
 val mockitoVersion      = "2.24.0"
 val argonautVersion     = "6.2.2"
