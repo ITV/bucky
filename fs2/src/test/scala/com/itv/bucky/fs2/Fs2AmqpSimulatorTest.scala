@@ -17,6 +17,7 @@ import examples._
 
 import scala.concurrent.{ExecutionContext, Future}
 
+@deprecated("", "")
 class Fs2AmqpSimulatorTest extends FlatSpec with TypeCheckedTripleEquals {
   import UnmarshalResultOps._
   import Fs2AmqpSimulatorTest._
@@ -61,6 +62,7 @@ class Fs2AmqpSimulatorTest extends FlatSpec with TypeCheckedTripleEquals {
     }.retry(10.millis, _ => 500.millis, 5, _ => true)
 }
 
+@deprecated("", "")
 object Fs2AmqpSimulatorTest {
   import App._
 
