@@ -15,8 +15,8 @@ import cats.syntax.traverse._
 import cats.instances.list._
 import _root_.fs2.Stream
 
-class SuperSyncSimulator(implicit executionContext: ExecutionContext, idMonad: Monad[Id],
-                          ioMonadError: MonadError[IO, Throwable])
+class SuperSyncSimulator(implicit idMonad: Monad[Id],
+                         ioMonadError: MonadError[IO, Throwable])
   extends AmqpClient[Id, IO, Throwable, Stream[IO, Unit]]
     with StrictLogging {
 
