@@ -15,6 +15,7 @@ import examples._
 
 import scala.concurrent.Future
 
+@deprecated("", "")
 class MemoryFs2AmqpSimulatorTest extends FlatSpec with TypeCheckedTripleEquals with StrictLogging {
   import UnmarshalResultOps._
   import MemoryFs2AmqpSimulatorTest._
@@ -103,6 +104,7 @@ class MemoryFs2AmqpSimulatorTest extends FlatSpec with TypeCheckedTripleEquals w
 
 }
 
+@deprecated("", "")
 object MemoryFs2AmqpSimulatorTest {
   import App._
   import com.itv.bucky.future.SameThreadExecutionContext.implicitly

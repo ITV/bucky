@@ -129,11 +129,13 @@ package object fs2 {
 
   type Fs2AmqpSimulator = AmqpSimulator[Id, IO, Throwable, Stream[IO, Unit]]
 
+  @deprecated("Please use com.itv.bucky.ext.fs2.supersync.SuperSyncSimulator instead - other simulators have known concurrency issues that will make your tests flakey", "2019-02-13")
   def rabbitSimulator(implicit executionContext: ExecutionContext,
                       ioMonadError: MonadError[IO, Throwable],
                       futureMonad: MonadError[Future, Throwable]): Fs2AmqpSimulator =
     old.rabbitSimulator
 
+  @deprecated("Please use com.itv.bucky.ext.fs2.supersync.SuperSyncSimulator instead - other simulators have known concurrency issues that will make your tests flakey", "2019-02-13")
   def rabbitSimulator(config: MemoryAmqpSimulator.Config = MemoryAmqpSimulator.Config.default)(
       implicit executionContext: ExecutionContext,
       timer: Timer[IO],
@@ -183,6 +185,7 @@ package object fs2 {
       override def bindExchange(binding: ExchangeBinding): Try[Unit] = Try(())
     }
 
+  @deprecated("Please use com.itv.bucky.ext.fs2.supersync.SuperSyncSimulator instead - other simulators have known concurrency issues that will make your tests flakey", "2019-02-13")
   def withSimulator[P](declarations: Iterable[Declaration] = List.empty)(ports: Fs2AmqpSimulator => Stream[IO, P])(
       test: P => IO[Assertion])(implicit executionContext: ExecutionContext,
                                 ioMonadError: MonadError[IO, Throwable],
@@ -192,6 +195,7 @@ package object fs2 {
     simulate(declarations, amqpClient, ports(amqpClient), test).compile.last.unsafeRunSync()
   }
 
+  @deprecated("Please use com.itv.bucky.ext.fs2.supersync.SuperSyncSimulator instead - other simulators have known concurrency issues that will make your tests flakey", "2019-02-13")
   def withSafeSimulator[P](declarations: Iterable[Declaration] = List.empty,
                            config: MemoryAmqpSimulator.Config = MemoryAmqpSimulator.Config.default)(
       ports: MemoryAmqpSimulator[IO] => Stream[IO, P])(test: P => IO[Assertion])(

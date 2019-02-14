@@ -12,6 +12,7 @@ import scala.util.Try
 object old {
   import _root_.fs2._
 
+  @deprecated("Please use com.itv.bucky.ext.fs2.supersync.SuperSyncSimulator instead - other simulators have known concurrency issues that will make your tests flakey", "2019-02-13")
   def rabbitSimulator(implicit executionContext: ExecutionContext,
                       ioMonadError: MonadError[IO, Throwable],
                       futureMonad: MonadError[Future, Throwable]): Fs2AmqpSimulator =

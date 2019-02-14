@@ -20,6 +20,7 @@ protected[fs2] object io extends StrictLogging {
 
   import Message._
 
+  @deprecated("Please use com.itv.bucky.ext.fs2.supersync.SuperSyncSimulator instead - other simulators have known concurrency issues that will make your tests flakey", "2019-02-13")
   def apply(config: MemoryAmqpSimulator.Config)(implicit executionContext: ExecutionContext,
                                                 timer: Timer[IO],
                                                 idMonad: Monad[Id],
