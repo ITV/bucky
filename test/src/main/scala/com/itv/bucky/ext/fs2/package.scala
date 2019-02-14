@@ -144,34 +144,6 @@ package object fs2 {
       F: Sync[IO]): IO[MemoryAmqpSimulator[IO]] =
     io.apply(config)
 
-  implicit class RabbitSimulatorExt(amqpClient: AmqpClient[Id, IO, Throwable, Stream[IO, Unit]]) extends StrictLogging {
-
-    def consume(exchangeName: ExchangeName,
-                routingKey: RoutingKey,
-                queueName: QueueName = QueueName(s"queue-${Random.nextInt(1000)}"))(
-        implicit executionContext: ExecutionContext,
-        ioMonadError: MonadError[IO, Throwable],
-        F: Sync[IO]
-    ): Stream[IO, ListBuffer[Delivery]] = {
-      val stubConsumeHandler            = new StubConsumeHandler[IO, Delivery]()(ioMonadError)
-      implicit val cs: ContextShift[IO] = IO.contextShift(executionContext)
-      Stream
-        .eval(IO(stubConsumeHandler.receivedMessages))
-        .concurrently(
-          Stream
-            .eval(IO {
-              val testDeclaration = List(
-                Queue(queueName),
-                Exchange(exchangeName, exchangeType = Topic)
-                  .binding(routingKey -> queueName)
-              )
-              logger.info(s"Defining a consumer with the follow config: [$exchangeName -> $routingKey -> $queueName]")
-              DeclarationExecutor(testDeclaration, amqpClient)
-            })
-            .flatMap(_ => amqpClient.consumer(queueName, stubConsumeHandler)))
-    }
-  }
-
   def amqpOpsFor(addBinding: Binding => Try[Unit]): AmqpOps =
     new AmqpOps {
       override def declareExchange(exchange: Exchange): Try[Unit] = Try(())

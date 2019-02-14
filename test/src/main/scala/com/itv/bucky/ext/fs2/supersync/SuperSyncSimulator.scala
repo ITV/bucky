@@ -1,16 +1,16 @@
 package com.itv.bucky.ext.fs2.supersync
 import java.util.concurrent.atomic.AtomicInteger
 
-import cats.effect.IO
+import cats.effect.{IO, Sync}
 import com.itv.bucky.Monad.Id
 import com.itv.bucky._
-import com.itv.bucky.decl.Binding
+import com.itv.bucky.decl._
 import com.typesafe.scalalogging.StrictLogging
 
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.Duration
-import scala.util.Try
+import scala.util.{Random, Try}
 import cats.syntax.traverse._
 import cats.instances.list._
 import _root_.fs2.Stream
@@ -86,5 +86,25 @@ class SuperSyncSimulator(implicit idMonad: Monad[Id],
       Envelope(deliveryTagCounter.incrementAndGet(), redeliver = false, publishCommand.exchange, publishCommand.routingKey),
       publishCommand.basicProperties
     )
+
+  def consume(exchangeName: ExchangeName,
+                  routingKey: RoutingKey,
+                  queueName: QueueName = QueueName(s"queue-${Random.nextInt(1000)}"))(
+                   implicit ioMonadError: MonadError[IO, Throwable]
+                 ): Stream[IO, ListBuffer[Delivery]] = {
+    val stubConsumeHandler            = new StubConsumeHandler[IO, Delivery]()(ioMonadError)
+    val testDeclaration = List(
+      Queue(queueName),
+      Exchange(exchangeName, exchangeType = Topic)
+        .binding(routingKey -> queueName)
+    )
+    logger.info(s"Defining a consumer with the follow config: [$exchangeName -> $routingKey -> $queueName]")
+    DeclarationExecutor(testDeclaration, this)
+
+    for {
+      _ <- consumer(queueName, stubConsumeHandler)
+    }
+      yield stubConsumeHandler.receivedMessages
+  }
 
 }
