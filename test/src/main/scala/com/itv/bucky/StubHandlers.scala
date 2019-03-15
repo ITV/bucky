@@ -7,7 +7,9 @@ class StubHandler[F[_], T, S](var nextResponse: F[S], var nextException: Option[
 
   val receivedMessages = ListBuffer[T]()
 
-  override def apply(message: T): F[S] = {
+  private val lock = new Object
+
+  override def apply(message: T): F[S] = lock.synchronized {
     receivedMessages += message
     nextException.fold[F[S]](nextResponse)(throw _)
   }
