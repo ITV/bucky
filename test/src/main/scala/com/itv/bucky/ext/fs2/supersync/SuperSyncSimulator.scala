@@ -1,7 +1,8 @@
 package com.itv.bucky.ext.fs2.supersync
+import java.util.concurrent.{Executors, TimeUnit}
 import java.util.concurrent.atomic.AtomicInteger
 
-import cats.effect.{IO, Sync}
+import cats.effect.{IO, Sync, Timer}
 import com.itv.bucky.Monad.Id
 import com.itv.bucky._
 import com.itv.bucky.decl._
@@ -9,7 +10,7 @@ import com.typesafe.scalalogging.StrictLogging
 
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration.Duration
+import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.util.{Random, Try}
 import cats.syntax.traverse._
 import cats.instances.list._
@@ -106,5 +107,26 @@ class SuperSyncSimulator(implicit idMonad: Monad[Id],
     }
       yield stubConsumeHandler.receivedMessages
   }
+
+
+  private lazy val waitForTimer: Timer[IO] = IO.timer(ExecutionContext.fromExecutor(Executors.newFixedThreadPool(1)))
+  def waitFor(exchangeName: ExchangeName, routingKey: RoutingKey, queueName: QueueName, retryDelay: FiniteDuration = FiniteDuration(10, TimeUnit.MILLISECONDS), maxRetries: Int = 100): IO[Unit] = {
+    val action = IO {
+      val bindingsCount =
+        bindings.count(b => b.queueName == queueName && b.exchangeName == exchangeName && b.routingKey == routingKey)
+
+      val handlersCount = consumers.get(queueName).size
+
+      if (!(bindingsCount == 1 && handlersCount == 1))
+        throw new IllegalStateException(s"Expected 1 matching binding and 1 matching handler, found $bindingsCount bindings and $handlersCount handlers")
+    }
+
+    implicit val timer: Timer[IO] = waitForTimer
+    Stream
+      .retry(action, retryDelay, _ => retryDelay, maxRetries)
+      .compile
+      .drain
+  }
+
 
 }
