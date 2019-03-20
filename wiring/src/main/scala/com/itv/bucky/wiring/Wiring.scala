@@ -49,7 +49,7 @@ class Wiring[T](
   def allDeclarations: List[Declaration] =
     (publisherDeclarations ++ consumerDeclarations).distinct
 
-  def publisher[B[_], F[_], E, C](client: AmqpClient[B, F, E, C]): B[Publisher[F, T]] = {
+  def publisher[B[_], F[_], E, C](client: AmqpClient[B, F, E, C], timeout: FiniteDuration = 10.seconds): B[Publisher[F, T]] = {
     logger.info(
       s"Creating publisher: " +
         s"exchange=${ exchangeName.value} " +
@@ -58,7 +58,7 @@ class Wiring[T](
         s"type=${ exchangeType.value} " +
         s"requeuePolicy=$requeuePolicy")
     DeclarationExecutor(publisherDeclarations, client)
-    client.publisherOf(publisherBuilder)
+    client.publisherOf(publisherBuilder, timeout)
   }
 
   def publisherWithHeaders[B[_], F[_], E, C](client: AmqpClient[B, F, E, C]): B[PublisherWithHeaders[F, T]] = {

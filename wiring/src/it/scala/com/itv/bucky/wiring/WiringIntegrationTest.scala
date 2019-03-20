@@ -18,7 +18,7 @@ trait WiringIntegrationTest
     with WiringTestOps { self: Suite =>
 
   implicit val executionContext: ExecutionContext =
-    ExecutionContext.Implicits.global
+    ExecutionContext.fromExecutor(Executors.newFixedThreadPool(1))
 
   override implicit def patienceConfig: PatienceConfig =
     PatienceConfig(Span(10, Seconds), Span(100, Millis))

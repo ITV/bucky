@@ -10,9 +10,7 @@ import org.scalatest.FunSuite
 
 import scala.concurrent.duration._
 
-class WiringFs2IntegrationTest
-    extends FunSuite
-      with WiringIntegrationTest {
+class WiringFs2IntegrationTest extends FunSuite with WiringIntegrationTest {
 
   val incoming = new Wiring[String](WiringName("fs2.incoming"))
   val outgoing = new Wiring[String](WiringName("fs2.outgoing"))
@@ -24,14 +22,9 @@ class WiringFs2IntegrationTest
       for {
         publishMessage <- incoming.publisher(fixture.client)
         _              <- publishMessage("fs2 publisher test")
-        _ <- IO {
-          eventually {
-            assert(fixture.sink.receivedMessages.size == 1)
-            assert(fixture.sink.receivedMessages.head.body.unmarshal[String] == Success("Outgoing: fs2 publisher test"))
-          }
-        }
-      } yield {
-        ()
+      } yield eventually {
+        assert(fixture.sink.receivedMessages.size == 1)
+        assert(fixture.sink.receivedMessages.head.body.unmarshal[String] == Success(s"Outgoing: fs2 publisher test"))
       }
     }
   }
@@ -72,7 +65,4 @@ class WiringFs2IntegrationTest
     }
   }
 
-
 }
-
-
