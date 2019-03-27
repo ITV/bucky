@@ -2,13 +2,12 @@ package com.itv.bucky
 
 import java.util.concurrent.TimeUnit
 
-import cats.effect.Sync
+import cats.effect._
 import cats.implicits._
 import cats.effect.implicits._
-
-import com.rabbitmq.client.Channel
+import com.rabbitmq.client.{BasicProperties, Channel, DefaultConsumer, Channel => RabbitChannel}
 import com.itv.bucky.decl.{Binding, Exchange, ExchangeBinding, Queue}
-import com.rabbitmq.client.{Channel => RabbitChannel}
+import com.typesafe.scalalogging.StrictLogging
 
 import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.util.Try
@@ -17,15 +16,15 @@ import scala.language.higherKinds
 trait AmqpClient[F[_]] {
   def performOps(thunk: AmqpOps => F[Unit]): F[Unit]
   def estimatedMessageCount(queueName: QueueName): F[Long]
-  def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): Publisher[F, PublishCommand]
+  def publisher(timeout: FiniteDuration = FiniteDuration(10, TimeUnit.SECONDS)): Publisher[F, PublishCommand]
   def consumer(queueName: QueueName,
                handler: Handler[F, Delivery],
                exceptionalAction: ConsumeAction = DeadLetter,
                prefetchCount: Int = 0): F[Unit]
 }
 
-object AmqpClient {
-  def apply[F[_]](implicit F: Sync[F]): F[AmqpClient[F]] =
+object AmqpClient extends StrictLogging {
+  def apply[F[_]](implicit F: Concurrent[F]): F[AmqpClient[F]] =
     for {
       channel <- F.delay(createChannel)
       client  <- mkClient(channel)
@@ -33,28 +32,52 @@ object AmqpClient {
 
   private def createChannel: Channel = ???
 
-  private def mkClient[F[_]](channel: Channel)(implicit F: Sync[F]): AmqpClient[F] =
+  private def mkClient[F[_]](
+      channel: Channel)(implicit F: Concurrent[F], cs: ContextShift[F], t: Timer[F]): AmqpClient[F] =
     new AmqpClient[F] {
-      //createChannel
-      override def performOps(thunk: AmqpOps => F[Unit]): F[Unit]             = thunk(ChannelAmqpOps(channel))
-      override def estimatedMessageCount(queueName: QueueName): F[Long]       = F.delay(channel.messageCount(queueName.value))
 
-      override def publisher(timeout: Duration): Publisher[F, PublishCommand] =
+      override def performOps(thunk: AmqpOps => F[Unit]): F[Unit]       = thunk(ChannelAmqpOps(channel))
+      override def estimatedMessageCount(queueName: QueueName): F[Long] = F.delay(channel.messageCount(queueName.value))
+      override def publisher(timeout: FiniteDuration): Publisher[F, PublishCommand] =
         cmd => {
-          F.delay {
-            channel.basicPublish(cmd.exchange.value,
-              cmd.routingKey.value,
-              false,
-              false,
-              MessagePropertiesConverters(cmd.basicProperties),
-              cmd.body.value)
-          }.timed(timeout)
-       }
+          (for {
+            _ <- cs.shift
+            _ <- F.delay(
+              channel.basicPublish(cmd.exchange.value,
+                                   cmd.routingKey.value,
+                                   false,
+                                   false,
+                                   MessagePropertiesConverters(cmd.basicProperties),
+                                   cmd.body.value))
+          } yield ()).timeout(timeout)
+        }
 
       override def consumer(queueName: QueueName,
                             handler: Handler[F, Delivery],
                             exceptionalAction: ConsumeAction,
-                            prefetchCount: Int): F[Unit] = ???
+                            prefetchCount: Int): F[Unit] = {
+        val consumeHandler = new DefaultConsumer(channel) {
+          logger.info(s"Creating consumer for $queueName")
+          override def handleDelivery(consumerTag: String,
+                                      envelope: Envelope,
+                                      properties: BasicProperties,
+                                      body: Array[Byte]): Unit = {
+            val delivery = Consumer.deliveryFrom(consumerTag, envelope, properties, body)
+            Consumer
+              .processDelivery(channel, queueName, handler, actionOnFailure, delivery)
+              .attempt
+              .unsafePerformSync match {
+              case \/-(_) =>
+              case -\/(exception) =>
+                logger.error(s"Unexpected error processing $delivery.", exception)
+            }
+          }
+        }
+        for {
+          _ <- F.delay(channel.basicQos(prefetchCount))
+          _ <- F.delay(channel.basicConsume(queueName.value, false, consumerTag.value, consumer))
+        } yield
+      }
     }
 }
 
