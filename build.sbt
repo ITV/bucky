@@ -131,7 +131,10 @@ lazy val core = project
   .settings(
     libraryDependencies ++= Seq(
       "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
-      "org.scalatest"              %% "scalatest"     % scalaTestVersion % "test"
+      "org.scalatest"              %% "scalatest"     % scalaTestVersion % "test",
+      "org.typelevel" %% "cats-core" % "1.6.0",
+      "org.typelevel" %% "cats-effect" % "0.10.1",
+      "com.rabbitmq"               % "amqp-client"    % amqpClientVersion
     )
   )
   .configs(IntegrationTest)

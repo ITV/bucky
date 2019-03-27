@@ -7,37 +7,6 @@ import scala.language.higherKinds
 
 package object bucky {
 
-  trait Monad[F[_]] {
-    def apply[A](a: => A): F[A]
-    def map[A, B](m: F[A])(f: A => B): F[B]
-    def flatMap[A, B](m: F[A])(f: A => F[B]): F[B]
-  }
-
-  trait MonadError[F[_], E] extends Monad[F] {
-    def raiseError[A](e: E): F[A]
-    def handleError[A](fa: F[A])(f: E => F[A]): F[A]
-  }
-
-  object Monad {
-    type Id[A] = A
-
-    implicit val idMonad = new Monad[Id] {
-      override def apply[A](a: => A): Id[A] = a
-
-      override def map[A, B](m: Id[A])(f: (A) => B): Id[B] = f(m)
-
-      override def flatMap[A, B](m: Id[A])(f: (A) => Id[B]): Id[B] = f(m)
-    }
-
-    import scala.language.implicitConversions
-    class MonadOps[F[_], A](fa: F[A])(implicit M: Monad[F]) {
-      def flatMap[B](f: A => F[B]) = M.flatMap(fa)(f)
-      def map[B]()(f: A => B)      = M.map(fa)(f)
-    }
-
-    implicit def toMonad[F[_], A](fa: F[A])(implicit M: Monad[F]) = new MonadOps(fa)
-  }
-
   type Publisher[F[_], -T]      = T => F[Unit]
   type Handler[F[_], -T]        = T => F[ConsumeAction]
   type RequeueHandler[F[_], -T] = T => F[RequeueConsumeAction]
