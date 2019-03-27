@@ -1,5 +1,8 @@
 package com.itv.bucky
 
+import com.rabbitmq.client.AMQP.BasicProperties
+import com.rabbitmq.client.{Envelope => RabbitMQEnvelope}
+
 object MessagePropertiesConverters {
 
   import scala.collection.JavaConverters._

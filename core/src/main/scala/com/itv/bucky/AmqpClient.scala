@@ -4,6 +4,7 @@ import java.util.concurrent.TimeUnit
 
 import cats.effect.Sync
 import cats.implicits._
+import cats.effect.implicits._
 
 import com.rabbitmq.client.Channel
 import com.itv.bucky.decl.{Binding, Exchange, ExchangeBinding, Queue}
@@ -15,7 +16,7 @@ import scala.language.higherKinds
 
 trait AmqpClient[F[_]] {
   def performOps(thunk: AmqpOps => F[Unit]): F[Unit]
-  def estimatedMessageCount(queueName: QueueName): Try[Int]
+  def estimatedMessageCount(queueName: QueueName): F[Long]
   def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): Publisher[F, PublishCommand]
   def consumer(queueName: QueueName,
                handler: Handler[F, Delivery],
@@ -37,7 +38,19 @@ object AmqpClient {
       //createChannel
       override def performOps(thunk: AmqpOps => F[Unit]): F[Unit]             = thunk(ChannelAmqpOps(channel))
       override def estimatedMessageCount(queueName: QueueName): F[Long]       = F.delay(channel.messageCount(queueName.value))
-      override def publisher(timeout: Duration): Publisher[F, PublishCommand] = ???
+
+      override def publisher(timeout: Duration): Publisher[F, PublishCommand] =
+        cmd => {
+          F.delay {
+            channel.basicPublish(cmd.exchange.value,
+              cmd.routingKey.value,
+              false,
+              false,
+              MessagePropertiesConverters(cmd.basicProperties),
+              cmd.body.value)
+          }.timed(timeout)
+       }
+
       override def consumer(queueName: QueueName,
                             handler: Handler[F, Delivery],
                             exceptionalAction: ConsumeAction,
