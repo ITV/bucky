@@ -1,22 +1,20 @@
 package com.itv.bucky
 
-import com.itv.bucky.decl.{Binding, Exchange, ExchangeBinding, Queue}
 import com.typesafe.scalalogging.StrictLogging
+import com.rabbitmq.client.{
+  ConnectionFactory,
+  ShutdownListener,
+  ShutdownSignalException,
+  Channel => RabbitChannel,
+  Connection => RabbitConnection
+}
 
 import scala.language.higherKinds
 import scala.util.{Failure, Success, Try}
 
 object Connection extends StrictLogging {
 
-  def lifecycle(connection: => RabbitConnection): Lifecycle[RabbitConnection] = new VanillaLifecycle[RabbitConnection] {
-    override def start(): RabbitConnection = connection
-
-    override def shutdown(instance: RabbitConnection): Unit = Connection.close(instance)
-  }
-
-  def lifecycle(config: AmqpClientConfig): Lifecycle[RabbitConnection] = lifecycle(Connection(config))
-
-  def apply(config: AmqpClientConfig): Id[RabbitConnection] =
+  def apply(config: AmqpClientConfig): Either[Throwable, RabbitConnection] =
     Try {
       logger.info(s"Starting AmqpClient")
       val connectionFactory = new ConnectionFactory()
@@ -28,14 +26,7 @@ object Connection extends StrictLogging {
       config.networkRecoveryInterval.map(_.toMillis.toInt).foreach(connectionFactory.setNetworkRecoveryInterval)
       config.virtualHost.foreach(connectionFactory.setVirtualHost)
       connectionFactory.newConnection()
-    } match {
-      case Success(connection) =>
-        logger.info(s"AmqpClient has been started successfully!")
-        connection
-      case Failure(exception) =>
-        logger.error(s"Failure when starting AmqpClient because ${exception.getMessage}", exception)
-        throw exception
-    }
+    }.toEither
 
   def close(connection: RabbitConnection): Unit =
     if (connection.isOpen) {
@@ -68,70 +59,20 @@ object Channel extends StrictLogging {
   def estimateMessageCount(channel: RabbitChannel, queueName: QueueName) =
     Try(Option(channel.basicGet(queueName.value, false)).fold(0)(_.getMessageCount + 1))
 
-  def apply(connection: RabbitConnection): Id[RabbitChannel] =
+  def apply(connection: RabbitConnection): Either[Throwable, RabbitChannel] =
     Try {
       logger.info(s"Starting Channel")
       val channel = connection.createChannel()
       channel.addShutdownListener(new ShutdownListener() {
         override def shutdownCompleted(cause: ShutdownSignalException): Unit =
-          logger.info(s"Channel shut down, cause reason: ${cause.getReason.protocolMethodName()}, " +
-            s"is hard error: ${cause.isHardError}, is initiated by application: ${cause.isInitiatedByApplication}", cause.getStackTrace)
+          logger.info(
+            s"Channel shut down, cause reason: ${cause.getReason.protocolMethodName()}, " +
+              s"is hard error: ${cause.isHardError}, is initiated by application: ${cause.isInitiatedByApplication}",
+            cause.getStackTrace
+          )
       })
       channel
-    } match {
-      case Success(channel) =>
-        logger.info(s"Channel has been started successfully!")
-        channel
-      case Failure(exception) =>
-        logger.error(s"Failure when starting Channel because ${exception.getMessage}", exception)
-        throw exception
-    }
-
-  def lifecycle(connection: RabbitConnection): Lifecycle[RabbitChannel] = new VanillaLifecycle[RabbitChannel] {
-    override def start(): RabbitChannel = Channel(connection)
-
-    override def shutdown(instance: RabbitChannel): Unit = Channel.close(instance)
-  }
+    }.toEither
 }
 
-case class ChannelAmqpOps(channel: RabbitChannel) extends AmqpOps {
 
-  import scala.collection.JavaConverters._
-
-  override def declareExchange(exchange: Exchange): Try[Unit] = Try {
-    channel.exchangeDeclare(exchange.name.value,
-                            exchange.exchangeType.value,
-                            exchange.isDurable,
-                            exchange.shouldAutoDelete,
-                            exchange.isInternal,
-                            exchange.arguments.asJava)
-  }
-
-  override def bindQueue(binding: Binding): Try[Unit] = Try {
-    channel.queueBind(binding.queueName.value,
-                      binding.exchangeName.value,
-                      binding.routingKey.value,
-                      binding.arguments.asJava)
-  }
-
-  override def bindExchange(binding: ExchangeBinding): Try[Unit] = Try {
-    channel.exchangeBind(
-      binding.destinationExchangeName.value,
-      binding.sourceExchangeName.value,
-      binding.routingKey.value,
-      binding.arguments.asJava
-    )
-  }
-
-  override def declareQueue(queue: Queue): Try[Unit] = Try {
-    channel.queueDeclare(queue.name.value,
-                         queue.isDurable,
-                         queue.isExclusive,
-                         queue.shouldAutoDelete,
-                         queue.arguments.asJava)
-  }
-
-  override def purgeQueue(name: QueueName): Try[Unit] = Try {
-    channel.queuePurge(name.value)
-  }
-}

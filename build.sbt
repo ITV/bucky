@@ -164,8 +164,8 @@ lazy val example = project
   .settings(name := "com.itv")
   .settings(moduleName := "bucky-example")
   .settings(kernelSettings: _*)
-  .aggregate(core, rabbitmq, scalaz, fs2, argonaut, circe)
-  .dependsOn(core, rabbitmq, scalaz, fs2, argonaut, circe)
+  .aggregate(core, rabbitmq, argonaut, circe)
+  .dependsOn(core, rabbitmq, argonaut, circe)
   .settings(
     libraryDependencies ++= Seq(
       "io.argonaut"                %% "argonaut"      % argonautVersion,
@@ -262,50 +262,9 @@ lazy val rabbitmq = project
     )
   )
 
-lazy val scalaz = project
-  .settings(name := "com.itv")
-  .settings(moduleName := "bucky-scalaz")
-  .settings(kernelSettings: _*)
-  .aggregate(core, test, rabbitmq)
-  .dependsOn(core, rabbitmq, test % "test,it")
-  .configs(IntegrationTest)
-  .settings(Defaults.itSettings)
-  .settings(
-    internalDependencyClasspath in IntegrationTest += Attributed.blank((classDirectory in Test).value),
-    parallelExecution in IntegrationTest := false,
-    parallelExecution in Test := false
-  )
-  .settings(
-    libraryDependencies ++= Seq(
-      "org.scalaz.stream" %% "scalaz-stream" % scalazStreamVersion,
-      "com.typesafe"      % "config"         % typeSafeVersion % "it"
-    )
-  )
-
-lazy val fs2 = project
-  .settings(name := "com.itv")
-  .settings(moduleName := "bucky-fs2")
-  .settings(kernelSettings: _*)
-  .aggregate(core, test, rabbitmq)
-  .dependsOn(core, rabbitmq, test % "test,it")
-  .configs(IntegrationTest)
-  .settings(Defaults.itSettings)
-  .settings(
-    internalDependencyClasspath in IntegrationTest += Attributed.blank((classDirectory in Test).value),
-    parallelExecution in IntegrationTest := false,
-    parallelExecution in Test := false
-  )
-  .settings(
-    libraryDependencies ++= Seq(
-      "co.fs2"       %% "fs2-core" % fs2Version,
-      "co.fs2"       %% "fs2-io" % fs2Version,
-      "org.typelevel" %% "cats-effect" % catsEffectsVersion ,
-      "com.typesafe" % "config"    % typeSafeVersion % "it"
-    )
-  )
 
 lazy val root = (project in file("."))
-  .aggregate(rabbitmq, scalaz, fs2, xml, circe, argonaut, example, test, core)
+  .aggregate(rabbitmq, xml, circe, argonaut, example, test, core)
   .settings(publishArtifact := false)
 
 lazy val readme = scalatex
