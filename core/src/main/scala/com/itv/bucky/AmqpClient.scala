@@ -13,6 +13,8 @@ import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.util.Try
 import scala.language.higherKinds
 
+import com.rabbitmq.client.{Envelope => RabbitMQEnvelope}
+
 trait AmqpClient[F[_]] {
   def performOps(thunk: AmqpOps => F[Unit]): F[Unit]
   def estimatedMessageCount(queueName: QueueName): F[Long]
@@ -33,7 +35,7 @@ object AmqpClient extends StrictLogging {
   private def createChannel: Channel = ???
 
   private def mkClient[F[_]](
-      channel: Channel)(implicit F: Concurrent[F], cs: ContextShift[F], t: Timer[F]): AmqpClient[F] =
+      channel: Channel)(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F]): AmqpClient[F] =
     new AmqpClient[F] {
 
       override def performOps(thunk: AmqpOps => F[Unit]): F[Unit]       = thunk(ChannelAmqpOps(channel))
@@ -52,6 +54,8 @@ object AmqpClient extends StrictLogging {
           } yield ()).timeout(timeout)
         }
 
+      import cats.effect.implicits._
+
       override def consumer(queueName: QueueName,
                             handler: Handler[F, Delivery],
                             exceptionalAction: ConsumeAction,
@@ -59,24 +63,30 @@ object AmqpClient extends StrictLogging {
         val consumeHandler = new DefaultConsumer(channel) {
           logger.info(s"Creating consumer for $queueName")
           override def handleDelivery(consumerTag: String,
-                                      envelope: Envelope,
-                                      properties: BasicProperties,
+                                      envelope: RabbitMQEnvelope,
+                                      properties: com.rabbitmq.client.AMQP.BasicProperties,
                                       body: Array[Byte]): Unit = {
             val delivery = Consumer.deliveryFrom(consumerTag, envelope, properties, body)
-            Consumer
-              .processDelivery(channel, queueName, handler, actionOnFailure, delivery)
+            Consumer.processDelivery(channel, queueName, handler, exceptionalAction, delivery)
               .attempt
-              .unsafePerformSync match {
-              case \/-(_) =>
-              case -\/(exception) =>
-                logger.error(s"Unexpected error processing $delivery.", exception)
-            }
+              .recoverWith {
+                case throwable =>
+                  F.point {
+                    logger.error("Unhandled exception whilst processing delivery", throwable)
+                    Left(throwable)
+                  }
+              }
+              .void
+              .toIO
+              .unsafeRunSync
           }
         }
+
         for {
+         consumerTag <- F.delay(ConsumerTag.create(queueName))
           _ <- F.delay(channel.basicQos(prefetchCount))
-          _ <- F.delay(channel.basicConsume(queueName.value, false, consumerTag.value, consumer))
-        } yield
+          _ <- F.delay(channel.basicConsume(queueName.value, false, consumerTag.value, consumeHandler))
+        } yield ()
       }
     }
 }
