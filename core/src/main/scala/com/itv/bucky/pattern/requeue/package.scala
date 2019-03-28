@@ -1,5 +1,6 @@
 package com.itv.bucky.pattern
 
+import cats.effect.Sync
 import com.itv.bucky.{AmqpClient, ConsumeAction, DeliveryUnmarshalHandler, _}
 import com.itv.bucky.Unmarshaller._
 import com.itv.bucky.decl._
@@ -43,7 +44,7 @@ package object requeue {
     )
   }
 
-  implicit class RequeueOps[B[_], F[_], E, C](val amqpClient: AmqpClient[B, F, E, C]) {
+  implicit class RequeueOps[F[_]](val amqpClient: AmqpClient[F])(implicit val F: Sync[F]) {
 
     def requeueHandlerOf[T](queueName: QueueName,
                             handler: RequeueHandler[F, T],
@@ -51,7 +52,7 @@ package object requeue {
                             unmarshaller: PayloadUnmarshaller[T],
                             onFailure: RequeueConsumeAction = Requeue,
                             unmarshalFailureAction: RequeueConsumeAction = DeadLetter,
-                            prefetchCount: Int = 0): B[C] =
+                            prefetchCount: Int = 0): F[Unit] =
       requeueDeliveryHandlerOf(queueName,
         handler,
         requeuePolicy,
@@ -68,7 +69,7 @@ package object requeue {
                                              onFailure: RequeueConsumeAction = Requeue,
                                              onFailureAction: T => F[Unit],
                                              unmarshalFailureAction: RequeueConsumeAction = DeadLetter,
-                                             prefetchCount: Int = 0): B[C] = {
+                                             prefetchCount: Int = 0): F[Unit] = {
       requeueDeliveryHandlerOf(queueName,
         handler,
         requeuePolicy,
@@ -85,15 +86,14 @@ package object requeue {
                                     requeuePolicy: RequeuePolicy,
                                     unmarshaller: DeliveryUnmarshaller[T],
                                     onFailure: RequeueConsumeAction = Requeue,
-                                    onFailureAction: T => F[Unit] = (_: T) => amqpClient.effectMonad.apply(()),
+                                    onFailureAction: T => F[Unit] = (_: T) => F.point(()),
                                     unmarshalFailureAction: RequeueConsumeAction = DeadLetter,
-                                    prefetchCount: Int = 0): B[C] = {
+                                    prefetchCount: Int = 0): F[Unit] = {
       val deserializeHandler =
-        new DeliveryUnmarshalHandler[F, T, RequeueConsumeAction](unmarshaller)(handler, unmarshalFailureAction)(
-          amqpClient.effectMonad)
+        new DeliveryUnmarshalHandler[F, T, RequeueConsumeAction](unmarshaller)(handler, unmarshalFailureAction)
 
       val deserializeOnFailureAction: Delivery => F[Unit] =
-        new UnmarshalFailureAction[F, T](unmarshaller)(amqpClient.effectMonad)(onFailureAction)
+        new UnmarshalFailureAction[F, T](unmarshaller).apply(onFailureAction)
 
       requeueOf(queueName, deserializeHandler, requeuePolicy, onFailure, deserializeOnFailureAction, prefetchCount = prefetchCount)
     }
@@ -102,15 +102,11 @@ package object requeue {
                   handler: RequeueHandler[F, Delivery],
                   requeuePolicy: RequeuePolicy,
                   onFailure: RequeueConsumeAction = Requeue,
-                  onFailureAction: Delivery => F[Unit] = (_: Delivery) => amqpClient.effectMonad.apply(()),
-                  prefetchCount: Int = 0): B[C] = {
+                  onFailureAction: Delivery => F[Unit] = (_: Delivery) => F.point(()),
+                  prefetchCount: Int = 0): F[Unit] = {
       val requeueExchange = ExchangeName(s"${queueName.value}.requeue")
-      amqpClient.monad.flatMap(amqpClient.publisher()) { requeuePublish =>
-        amqpClient.consumer(queueName,
-          RequeueTransformer(requeuePublish, requeueExchange, requeuePolicy, onFailure, onFailureAction)(handler)(
-            amqpClient.effectMonad),
-          prefetchCount = prefetchCount)
-      }
+      val requeuePublish = amqpClient.publisher()
+      amqpClient.consumer(queueName, RequeueTransformer(requeuePublish, requeueExchange, requeuePolicy, onFailure, onFailureAction)(handler), prefetchCount = prefetchCount)
     }
   }
 }

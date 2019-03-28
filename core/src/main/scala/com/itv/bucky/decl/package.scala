@@ -1,9 +1,15 @@
 package com.itv.bucky
 
+import cats.effect.Sync
 import com.typesafe.scalalogging.StrictLogging
 
 import scala.concurrent.duration.FiniteDuration
 import scala.util.Try
+import cats.implicits._
+import cats.instances.all._
+import cats.effect.implicits._
+
+import scala.language.higherKinds
 
 package object decl {
 
@@ -12,14 +18,16 @@ package object decl {
   }
 
   object Declaration extends StrictLogging {
-    def runAll(declaration: Iterable[Declaration]): AmqpOps => Try[Unit] =
-      ops => {
-        val queues    = declaration.collect { case queue: Queue       => queue }.toSet
-        val exchanges = declaration.collect { case exchange: Exchange => exchange }.toSet
+
+    def runAll[F[_]](declaration: Iterable[Declaration])(implicit F: Sync[F]): AmqpOps => F[Unit] =
+      ops => F.fromTry {
+        val queues    = declaration.collect { case queue: Queue       => queue }.toList
+        val exchanges = declaration.collect { case exchange: Exchange => exchange }.toList
         val bindings = declaration.collect {
           case binding: Binding                 => binding
           case exchangeBinding: ExchangeBinding => exchangeBinding
-        }.toSet
+        }.toList
+        logger.info(s"Applying the following declarations: $declaration")
         for {
           _ <- TryUtil.sequence(queues.map(_.run(ops)))
           _ <- TryUtil.sequence(exchanges.map(_.run(ops)))

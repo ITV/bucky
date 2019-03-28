@@ -5,11 +5,11 @@ import java.util.concurrent.TimeUnit
 import cats.effect._
 import cats.implicits._
 import cats.effect.implicits._
-import com.rabbitmq.client.{BasicProperties, Channel, DefaultConsumer, Channel => RabbitChannel}
+import com.rabbitmq.client.{DefaultConsumer, Channel => RabbitChannel}
 import com.itv.bucky.decl.{Binding, Exchange, ExchangeBinding, Queue}
 import com.typesafe.scalalogging.StrictLogging
 
-import scala.concurrent.duration.{Duration, FiniteDuration}
+import scala.concurrent.duration.{FiniteDuration}
 import scala.util.Try
 import scala.language.higherKinds
 
@@ -26,16 +26,15 @@ trait AmqpClient[F[_]] {
 }
 
 object AmqpClient extends StrictLogging {
-  def apply[F[_]](implicit F: Concurrent[F]): F[AmqpClient[F]] =
+  def apply[F[_]](implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F]): F[AmqpClient[F]] =
     for {
       channel <- F.delay(createChannel)
-      client  <- mkClient(channel)
+      client  = mkClient(channel)
     } yield client
 
-  private def createChannel: Channel = ???
+  private def createChannel: RabbitChannel = ???
 
-  private def mkClient[F[_]](
-      channel: Channel)(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F]): AmqpClient[F] =
+  private def mkClient[F[_]](channel: RabbitChannel)(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F]): AmqpClient[F] =
     new AmqpClient[F] {
 
       override def performOps(thunk: AmqpOps => F[Unit]): F[Unit]       = thunk(ChannelAmqpOps(channel))
