@@ -34,6 +34,7 @@ trait AmqpClient[F[_]] {
                handler: Handler[F, Delivery],
                exceptionalAction: ConsumeAction = DeadLetter,
                prefetchCount: Int = 0): F[Unit]
+  def shutdown(): F[Unit]
 }
 
 case class AmqpClientConnectionManager[F[_]](amqpConfig: AmqpClientConfig)(implicit F: ConcurrentEffect[F],
@@ -94,7 +95,7 @@ case class AmqpClientConnectionManager[F[_]](amqpConfig: AmqpClientConfig)(impli
 object AmqpClient extends StrictLogging {
 
   private def confirmListener[F[_]](pendingConfirmations: Ref[F, TreeMap[Long, Deferred[F, Boolean]]])(
-      implicit F: Sync[F]): ConfirmListener =
+      implicit F: ConcurrentEffect[F]): ConfirmListener =
     new ConfirmListener {
       private def pop[T](deliveryTag: Long, multiple: Boolean): F[List[Deferred[F, Boolean]]] =
         pendingConfirmations.modify { x =>
@@ -111,16 +112,22 @@ object AmqpClient extends StrictLogging {
         }
 
       override def handleAck(deliveryTag: Long, multiple: Boolean): Unit =
-        pop(deliveryTag, multiple).flatMap { toComplete =>
-          logger.error("Received ack for delivery tag: {} and multiple: {}", deliveryTag, multiple)
-          toComplete.map(_.complete(true)).sequence
-        }
+        pop(deliveryTag, multiple)
+          .flatMap { toComplete =>
+            logger.error("Received ack for delivery tag: {} and multiple: {}", deliveryTag, multiple)
+            toComplete.map(_.complete(true)).sequence
+          }
+          .toIO
+          .unsafeRunSync()
 
       override def handleNack(deliveryTag: Long, multiple: Boolean): Unit =
-        pop(deliveryTag, multiple).flatMap { toComplete =>
-          logger.error("Received Nack for delivery tag: {} and multiple: {}", deliveryTag, multiple)
-          toComplete.map(_.complete(false)).sequence
-        }
+        pop(deliveryTag, multiple)
+          .flatMap { toComplete =>
+            logger.error("Received Nack for delivery tag: {} and multiple: {}", deliveryTag, multiple)
+            toComplete.map(_.complete(false)).sequence
+          }
+          .toIO
+          .unsafeRunSync()
     }
 
   def apply[F[_]](
@@ -133,9 +140,11 @@ object AmqpClient extends StrictLogging {
       _                    <- F.delay(channel.confirmSelect())
       pendingConfirmations <- Ref.of[F, TreeMap[Long, Deferred[F, Boolean]]](TreeMap.empty)
       _                    <- F.delay(channel.addConfirmListener(confirmListener(pendingConfirmations)))
-    } yield mkClient(channel, pendingConfirmations)
+    } yield mkClient(connection, channel, pendingConfirmations)
 
-  private def mkClient[F[_]](channel: RabbitChannel, pendingConfirmations: Ref[F, TreeMap[Long, Deferred[F, Boolean]]])(
+  private def mkClient[F[_]](connection: RabbitConnection,
+                             channel: RabbitChannel,
+                             pendingConfirmations: Ref[F, TreeMap[Long, Deferred[F, Boolean]]])(
       implicit F: ConcurrentEffect[F],
       cs: ContextShift[F],
       t: Timer[F]): AmqpClient[F] =
@@ -202,6 +211,8 @@ object AmqpClient extends StrictLogging {
           _           <- F.delay(channel.basicConsume(queueName.value, false, consumerTag.value, consumeHandler))
         } yield ()
       }
+
+      override def shutdown(): F[Unit] = F.delay(channel.close()).attempt.flatMap(_ => F.delay(connection.close()))
     }
 }
 
