@@ -6,7 +6,17 @@ import cats.effect._
 import cats.effect.concurrent.{Deferred, Ref}
 import cats.implicits._
 import cats.effect.implicits._
-import com.rabbitmq.client.{ConfirmCallback, ConfirmListener, ConnectionFactory, DefaultConsumer, ReturnListener, ShutdownSignalException, Channel => RabbitChannel, Connection => RabbitConnection, Envelope => RabbitMQEnvelope}
+import com.rabbitmq.client.{
+  ConfirmCallback,
+  ConfirmListener,
+  ConnectionFactory,
+  DefaultConsumer,
+  ReturnListener,
+  ShutdownSignalException,
+  Channel => RabbitChannel,
+  Connection => RabbitConnection,
+  Envelope => RabbitMQEnvelope
+}
 import com.itv.bucky.decl.{Binding, Exchange, ExchangeBinding, Queue}
 import com.typesafe.scalalogging.StrictLogging
 
@@ -83,17 +93,17 @@ case class AmqpClientConnectionManager[F[_]](amqpConfig: AmqpClientConfig)(impli
 
 object AmqpClient extends StrictLogging {
 
-  private def confirmListener[F[_]](pendingConfirmations: Ref[F, TreeMap[Long, Deferred[F, Boolean]]])(implicit F: Sync[F]): ConfirmListener =
+  private def confirmListener[F[_]](pendingConfirmations: Ref[F, TreeMap[Long, Deferred[F, Boolean]]])(
+      implicit F: Sync[F]): ConfirmListener =
     new ConfirmListener {
       private def pop[T](deliveryTag: Long, multiple: Boolean): F[List[Deferred[F, Boolean]]] =
         pendingConfirmations.modify { x =>
           if (multiple) {
-            val entries = x.until(deliveryTag + 1).toList
-            val nextPending = x -- entries.map { case (key, _) => key}
+            val entries     = x.until(deliveryTag + 1).toList
+            val nextPending = x -- entries.map { case (key, _) => key }
 
             (nextPending, entries.map { case (_, value) => value })
-          }
-          else {
+          } else {
             val nextPending = x - deliveryTag
 
             (nextPending, x.get(deliveryTag).toList)
@@ -102,11 +112,13 @@ object AmqpClient extends StrictLogging {
 
       override def handleAck(deliveryTag: Long, multiple: Boolean): Unit =
         pop(deliveryTag, multiple).flatMap { toComplete =>
+          logger.error("Received ack for delivery tag: {} and multiple: {}", deliveryTag, multiple)
           toComplete.map(_.complete(true)).sequence
         }
 
       override def handleNack(deliveryTag: Long, multiple: Boolean): Unit =
         pop(deliveryTag, multiple).flatMap { toComplete =>
+          logger.error("Received Nack for delivery tag: {} and multiple: {}", deliveryTag, multiple)
           toComplete.map(_.complete(false)).sequence
         }
     }
@@ -114,44 +126,43 @@ object AmqpClient extends StrictLogging {
   def apply[F[_]](
       config: AmqpClientConfig)(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F]): F[AmqpClient[F]] =
     for {
-      connectionManager <- F.delay(AmqpClientConnectionManager(config))
-      connection        <- connectionManager.createConnection(config)
-      channel           <- connectionManager.createChannel(connection)
-      _                 <- F.delay(channel.confirmSelect())
+      _                    <- cs.shift
+      connectionManager    <- F.delay(AmqpClientConnectionManager(config))
+      connection           <- connectionManager.createConnection(config)
+      channel              <- connectionManager.createChannel(connection)
+      _                    <- F.delay(channel.confirmSelect())
       pendingConfirmations <- Ref.of[F, TreeMap[Long, Deferred[F, Boolean]]](TreeMap.empty)
-      _ <- F.delay(channel.addConfirmListener(confirmListener(pendingConfirmations)))
+      _                    <- F.delay(channel.addConfirmListener(confirmListener(pendingConfirmations)))
     } yield mkClient(channel, pendingConfirmations)
 
-  private def mkClient[F[_]](
-      channel: RabbitChannel,
-      pendingConfirmations: Ref[F, TreeMap[Long, Deferred[F, Boolean]]])(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F]): AmqpClient[F] =
+  private def mkClient[F[_]](channel: RabbitChannel, pendingConfirmations: Ref[F, TreeMap[Long, Deferred[F, Boolean]]])(
+      implicit F: ConcurrentEffect[F],
+      cs: ContextShift[F],
+      t: Timer[F]): AmqpClient[F] =
     new AmqpClient[F] {
-
-      val unconfirmedPublications: Ref[F,mutable.TreeMap[Long, Either[Throwable, Unit] => Unit]] = ???
-      private def addPublication[F[_]](h: Either[Throwable, Unit] => Unit) : F[Unit] = ???
-
 
       override def performOps(thunk: AmqpOps => F[Unit]): F[Unit]       = thunk(ChannelAmqpOps(channel))
       override def estimatedMessageCount(queueName: QueueName): F[Long] = F.delay(channel.messageCount(queueName.value))
       override def publisher(timeout: FiniteDuration): Publisher[F, PublishCommand] = cmd => {
         (for {
-          _ <- cs.shift
+          _      <- cs.shift
           signal <- Deferred[F, Boolean]
           _ <- channel.synchronized {
             val deliveryTag = channel.getNextPublishSeqNo
-            pendingConfirmations.update { x =>
-              x + (deliveryTag -> signal)
-            }.map { _ =>
-              channel.basicPublish(cmd.exchange.value,
-                cmd.routingKey.value,
-                false,
-                false,
-                MessagePropertiesConverters(cmd.basicProperties),
-                cmd.body.value)
-            }
+
+            pendingConfirmations
+              .update(_ + (deliveryTag -> signal))
+              .map { _ =>
+                channel.basicPublish(cmd.exchange.value,
+                                     cmd.routingKey.value,
+                                     false,
+                                     false,
+                                     MessagePropertiesConverters(cmd.basicProperties),
+                                     cmd.body.value)
+              }
           }
           isAck <- signal.get
-          _ <- if (isAck) F.pure(()) else F.raiseError[Unit](new RuntimeException("Publish failed"))
+          _     <- if (isAck) F.pure(()) else F.raiseError[Unit](new RuntimeException("Publish failed"))
         } yield ()).timeout(timeout)
       }
 
@@ -186,6 +197,7 @@ object AmqpClient extends StrictLogging {
 
         for {
           consumerTag <- F.delay(ConsumerTag.create(queueName))
+          _           <- cs.shift
           _           <- F.delay(channel.basicQos(prefetchCount))
           _           <- F.delay(channel.basicConsume(queueName.value, false, consumerTag.value, consumeHandler))
         } yield ()

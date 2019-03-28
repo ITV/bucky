@@ -9,11 +9,11 @@ case class AmqpClientConfig(host: String,
                             port: Int,
                             username: String,
                             password: String,
-                            networkRecoveryInterval: Option[FiniteDuration] = Some(5.seconds),
+                            networkRecoveryInterval: Option[FiniteDuration] = Some(3.seconds),
                             networkRecoveryIntervalOnStart: Option[NetworkRecoveryOnStart] = Some(
                               NetworkRecoveryOnStart()),
                             virtualHost: Option[String] = None)
 
-case class NetworkRecoveryOnStart(interval: FiniteDuration = 30.seconds, max: FiniteDuration = 15.minutes) {
+case class NetworkRecoveryOnStart(interval: FiniteDuration = 3.seconds, max: FiniteDuration = 3.seconds) {
   val numberOfRetries = max.toMillis / interval.toMillis
 }
