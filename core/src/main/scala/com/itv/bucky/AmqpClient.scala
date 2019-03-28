@@ -18,10 +18,10 @@ trait AmqpClient[F[_]] {
   def declare(declarations: Iterable[Declaration]): F[Unit]
   def estimatedMessageCount(queueName: QueueName): F[Long]
   def publisher(timeout: FiniteDuration = FiniteDuration(10, TimeUnit.SECONDS)): Publisher[F, PublishCommand]
-  def consumer(queueName: QueueName,
-               handler: Handler[F, Delivery],
-               exceptionalAction: ConsumeAction = DeadLetter,
-               prefetchCount: Int = 0): F[Unit]
+  def registerConsumer(queueName: QueueName,
+                       handler: Handler[F, Delivery],
+                       exceptionalAction: ConsumeAction = DeadLetter,
+                       prefetchCount: Int = 0): F[Unit]
   def shutdown(): F[Unit]
 }
 
@@ -46,10 +46,10 @@ object AmqpClient extends StrictLogging {
           _ <- connectionManager.publish(cmd)
         } yield ()).timeout(timeout)
       }
-      override def consumer(queueName: QueueName,
-                            handler: Handler[F, Delivery],
-                            exceptionalAction: ConsumeAction,
-                            prefetchCount: Int): F[Unit] =
+      override def registerConsumer(queueName: QueueName,
+                                    handler: Handler[F, Delivery],
+                                    exceptionalAction: ConsumeAction,
+                                    prefetchCount: Int): F[Unit] =
         connectionManager.registerConsumer(queueName, handler, exceptionalAction, prefetchCount)
 
       override def shutdown(): F[Unit]                                   = connectionManager.shutdown()

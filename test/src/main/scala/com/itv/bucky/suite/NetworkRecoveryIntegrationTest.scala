@@ -179,8 +179,8 @@ trait NetworkRecoveryIntegrationTest[F[_], E, C]
         DeclarationExecutor(List(Queue(queueB).notDurable.expires(1.minute)), client)
         val publisherA = client.publisherOf(pcbA)
         val publisherB = client.publisherOf(pcbB)
-        executeConsumer(client.consumer(queueA, AmqpClient.handlerOf(handlerA, unmarshaller)))
-        executeConsumer(client.consumer(queueB, AmqpClient.handlerOf(handlerB, unmarshaller)))
+        executeConsumer(client.registerConsumer(queueA, AmqpClient.handlerOf(handlerA, unmarshaller)))
+        executeConsumer(client.registerConsumer(queueB, AmqpClient.handlerOf(handlerB, unmarshaller)))
         client.performOps(_.purgeQueue(queueA))
         client.performOps(_.purgeQueue(queueB))
         f(proxy, handlerA, handlerB, publisherA, publisherB)
@@ -220,7 +220,7 @@ trait NetworkRecoveryIntegrationTest[F[_], E, C]
 
     val stubConsumeHandler = new StubConsumeHandler[F, Delivery]()
 
-    executeConsumer(amqpClient.consumer(queueName, stubConsumeHandler))
+    executeConsumer(amqpClient.registerConsumer(queueName, stubConsumeHandler))
     stubConsumeHandler
   }
 }

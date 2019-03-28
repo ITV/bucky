@@ -106,7 +106,7 @@ package object requeue {
                   prefetchCount: Int = 0): F[Unit] = {
       val requeueExchange = ExchangeName(s"${queueName.value}.requeue")
       val requeuePublish = amqpClient.publisher()
-      amqpClient.consumer(queueName, RequeueTransformer(requeuePublish, requeueExchange, requeuePolicy, onFailure, onFailureAction)(handler), prefetchCount = prefetchCount)
+      amqpClient.registerConsumer(queueName, RequeueTransformer(requeuePublish, requeueExchange, requeuePolicy, onFailure, onFailureAction)(handler), prefetchCount = prefetchCount)
     }
   }
 }

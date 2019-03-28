@@ -126,7 +126,7 @@ class RabbitSimulator[B[_]](bindings: Bindings = IdentityBindings)(implicit M: M
 
   def watchQueue(queueName: QueueName): ListBuffer[Delivery] = {
     val messages = new ListBuffer[Delivery]()
-    this.consumer(queueName, { delivery =>
+    this.registerConsumer(queueName, { delivery =>
       messages += delivery
       logger.debug(s"Watch queue consume message [$delivery]")
       Future.successful(Ack)

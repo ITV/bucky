@@ -56,7 +56,7 @@ class DeclarationTest extends FunSuite with Eventually with IntegrationPatience 
       val handler = accHandler
       for {
         _ <- client.declare(declarations)
-        _ <- client.consumer(queueName, handler.apply)
+        _ <- client.registerConsumer(queueName, handler.apply)
         _ <- client.publisher(10.second)(commandBuilder)
       } yield {
         eventually {

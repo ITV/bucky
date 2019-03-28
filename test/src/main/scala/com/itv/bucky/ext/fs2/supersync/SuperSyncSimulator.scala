@@ -103,7 +103,7 @@ class SuperSyncSimulator(implicit idMonad: Monad[Id],
     DeclarationExecutor(testDeclaration, this)
 
     for {
-      _ <- consumer(queueName, stubConsumeHandler)
+      _ <- registerConsumer(queueName, stubConsumeHandler)
     }
       yield stubConsumeHandler.receivedMessages
   }

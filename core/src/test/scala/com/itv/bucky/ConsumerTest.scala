@@ -44,7 +44,7 @@ class ConsumerTest extends FunSuite with Eventually with IntegrationPatience wit
         .toPublishCommand(message)
       val handler = accHandler
       for {
-        _ <- client.consumer(queue, handler.apply)
+        _ <- client.registerConsumer(queue, handler.apply)
         _ <- client.publisher(10.second)(commandBuilder)
       } yield {
         eventually {
@@ -53,7 +53,7 @@ class ConsumerTest extends FunSuite with Eventually with IntegrationPatience wit
       }
     }
   }
-  
+
   test("should have a consumerOf method") {
     fail("do some work")
   }
