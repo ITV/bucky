@@ -3,13 +3,14 @@ package com.itv.bucky
 import java.util.concurrent.TimeUnit
 
 import cats.effect._
-import cats.effect.concurrent.Ref
+import cats.effect.concurrent.{Deferred, Ref}
 import cats.implicits._
 import cats.effect.implicits._
-import com.rabbitmq.client.{ConfirmCallback, ConnectionFactory, DefaultConsumer, ReturnListener, ShutdownSignalException, Channel => RabbitChannel, Connection => RabbitConnection, Envelope => RabbitMQEnvelope}
+import com.rabbitmq.client.{ConfirmCallback, ConfirmListener, ConnectionFactory, DefaultConsumer, ReturnListener, ShutdownSignalException, Channel => RabbitChannel, Connection => RabbitConnection, Envelope => RabbitMQEnvelope}
 import com.itv.bucky.decl.{Binding, Exchange, ExchangeBinding, Queue}
 import com.typesafe.scalalogging.StrictLogging
 
+import scala.collection.immutable.TreeMap
 import scala.collection.mutable
 import scala.concurrent.duration.FiniteDuration
 import scala.util.Try
@@ -46,6 +47,17 @@ case class AmqpClientConnectionManager[F[_]](amqpConfig: AmqpClientConfig)(impli
       }
       .rethrow
 
+  /*
+
+          _ <- F.delay(channel.confirmSelect())
+          _ <- F.delay(
+            channel.addConfirmListener(
+              (dt: Long, multiple: Boolean) => unconfirmedPublications.get.map(_(dt)(Right(()))).toIO.unsafeRunSync(),
+              (dt: Long, multiple: Boolean) => logger.error(s"Nack Received $dt $multiple")
+            )
+          )
+   */
+
   def createConnection(config: AmqpClientConfig): F[RabbitConnection] =
     F.delay {
         logger.info(s"Starting AmqpClient")
@@ -71,16 +83,42 @@ case class AmqpClientConnectionManager[F[_]](amqpConfig: AmqpClientConfig)(impli
 
 object AmqpClient extends StrictLogging {
 
+  private def confirmListener[F[_]](pendingConfirmations: Ref[F, TreeMap[Long, Deferred[F, Boolean]]]): ConfirmListener =
+    new ConfirmListener {
+      private def pop[T](deliveryTag: Long, multiple: Boolean): F[List[Deferred[F, Boolean]]] =
+        pendingConfirmations.modify { x =>
+          if (multiple) {
+            val entries = x.until(deliveryTag + 1).toList
+            val nextPending = x -- entries.map { case (key, _) => key}
+
+            (nextPending, entries.map { case (_, value) => value })
+          }
+          else {
+            val nextPending = x - deliveryTag
+
+            (nextPending, x.get(deliveryTag))
+          }
+        }
+
+      override def handleAck(deliveryTag: Long, multiple: Boolean): Unit = ???
+
+      override def handleNack(deliveryTag: Long, multiple: Boolean): Unit = ???
+    }
+
   def apply[F[_]](
       config: AmqpClientConfig)(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F]): F[AmqpClient[F]] =
     for {
       connectionManager <- F.delay(AmqpClientConnectionManager(config))
       connection        <- connectionManager.createConnection(config)
       channel           <- connectionManager.createChannel(connection)
-    } yield mkClient(channel)
+      _                 <- F.delay(channel.confirmSelect())
+      pendingConfirmations <- Ref.of[F, TreeMap[Long, Deferred[F, Boolean]]](Map.empty)
+    _ <- ??? // add confirm listener
+    } yield mkClient(channel, pendingConfirmations)
 
   private def mkClient[F[_]](
-      channel: RabbitChannel)(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F]): AmqpClient[F] =
+      channel: RabbitChannel,
+      pendingConfirmations: Ref[F, TreeMap[Long, Deferred[F, Boolean]]])(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F]): AmqpClient[F] =
     new AmqpClient[F] {
 
       val unconfirmedPublications: Ref[F,mutable.TreeMap[Long, Either[Throwable, Unit] => Unit]] = ???
@@ -92,22 +130,22 @@ object AmqpClient extends StrictLogging {
       override def publisher(timeout: FiniteDuration): Publisher[F, PublishCommand] = cmd => {
         (for {
           _ <- cs.shift
-          _ <- F.delay(channel.confirmSelect())
-          _ <- F.delay(
-            channel.addConfirmListener(
-              (dt: Long, multiple: Boolean) => unconfirmedPublications.get.map(_(dt)(Right(()))).toIO.unsafeRunSync(),
-              (dt: Long, multiple: Boolean) => logger.error(s"Nack Received $dt $multiple")
-            )
-          )
-          _ <- F.defer()
-          _ <- addPublication()
-          _ <- F.delay(
-            channel.basicPublish(cmd.exchange.value,
-                                 cmd.routingKey.value,
-                                 false,
-                                 false,
-                                 MessagePropertiesConverters(cmd.basicProperties),
-                                 cmd.body.value))
+          signal <- Deferred[F, Boolean]
+          _ <- channel.synchronized {
+            val deliveryTag = channel.getNextPublishSeqNo
+            pendingConfirmations.update { x =>
+              x + (deliveryTag -> signal)
+            }.map { _ =>
+              channel.basicPublish(cmd.exchange.value,
+                cmd.routingKey.value,
+                false,
+                false,
+                MessagePropertiesConverters(cmd.basicProperties),
+                cmd.body.value)
+            }
+          }
+          isAck <- signal.get
+          _ <- if (isAck) F.pure(()) else F.raiseError[Unit](new RuntimeException("Publish failed"))
         } yield ()).timeout(timeout)
       }
 
