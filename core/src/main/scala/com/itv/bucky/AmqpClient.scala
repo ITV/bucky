@@ -83,7 +83,7 @@ case class AmqpClientConnectionManager[F[_]](amqpConfig: AmqpClientConfig)(impli
 
 object AmqpClient extends StrictLogging {
 
-  private def confirmListener[F[_]](pendingConfirmations: Ref[F, TreeMap[Long, Deferred[F, Boolean]]]): ConfirmListener =
+  private def confirmListener[F[_]](pendingConfirmations: Ref[F, TreeMap[Long, Deferred[F, Boolean]]])(implicit F: Sync[F]): ConfirmListener =
     new ConfirmListener {
       private def pop[T](deliveryTag: Long, multiple: Boolean): F[List[Deferred[F, Boolean]]] =
         pendingConfirmations.modify { x =>
@@ -96,13 +96,19 @@ object AmqpClient extends StrictLogging {
           else {
             val nextPending = x - deliveryTag
 
-            (nextPending, x.get(deliveryTag))
+            (nextPending, x.get(deliveryTag).toList)
           }
         }
 
-      override def handleAck(deliveryTag: Long, multiple: Boolean): Unit = ???
+      override def handleAck(deliveryTag: Long, multiple: Boolean): Unit =
+        pop(deliveryTag, multiple).flatMap { toComplete =>
+          toComplete.map(_.complete(true)).sequence
+        }
 
-      override def handleNack(deliveryTag: Long, multiple: Boolean): Unit = ???
+      override def handleNack(deliveryTag: Long, multiple: Boolean): Unit =
+        pop(deliveryTag, multiple).flatMap { toComplete =>
+          toComplete.map(_.complete(true)).sequence
+        }
     }
 
   def apply[F[_]](
@@ -112,8 +118,8 @@ object AmqpClient extends StrictLogging {
       connection        <- connectionManager.createConnection(config)
       channel           <- connectionManager.createChannel(connection)
       _                 <- F.delay(channel.confirmSelect())
-      pendingConfirmations <- Ref.of[F, TreeMap[Long, Deferred[F, Boolean]]](Map.empty)
-    _ <- ??? // add confirm listener
+      pendingConfirmations <- Ref.of[F, TreeMap[Long, Deferred[F, Boolean]]](TreeMap.empty)
+      _ <- F.delay(channel.addConfirmListener(confirmListener(pendingConfirmations)))
     } yield mkClient(channel, pendingConfirmations)
 
   private def mkClient[F[_]](
