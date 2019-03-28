@@ -5,15 +5,20 @@ import java.util.concurrent.TimeUnit
 import cats.effect._
 import cats.implicits._
 import cats.effect.implicits._
-import com.rabbitmq.client.{DefaultConsumer, Channel => RabbitChannel}
+import com.rabbitmq.client.{
+  ConnectionFactory,
+  DefaultConsumer,
+  ShutdownSignalException,
+  Channel => RabbitChannel,
+  Connection => RabbitConnection,
+  Envelope => RabbitMQEnvelope
+}
 import com.itv.bucky.decl.{Binding, Exchange, ExchangeBinding, Queue}
 import com.typesafe.scalalogging.StrictLogging
 
-import scala.concurrent.duration.{FiniteDuration}
+import scala.concurrent.duration.FiniteDuration
 import scala.util.Try
 import scala.language.higherKinds
-
-import com.rabbitmq.client.{Envelope => RabbitMQEnvelope}
 
 trait AmqpClient[F[_]] {
   def performOps(thunk: AmqpOps => F[Unit]): F[Unit]
@@ -25,16 +30,61 @@ trait AmqpClient[F[_]] {
                prefetchCount: Int = 0): F[Unit]
 }
 
+case class AmqpClientConnectionManager[F[_]](amqpConfig: AmqpClientConfig)(implicit F: ConcurrentEffect[F],
+                                                                           cs: ContextShift[F],
+                                                                           t: Timer[F])
+    extends StrictLogging {
+  def createChannel(connection: RabbitConnection): F[RabbitChannel] =
+    F.delay {
+        logger.info(s"Starting Channel")
+        val channel = connection.createChannel()
+        channel.addShutdownListener((cause: ShutdownSignalException) => logger.warn(s"Channel shut down", cause))
+        channel
+      }
+      .attempt
+      .flatTap {
+        case Right(_) =>
+          F.delay(logger.info(s"Channel has been started successfully!"))
+        case Left(exception) =>
+          F.delay(logger.error(s"Failure when starting Channel because ${exception.getMessage}", exception))
+      }
+      .rethrow
+
+  def createConnection(config: AmqpClientConfig): F[RabbitConnection] =
+    F.delay {
+        logger.info(s"Starting AmqpClient")
+        val connectionFactory = new ConnectionFactory()
+        connectionFactory.setHost(config.host)
+        connectionFactory.setPort(config.port)
+        connectionFactory.setUsername(config.username)
+        connectionFactory.setPassword(config.password)
+        connectionFactory.setAutomaticRecoveryEnabled(config.networkRecoveryInterval.isDefined)
+        config.networkRecoveryInterval.map(_.toMillis.toInt).foreach(connectionFactory.setNetworkRecoveryInterval)
+        config.virtualHost.foreach(connectionFactory.setVirtualHost)
+        connectionFactory.newConnection()
+      }
+      .attempt
+      .flatTap {
+        case Right(_) =>
+          logger.info(s"AmqpClient has been started successfully!").pure[F]
+        case Left(exception) =>
+          logger.error(s"Failure when starting AmqpClient because ${exception.getMessage}", exception).pure[F]
+      }
+      .rethrow
+}
+
 object AmqpClient extends StrictLogging {
-  def apply[F[_]](implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F]): F[AmqpClient[F]] =
+
+  def apply[F[_]](
+      config: AmqpClientConfig)(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F]): F[AmqpClient[F]] =
     for {
-      channel <- F.delay(createChannel)
-      client  = mkClient(channel)
-    } yield client
+      connectionManager <- F.delay(AmqpClientConnectionManager(config))
+      connection        <- connectionManager.createConnection(config)
+      channel           <- connectionManager.createChannel(connection)
+    } yield mkClient(channel)
 
-  private def createChannel: RabbitChannel = ???
-
-  private def mkClient[F[_]](channel: RabbitChannel)(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F]): AmqpClient[F] =
+  private def mkClient[F[_]](
+      channel: RabbitChannel)(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F]): AmqpClient[F] =
     new AmqpClient[F] {
 
       override def performOps(thunk: AmqpOps => F[Unit]): F[Unit]       = thunk(ChannelAmqpOps(channel))
@@ -66,7 +116,8 @@ object AmqpClient extends StrictLogging {
                                       properties: com.rabbitmq.client.AMQP.BasicProperties,
                                       body: Array[Byte]): Unit = {
             val delivery = Consumer.deliveryFrom(consumerTag, envelope, properties, body)
-            Consumer.processDelivery(channel, queueName, handler, exceptionalAction, delivery)
+            Consumer
+              .processDelivery(channel, queueName, handler, exceptionalAction, delivery)
               .attempt
               .recoverWith {
                 case throwable =>
@@ -82,9 +133,9 @@ object AmqpClient extends StrictLogging {
         }
 
         for {
-         consumerTag <- F.delay(ConsumerTag.create(queueName))
-          _ <- F.delay(channel.basicQos(prefetchCount))
-          _ <- F.delay(channel.basicConsume(queueName.value, false, consumerTag.value, consumeHandler))
+          consumerTag <- F.delay(ConsumerTag.create(queueName))
+          _           <- F.delay(channel.basicQos(prefetchCount))
+          _           <- F.delay(channel.basicConsume(queueName.value, false, consumerTag.value, consumeHandler))
         } yield ()
       }
     }
