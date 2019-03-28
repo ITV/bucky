@@ -134,7 +134,9 @@ lazy val core = project
       "org.scalatest"              %% "scalatest"     % scalaTestVersion % "test",
       "org.typelevel" %% "cats-core" % "1.6.0",
       "org.typelevel" %% "cats-effect" % "1.2.0",
-      "com.rabbitmq"               % "amqp-client"    % amqpClientVersion
+      "com.rabbitmq"               % "amqp-client"    % amqpClientVersion,
+      "ch.qos.logback"             % "logback-classic"            % "1.2.3" % "test"
+
     )
   )
   .configs(IntegrationTest)

@@ -3,19 +3,14 @@ package com.itv.bucky
 import java.util.concurrent.TimeUnit
 
 import cats.effect._
+import cats.effect.concurrent.Ref
 import cats.implicits._
 import cats.effect.implicits._
-import com.rabbitmq.client.{
-  ConnectionFactory,
-  DefaultConsumer,
-  ShutdownSignalException,
-  Channel => RabbitChannel,
-  Connection => RabbitConnection,
-  Envelope => RabbitMQEnvelope
-}
+import com.rabbitmq.client.{ConfirmCallback, ConnectionFactory, DefaultConsumer, ReturnListener, ShutdownSignalException, Channel => RabbitChannel, Connection => RabbitConnection, Envelope => RabbitMQEnvelope}
 import com.itv.bucky.decl.{Binding, Exchange, ExchangeBinding, Queue}
 import com.typesafe.scalalogging.StrictLogging
 
+import scala.collection.mutable
 import scala.concurrent.duration.FiniteDuration
 import scala.util.Try
 import scala.language.higherKinds
@@ -34,6 +29,7 @@ case class AmqpClientConnectionManager[F[_]](amqpConfig: AmqpClientConfig)(impli
                                                                            cs: ContextShift[F],
                                                                            t: Timer[F])
     extends StrictLogging {
+
   def createChannel(connection: RabbitConnection): F[RabbitChannel] =
     F.delay {
         logger.info(s"Starting Channel")
@@ -87,21 +83,33 @@ object AmqpClient extends StrictLogging {
       channel: RabbitChannel)(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F]): AmqpClient[F] =
     new AmqpClient[F] {
 
+      val unconfirmedPublications: Ref[F,mutable.TreeMap[Long, Either[Throwable, Unit] => Unit]] = ???
+      private def addPublication[F[_]](h: Either[Throwable, Unit] => Unit) : F[Unit] = ???
+
+
       override def performOps(thunk: AmqpOps => F[Unit]): F[Unit]       = thunk(ChannelAmqpOps(channel))
       override def estimatedMessageCount(queueName: QueueName): F[Long] = F.delay(channel.messageCount(queueName.value))
-      override def publisher(timeout: FiniteDuration): Publisher[F, PublishCommand] =
-        cmd => {
-          (for {
-            _ <- cs.shift
-            _ <- F.delay(
-              channel.basicPublish(cmd.exchange.value,
-                                   cmd.routingKey.value,
-                                   false,
-                                   false,
-                                   MessagePropertiesConverters(cmd.basicProperties),
-                                   cmd.body.value))
-          } yield ()).timeout(timeout)
-        }
+      override def publisher(timeout: FiniteDuration): Publisher[F, PublishCommand] = cmd => {
+        (for {
+          _ <- cs.shift
+          _ <- F.delay(channel.confirmSelect())
+          _ <- F.delay(
+            channel.addConfirmListener(
+              (dt: Long, multiple: Boolean) => unconfirmedPublications.get.map(_(dt)(Right(()))).toIO.unsafeRunSync(),
+              (dt: Long, multiple: Boolean) => logger.error(s"Nack Received $dt $multiple")
+            )
+          )
+          _ <- F.defer()
+          _ <- addPublication()
+          _ <- F.delay(
+            channel.basicPublish(cmd.exchange.value,
+                                 cmd.routingKey.value,
+                                 false,
+                                 false,
+                                 MessagePropertiesConverters(cmd.basicProperties),
+                                 cmd.body.value))
+        } yield ()).timeout(timeout)
+      }
 
       import cats.effect.implicits._
 
