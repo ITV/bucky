@@ -52,4 +52,8 @@ class PublisherTest extends FunSuite with ScalaFutures {
         })
     }
   }
+
+  test("should have a publisherOf method") {
+    fail("do some work")
+  }
 }

@@ -1,7 +1,10 @@
 package com.itv.bucky
 
+import java.util.UUID
+
 import cats.effect.{ContextShift, IO, Timer}
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
+import com.itv.bucky.decl.{Declaration, Exchange, Queue}
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
@@ -11,12 +14,12 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.reflectiveCalls
 
-class ConsumerTest extends FunSuite with Eventually with IntegrationPatience with ScalaFutures {
+class DeclarationTest extends FunSuite with Eventually with IntegrationPatience with ScalaFutures {
   def withDefaultClient(test: AmqpClient[IO] => IO[Unit]): Unit = {
     val ec                            = ExecutionContext.global
     implicit val cs: ContextShift[IO] = IO.contextShift(ec)
     implicit val timer: Timer[IO]     = IO.timer(ec)
-    AmqpClient[IO](AmqpClientConfig("localhost", 5672, "guest", "guest"))
+    AmqpClient[IO](AmqpClientConfig("172.17.0.2", 5672, "guest", "guest"))
       .bracket(test)(_.shutdown())
 
 
@@ -31,20 +34,29 @@ class ConsumerTest extends FunSuite with Eventually with IntegrationPatience wit
     }
   }
 
-  test("A message can be published and consumed") {
+  test("We can declare things") {
     withDefaultClient { client =>
-      val exchange = ExchangeName("")
-      val queue    = QueueName("aqueue")
-      val rk       = RoutingKey(queue.value)
+      val exchangeName = ExchangeName(UUID.randomUUID().toString)
+      val queueName    = QueueName(UUID.randomUUID().toString)
+      val rk       = RoutingKey(UUID.randomUUID().toString)
       val message  = "Hello"
+
+      val declarations = List(
+        Queue(name = queueName),
+        Exchange(name = exchangeName)
+          .binding(rk -> queueName)
+      )
+
       val commandBuilder = PublishCommandBuilder
         .publishCommandBuilder[String](StringPayloadMarshaller)
-        .using(exchange)
+        .using(exchangeName)
         .using(rk)
         .toPublishCommand(message)
+
       val handler = accHandler
       for {
-        _ <- client.consumer(queue, handler.apply)
+        _ <- client.declare(declarations)
+        _ <- client.consumer(queueName, handler.apply)
         _ <- client.publisher(10.second)(commandBuilder)
       } yield {
         eventually {
@@ -52,10 +64,6 @@ class ConsumerTest extends FunSuite with Eventually with IntegrationPatience wit
         }
       }
     }
-  }
-  
-  test("should have a consumerOf method") {
-    fail("do some work")
   }
 
 }

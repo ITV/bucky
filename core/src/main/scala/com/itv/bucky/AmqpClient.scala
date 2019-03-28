@@ -3,31 +3,19 @@ package com.itv.bucky
 import java.util.concurrent.TimeUnit
 
 import cats.effect._
-import cats.effect.concurrent.{Deferred, Ref}
-import cats.implicits._
 import cats.effect.implicits._
-import com.rabbitmq.client.{
-  ConfirmCallback,
-  ConfirmListener,
-  ConnectionFactory,
-  DefaultConsumer,
-  ReturnListener,
-  ShutdownSignalException,
-  Channel => RabbitChannel,
-  Connection => RabbitConnection,
-  Envelope => RabbitMQEnvelope
-}
-import com.itv.bucky.decl.{Binding, Exchange, ExchangeBinding, Queue}
+import cats.implicits._
+import com.itv.bucky.decl._
+import com.rabbitmq.client.{Channel => RabbitChannel}
 import com.typesafe.scalalogging.StrictLogging
 
-import scala.collection.immutable.TreeMap
-import scala.collection.mutable
 import scala.concurrent.duration.FiniteDuration
-import scala.util.Try
 import scala.language.higherKinds
+import scala.util.Try
 
 trait AmqpClient[F[_]] {
-  def performOps(thunk: AmqpOps => F[Unit]): F[Unit]
+  def declare(declarations: Declaration*): F[Unit]
+  def declare(declarations: Iterable[Declaration]): F[Unit]
   def estimatedMessageCount(queueName: QueueName): F[Long]
   def publisher(timeout: FiniteDuration = FiniteDuration(10, TimeUnit.SECONDS)): Publisher[F, PublishCommand]
   def consumer(queueName: QueueName,
@@ -37,182 +25,36 @@ trait AmqpClient[F[_]] {
   def shutdown(): F[Unit]
 }
 
-case class AmqpClientConnectionManager[F[_]](amqpConfig: AmqpClientConfig)(implicit F: ConcurrentEffect[F],
-                                                                           cs: ContextShift[F],
-                                                                           t: Timer[F])
-    extends StrictLogging {
-
-  def createChannel(connection: RabbitConnection): F[RabbitChannel] =
-    F.delay {
-        logger.info(s"Starting Channel")
-        val channel = connection.createChannel()
-        channel.addShutdownListener((cause: ShutdownSignalException) => logger.warn(s"Channel shut down", cause))
-        channel
-      }
-      .attempt
-      .flatTap {
-        case Right(_) =>
-          F.delay(logger.info(s"Channel has been started successfully!"))
-        case Left(exception) =>
-          F.delay(logger.error(s"Failure when starting Channel because ${exception.getMessage}", exception))
-      }
-      .rethrow
-
-  /*
-
-          _ <- F.delay(channel.confirmSelect())
-          _ <- F.delay(
-            channel.addConfirmListener(
-              (dt: Long, multiple: Boolean) => unconfirmedPublications.get.map(_(dt)(Right(()))).toIO.unsafeRunSync(),
-              (dt: Long, multiple: Boolean) => logger.error(s"Nack Received $dt $multiple")
-            )
-          )
-   */
-
-  def createConnection(config: AmqpClientConfig): F[RabbitConnection] =
-    F.delay {
-        logger.info(s"Starting AmqpClient")
-        val connectionFactory = new ConnectionFactory()
-        connectionFactory.setHost(config.host)
-        connectionFactory.setPort(config.port)
-        connectionFactory.setUsername(config.username)
-        connectionFactory.setPassword(config.password)
-        connectionFactory.setAutomaticRecoveryEnabled(config.networkRecoveryInterval.isDefined)
-        config.networkRecoveryInterval.map(_.toMillis.toInt).foreach(connectionFactory.setNetworkRecoveryInterval)
-        config.virtualHost.foreach(connectionFactory.setVirtualHost)
-        connectionFactory.newConnection()
-      }
-      .attempt
-      .flatTap {
-        case Right(_) =>
-          logger.info(s"AmqpClient has been started successfully!").pure[F]
-        case Left(exception) =>
-          logger.error(s"Failure when starting AmqpClient because ${exception.getMessage}", exception).pure[F]
-      }
-      .rethrow
-}
-
 object AmqpClient extends StrictLogging {
-
-  private def confirmListener[F[_]](pendingConfirmations: Ref[F, TreeMap[Long, Deferred[F, Boolean]]])(
-      implicit F: ConcurrentEffect[F]): ConfirmListener =
-    new ConfirmListener {
-      private def pop[T](deliveryTag: Long, multiple: Boolean): F[List[Deferred[F, Boolean]]] =
-        pendingConfirmations.modify { x =>
-          if (multiple) {
-            val entries     = x.until(deliveryTag + 1).toList
-            val nextPending = x -- entries.map { case (key, _) => key }
-
-            (nextPending, entries.map { case (_, value) => value })
-          } else {
-            val nextPending = x - deliveryTag
-
-            (nextPending, x.get(deliveryTag).toList)
-          }
-        }
-
-      override def handleAck(deliveryTag: Long, multiple: Boolean): Unit =
-        pop(deliveryTag, multiple)
-          .flatMap { toComplete =>
-            logger.error("Received ack for delivery tag: {} and multiple: {}", deliveryTag, multiple)
-            toComplete.map(_.complete(true)).sequence
-          }
-          .toIO
-          .unsafeRunSync()
-
-      override def handleNack(deliveryTag: Long, multiple: Boolean): Unit =
-        pop(deliveryTag, multiple)
-          .flatMap { toComplete =>
-            logger.error("Received Nack for delivery tag: {} and multiple: {}", deliveryTag, multiple)
-            toComplete.map(_.complete(false)).sequence
-          }
-          .toIO
-          .unsafeRunSync()
-    }
 
   def apply[F[_]](
       config: AmqpClientConfig)(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F]): F[AmqpClient[F]] =
     for {
-      _                    <- cs.shift
-      connectionManager    <- F.delay(AmqpClientConnectionManager(config))
-      connection           <- connectionManager.createConnection(config)
-      channel              <- connectionManager.createChannel(connection)
-      _                    <- F.delay(channel.confirmSelect())
-      pendingConfirmations <- Ref.of[F, TreeMap[Long, Deferred[F, Boolean]]](TreeMap.empty)
-      _                    <- F.delay(channel.addConfirmListener(confirmListener(pendingConfirmations)))
-    } yield mkClient(connection, channel, pendingConfirmations)
+      _                 <- cs.shift
+      connectionManager <- AmqpClientConnectionManager(config)
+    } yield mkClient(connectionManager)
 
-  private def mkClient[F[_]](connection: RabbitConnection,
-                             channel: RabbitChannel,
-                             pendingConfirmations: Ref[F, TreeMap[Long, Deferred[F, Boolean]]])(
-      implicit F: ConcurrentEffect[F],
-      cs: ContextShift[F],
-      t: Timer[F]): AmqpClient[F] =
+  private def mkClient[F[_]](connectionManager: AmqpClientConnectionManager[F])(implicit F: Concurrent[F],
+                                                                                cs: ContextShift[F],
+                                                                                t: Timer[F]): AmqpClient[F] =
     new AmqpClient[F] {
-
-      override def performOps(thunk: AmqpOps => F[Unit]): F[Unit]       = thunk(ChannelAmqpOps(channel))
-      override def estimatedMessageCount(queueName: QueueName): F[Long] = F.delay(channel.messageCount(queueName.value))
+      override def estimatedMessageCount(queueName: QueueName): F[Long] =
+        connectionManager.estimatedMessageCount(queueName)
       override def publisher(timeout: FiniteDuration): Publisher[F, PublishCommand] = cmd => {
         (for {
-          _      <- cs.shift
-          signal <- Deferred[F, Boolean]
-          _ <- channel.synchronized {
-            val deliveryTag = channel.getNextPublishSeqNo
-
-            pendingConfirmations
-              .update(_ + (deliveryTag -> signal))
-              .map { _ =>
-                channel.basicPublish(cmd.exchange.value,
-                                     cmd.routingKey.value,
-                                     false,
-                                     false,
-                                     MessagePropertiesConverters(cmd.basicProperties),
-                                     cmd.body.value)
-              }
-          }
-          isAck <- signal.get
-          _     <- if (isAck) F.pure(()) else F.raiseError[Unit](new RuntimeException("Publish failed"))
+          _ <- cs.shift
+          _ <- connectionManager.publish(cmd)
         } yield ()).timeout(timeout)
       }
-
-      import cats.effect.implicits._
-
       override def consumer(queueName: QueueName,
                             handler: Handler[F, Delivery],
                             exceptionalAction: ConsumeAction,
-                            prefetchCount: Int): F[Unit] = {
-        val consumeHandler = new DefaultConsumer(channel) {
-          logger.info(s"Creating consumer for $queueName")
-          override def handleDelivery(consumerTag: String,
-                                      envelope: RabbitMQEnvelope,
-                                      properties: com.rabbitmq.client.AMQP.BasicProperties,
-                                      body: Array[Byte]): Unit = {
-            val delivery = Consumer.deliveryFrom(consumerTag, envelope, properties, body)
-            Consumer
-              .processDelivery(channel, queueName, handler, exceptionalAction, delivery)
-              .attempt
-              .recoverWith {
-                case throwable =>
-                  F.point {
-                    logger.error("Unhandled exception whilst processing delivery", throwable)
-                    Left(throwable)
-                  }
-              }
-              .void
-              .toIO
-              .unsafeRunSync
-          }
-        }
+                            prefetchCount: Int): F[Unit] =
+        connectionManager.registerConsumer(queueName, handler, exceptionalAction, prefetchCount)
 
-        for {
-          consumerTag <- F.delay(ConsumerTag.create(queueName))
-          _           <- cs.shift
-          _           <- F.delay(channel.basicQos(prefetchCount))
-          _           <- F.delay(channel.basicConsume(queueName.value, false, consumerTag.value, consumeHandler))
-        } yield ()
-      }
-
-      override def shutdown(): F[Unit] = F.delay(channel.close()).attempt.flatMap(_ => F.delay(connection.close()))
+      override def shutdown(): F[Unit]                                   = connectionManager.shutdown()
+      override def declare(declarations: Declaration*): F[Unit]          = connectionManager.declare(declarations)
+      override def declare(declarations: Iterable[Declaration]): F[Unit] = connectionManager.declare(declarations)
     }
 }
 
