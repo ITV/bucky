@@ -107,7 +107,7 @@ object AmqpClient extends StrictLogging {
 
       override def handleNack(deliveryTag: Long, multiple: Boolean): Unit =
         pop(deliveryTag, multiple).flatMap { toComplete =>
-          toComplete.map(_.complete(true)).sequence
+          toComplete.map(_.complete(false)).sequence
         }
     }
 
