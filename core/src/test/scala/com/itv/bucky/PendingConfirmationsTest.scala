@@ -19,14 +19,13 @@ class PendingConfirmationsTest extends FunSuite {
       map = TreeMap(1L -> signal)
       ref <- Ref.of[IO, TreeMap[Long, Deferred[IO, Boolean]]](map)
       pendingConfirmListener = PendingConfirmListener(ref)
-      _ <- IO.delay(pendingConfirmListener.handleAck(1L, multiple = false))
-      refAfterUpdate <- ref.get
+      _                 <- IO.delay(pendingConfirmListener.handleAck(1L, multiple = false))
+      refAfterUpdate    <- ref.get
       signalAfterUpdate <- signal.get
-    }
-      yield {
-        signalAfterUpdate shouldBe true
-        refAfterUpdate shouldBe 'empty
-      }).unsafeRunSync()
+    } yield {
+      signalAfterUpdate shouldBe true
+      refAfterUpdate shouldBe 'empty
+    }).unsafeRunSync()
   }
 
   test("complete with true after confirmation ack (multiple)") {
@@ -42,23 +41,34 @@ class PendingConfirmationsTest extends FunSuite {
       pendingConfirmListener = PendingConfirmListener(ref)
       _ <- IO.delay(pendingConfirmListener.handleAck(2L, multiple = true))
 
-      refAfterUpdate <- ref.get
+      refAfterUpdate     <- ref.get
       signal1AfterUpdate <- signal1.get
       signal2AfterUpdate <- signal2.get
       signal3AfterUpdate <- signal3.tryGet
-    }
-      yield {
-        refAfterUpdate should have size 1
-        refAfterUpdate(3L) shouldBe signal3
+    } yield {
+      refAfterUpdate should have size 1
+      refAfterUpdate(3L) shouldBe signal3
 
-        signal1AfterUpdate shouldBe true
-        signal2AfterUpdate shouldBe true
-        signal3AfterUpdate shouldBe None
-      }).unsafeRunSync()
+      signal1AfterUpdate shouldBe true
+      signal2AfterUpdate shouldBe true
+      signal3AfterUpdate shouldBe None
+    }).unsafeRunSync()
   }
 
   test("should remove pending confirmations after a publish timeout") {
-    fail("do some work")
+    implicit val cs: ContextShift[IO] = IO.contextShift(scala.concurrent.ExecutionContext.Implicits.global)
+    (for {
+      signal <- Deferred.tryable[IO, Boolean]
+      map = TreeMap(1L -> signal)
+      ref <- Ref.of[IO, TreeMap[Long, Deferred[IO, Boolean]]](map)
+      pendingConfirmListener = PendingConfirmListener(ref)
+      _                 <- IO.delay(pendingConfirmListener.handleAck(1L, multiple = false))
+      refAfterUpdate    <- ref.get.attempt
+      signalAfterUpdate <- signal.tryGet
+    } yield {
+      signalAfterUpdate shouldBe None
+      refAfterUpdate shouldBe 'empty
+    }).unsafeRunSync()
   }
 
 }

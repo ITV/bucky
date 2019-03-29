@@ -27,24 +27,22 @@ trait AmqpClient[F[_]] {
 
 object AmqpClient extends StrictLogging {
 
-  def apply[F[_]](
-      config: AmqpClientConfig)(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F]): F[AmqpClient[F]] =
+  def apply[F[_]](config: AmqpClientConfig)(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F]): F[AmqpClient[F]] =
     for {
       _                 <- cs.shift
       connectionManager <- AmqpClientConnectionManager(config)
     } yield mkClient(connectionManager)
 
-  private def mkClient[F[_]](connectionManager: AmqpClientConnectionManager[F])(implicit F: Concurrent[F],
-                                                                                cs: ContextShift[F],
-                                                                                t: Timer[F]): AmqpClient[F] =
+  private def mkClient[F[_]](
+      connectionManager: AmqpClientConnectionManager[F])(implicit F: Concurrent[F], cs: ContextShift[F], t: Timer[F]): AmqpClient[F] =
     new AmqpClient[F] {
       override def estimatedMessageCount(queueName: QueueName): F[Long] =
         connectionManager.estimatedMessageCount(queueName)
       override def publisher(timeout: FiniteDuration): Publisher[F, PublishCommand] = cmd => {
-        (for {
+        for {
           _ <- cs.shift
-          _ <- connectionManager.publish(cmd)
-        } yield ()).timeout(timeout)
+          _ <- connectionManager.publish(timeout, cmd)
+        } yield ()
       }
       override def registerConsumer(queueName: QueueName,
                                     handler: Handler[F, Delivery],
@@ -72,10 +70,7 @@ case class ChannelAmqpOps(channel: RabbitChannel) extends AmqpOps {
   }
 
   override def bindQueue(binding: Binding): Try[Unit] = Try {
-    channel.queueBind(binding.queueName.value,
-                      binding.exchangeName.value,
-                      binding.routingKey.value,
-                      binding.arguments.asJava)
+    channel.queueBind(binding.queueName.value, binding.exchangeName.value, binding.routingKey.value, binding.arguments.asJava)
   }
 
   override def bindExchange(binding: ExchangeBinding): Try[Unit] = Try {
@@ -88,11 +83,7 @@ case class ChannelAmqpOps(channel: RabbitChannel) extends AmqpOps {
   }
 
   override def declareQueue(queue: Queue): Try[Unit] = Try {
-    channel.queueDeclare(queue.name.value,
-                         queue.isDurable,
-                         queue.isExclusive,
-                         queue.shouldAutoDelete,
-                         queue.arguments.asJava)
+    channel.queueDeclare(queue.name.value, queue.isDurable, queue.isExclusive, queue.shouldAutoDelete, queue.arguments.asJava)
   }
 
   override def purgeQueue(name: QueueName): Try[Unit] = Try {

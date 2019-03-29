@@ -4,19 +4,29 @@ import cats.effect._
 import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.implicits._
 import cats.implicits._
-import com.itv.bucky.AmqpClient.logger
 import com.itv.bucky.decl.Declaration
-import com.rabbitmq.client.{ConfirmListener, ConnectionFactory, DefaultConsumer, ShutdownSignalException, Channel => RabbitChannel, Connection => RabbitConnection, Envelope => RabbitMQEnvelope}
+import com.rabbitmq.client.{
+  ConfirmListener,
+  ConnectionFactory,
+  DefaultConsumer,
+  ShutdownSignalException,
+  Channel => RabbitChannel,
+  Connection => RabbitConnection,
+  Envelope => RabbitMQEnvelope
+}
 import com.typesafe.scalalogging.StrictLogging
 
 import scala.collection.immutable.TreeMap
+import scala.concurrent.duration.FiniteDuration
 import scala.language.higherKinds
+import scala.util.Try
 
-private[bucky] case class PendingConfirmListener[F[_]](
-    pendingConfirmations: Ref[F, TreeMap[Long, Deferred[F, Boolean]]])(implicit sync: ConcurrentEffect[F])
-    extends ConfirmListener with StrictLogging {
+private[bucky] case class PendingConfirmListener[F[_]](pendingConfirmations: Ref[F, TreeMap[Long, Deferred[F, Boolean]]])(
+    implicit sync: ConcurrentEffect[F])
+    extends ConfirmListener
+    with StrictLogging {
 
-  private def pop[T](deliveryTag: Long, multiple: Boolean): F[List[Deferred[F, Boolean]]] =
+  def pop[T](deliveryTag: Long, multiple: Boolean): F[List[Deferred[F, Boolean]]] =
     pendingConfirmations.modify { x =>
       if (multiple) {
         val entries     = x.until(deliveryTag + 1).toList
@@ -49,38 +59,72 @@ private[bucky] case class PendingConfirmListener[F[_]](
       .unsafeRunSync()
 }
 
-private[bucky] case class AmqpClientConnectionManager[F[_]](amqpConfig: AmqpClientConfig,
-                                                     channel: RabbitChannel,
-                                                     connection: RabbitConnection,
-                                                     pendingConfirmListener: PendingConfirmListener[F])(
-    implicit F: ConcurrentEffect[F],
-    cs: ContextShift[F],
-    t: Timer[F])
+private[bucky] case class AmqpClientConnectionManager[F[_]](
+    amqpConfig: AmqpClientConfig,
+    channel: RabbitChannel,
+    pendingConfirmListener: PendingConfirmListener[F])(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F])
     extends StrictLogging {
+
+  private def runWithChannelSync[T](action: F[T]): F[T] =
+    channel.synchronized {
+      F.fromTry(Try {
+        action.toIO.unsafeRunSync()
+      })
+    }
+
   def estimatedMessageCount(queueName: QueueName): F[Long] = F.delay(channel.messageCount(queueName.value))
-  def publish(cmd: PublishCommand): F[Unit] =
+
+  private[bucky] def internalPublish(
+      timeout: FiniteDuration,
+      cmd: PublishCommand,
+      pendingConfListener: PendingConfirmListener[F],
+      nextDeliveryTag: () => F[Long],
+      publish: (PublishCommand, Deferred[F, Boolean], Long) => F[Unit]
+  ) =
     for {
-      signal <- Deferred[F, Boolean]
-      _ <- channel.synchronized {
-        val deliveryTag = channel.getNextPublishSeqNo
-        pendingConfirmListener.pendingConfirmations
-          .update(_ + (deliveryTag -> signal))
-          .map { _ =>
-            channel.basicPublish(cmd.exchange.value,
-                                 cmd.routingKey.value,
-                                 false,
-                                 false,
-                                 MessagePropertiesConverters(cmd.basicProperties),
-                                 cmd.body.value)
-          }
-      }
-      isAck <- signal.get
-      _     <- if (isAck) F.pure(()) else F.raiseError[Unit](new RuntimeException("Publish failed"))
+      deliveryTag <- Ref.of[F, Option[Long]](None)
+      _ <- (for {
+        signal <- Deferred[F, Boolean]
+        _ <- runWithChannelSync {
+          for {
+            nextPublishSeq <- nextDeliveryTag()
+            _              <- deliveryTag.set(Some(nextPublishSeq))
+            _              <- publishMessage(cmd, signal, nextPublishSeq)
+          } yield ()
+        }
+        _ <- signal.get.ifM(F.unit, F.raiseError[Unit](new RuntimeException("Failed to publish msg.")))
+      } yield ())
+        .timeout(timeout)
+        .recoverWith {
+          case e =>
+            runWithChannelSync {
+              for {
+                dl          <- deliveryTag.get
+                deliveryTag <- F.fromOption(dl, new RuntimeException("Timeout occurred before a delivery tag could be obtained.", e))
+                _           <- pendingConfirmListener.pop(deliveryTag, multiple = false)
+                _           <- F.raiseError[Unit](e)
+              } yield ()
+            }
+        }
     } yield ()
-  def registerConsumer(queueName: QueueName,
-                       handler: Handler[F, Delivery],
-                       exceptionalAction: ConsumeAction,
-                       prefetchCount: Int): F[Unit] = {
+
+  def publish(timeout: FiniteDuration, cmd: PublishCommand): F[Unit] =
+    internalPublish(
+      timeout,
+      cmd,
+      pendingConfirmListener,
+      () => F.delay(channel.getNextPublishSeqNo),
+      publishMessage
+    )
+
+  private def publishMessage(cmd: PublishCommand, signal: Deferred[F, Boolean], deliveryTag: Long): F[Unit] =
+    pendingConfirmListener.pendingConfirmations
+      .update(_ + (deliveryTag -> signal))
+      .map { _ =>
+        channel.basicPublish(cmd.exchange.value, cmd.routingKey.value, false, false, MessagePropertiesConverters(cmd.basicProperties), cmd.body.value)
+      }
+
+  def registerConsumer(queueName: QueueName, handler: Handler[F, Delivery], exceptionalAction: ConsumeAction, prefetchCount: Int): F[Unit] = {
     val consumeHandler = new DefaultConsumer(channel) {
       logger.info(s"Creating consumer for $queueName")
       override def handleDelivery(consumerTag: String,
@@ -111,7 +155,7 @@ private[bucky] case class AmqpClientConnectionManager[F[_]](amqpConfig: AmqpClie
       _           <- F.delay(channel.basicConsume(queueName.value, false, consumerTag.value, consumeHandler))
     } yield ()
   }
-  def shutdown(): F[Unit] = F.delay(channel.close()).attempt.flatMap(_ => F.delay(connection.close()))
+  def shutdown(): F[Unit] = F.delay(channel.close()).attempt.flatMap(_ => F.delay(channel.getConnection.close()))
 
   def declare(declarations: Iterable[Declaration]): F[Unit] =
     Declaration.runAll[F](declarations).apply(ChannelAmqpOps(channel))
@@ -120,9 +164,7 @@ private[bucky] case class AmqpClientConnectionManager[F[_]](amqpConfig: AmqpClie
 
 private[bucky] object AmqpClientConnectionManager extends StrictLogging {
 
-  def apply[F[_]](config: AmqpClientConfig)(implicit F: ConcurrentEffect[F],
-                                            cs: ContextShift[F],
-                                            t: Timer[F]): F[AmqpClientConnectionManager[F]] =
+  def apply[F[_]](config: AmqpClientConfig)(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F]): F[AmqpClientConnectionManager[F]] =
     for {
       pendingConfirmations <- Ref.of[F, TreeMap[Long, Deferred[F, Boolean]]](TreeMap.empty)
       connection           <- createConnection(config)
@@ -130,7 +172,7 @@ private[bucky] object AmqpClientConnectionManager extends StrictLogging {
       _                    <- F.delay(channel.confirmSelect())
       confirmListener      <- F.delay(PendingConfirmListener(pendingConfirmations))
       _                    <- F.delay(channel.addConfirmListener(confirmListener))
-    } yield AmqpClientConnectionManager(config, channel, connection, confirmListener)
+    } yield AmqpClientConnectionManager(config, channel, confirmListener)
 
   private def createChannel[F[_]](connection: RabbitConnection)(implicit F: Sync[F]): F[RabbitChannel] =
     F.delay {

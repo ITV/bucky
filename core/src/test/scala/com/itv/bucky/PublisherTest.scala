@@ -33,7 +33,7 @@ class PublisherTest extends FunSuite with ScalaFutures {
     }
   }
 
-  test("A message should failt to be published on a non exitent exchange") {
+  test("A message should fail to be published on a non existent exchange") {
     withDefaultClient { client =>
       val exchange = ExchangeName("non-existent-exchange")
       val queue    = QueueName("aqueue")
