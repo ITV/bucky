@@ -16,10 +16,8 @@ class ConsumerTest extends FunSuite with Eventually with IntegrationPatience wit
     val ec                            = ExecutionContext.global
     implicit val cs: ContextShift[IO] = IO.contextShift(ec)
     implicit val timer: Timer[IO]     = IO.timer(ec)
-    AmqpClient[IO](AmqpClientConfig("localhost", 5672, "guest", "guest"))
+    AmqpClient[IO](AmqpClientConfig("172.17.0.2", 5672, "guest", "guest"))
       .bracket(test)(_.shutdown())
-
-
       .unsafeRunSync()
   }
 

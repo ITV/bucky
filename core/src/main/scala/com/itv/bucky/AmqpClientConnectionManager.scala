@@ -78,7 +78,7 @@ private[bucky] case class AmqpClientConnectionManager[F[_]](
       timeout: FiniteDuration,
       cmd: PublishCommand,
       pendingConfListener: PendingConfirmListener[F],
-      nextDeliveryTag: () => F[Long],
+      generateNextDeliveryTag: () => F[Long],
       publish: (PublishCommand, Deferred[F, Boolean], Long) => F[Unit]
   ) =
     for {
@@ -87,9 +87,10 @@ private[bucky] case class AmqpClientConnectionManager[F[_]](
         signal <- Deferred[F, Boolean]
         _ <- runWithChannelSync {
           for {
-            nextPublishSeq <- nextDeliveryTag()
+            nextPublishSeq <- generateNextDeliveryTag()
             _              <- deliveryTag.set(Some(nextPublishSeq))
-            _              <- publishMessage(cmd, signal, nextPublishSeq)
+            _              <- pendingConfListener.pendingConfirmations.update(_ + (nextPublishSeq -> signal))
+            _              <- publish(cmd, signal, nextPublishSeq)
           } yield ()
         }
         _ <- signal.get.ifM(F.unit, F.raiseError[Unit](new RuntimeException("Failed to publish msg.")))
@@ -101,7 +102,7 @@ private[bucky] case class AmqpClientConnectionManager[F[_]](
               for {
                 dl          <- deliveryTag.get
                 deliveryTag <- F.fromOption(dl, new RuntimeException("Timeout occurred before a delivery tag could be obtained.", e))
-                _           <- pendingConfirmListener.pop(deliveryTag, multiple = false)
+                _           <- pendingConfListener.pop(deliveryTag, multiple = false)
                 _           <- F.raiseError[Unit](e)
               } yield ()
             }
@@ -118,11 +119,9 @@ private[bucky] case class AmqpClientConnectionManager[F[_]](
     )
 
   private def publishMessage(cmd: PublishCommand, signal: Deferred[F, Boolean], deliveryTag: Long): F[Unit] =
-    pendingConfirmListener.pendingConfirmations
-      .update(_ + (deliveryTag -> signal))
-      .map { _ =>
-        channel.basicPublish(cmd.exchange.value, cmd.routingKey.value, false, false, MessagePropertiesConverters(cmd.basicProperties), cmd.body.value)
-      }
+    F.delay {
+      channel.basicPublish(cmd.exchange.value, cmd.routingKey.value, false, false, MessagePropertiesConverters(cmd.basicProperties), cmd.body.value)
+    }
 
   def registerConsumer(queueName: QueueName, handler: Handler[F, Delivery], exceptionalAction: ConsumeAction, prefetchCount: Int): F[Unit] = {
     val consumeHandler = new DefaultConsumer(channel) {
