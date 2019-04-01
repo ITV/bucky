@@ -5,7 +5,7 @@ import com.itv.bucky.decl.Queue
 import com.itv.bucky.lifecycle._
 import com.itv.bucky._
 import com.itv.lifecycle.Lifecycle
-import org.scalatest.FunSuite
+import org.scalatest.{FunSuite, Ignore}
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.Eventually.eventually
 import org.scalatest.concurrent.{Eventually, ScalaFutures}
@@ -14,6 +14,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.Random
 
+@Ignore
 class NetworkRecoveryIntegrationTest extends FunSuite with ScalaFutures {
 
   import Implicits._

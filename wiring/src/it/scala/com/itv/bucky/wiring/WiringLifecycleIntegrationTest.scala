@@ -4,11 +4,12 @@ import com.itv.bucky._
 import com.itv.bucky.future.futureMonad
 import com.itv.bucky.lifecycle.AmqpClientLifecycle
 import com.itv.lifecycle.{Lifecycle, NoOpLifecycle}
-import org.scalatest.FunSuite
+import org.scalatest.{FunSuite, Ignore}
 
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future}
 
+@Ignore
 class WiringLifecycleIntegrationTest extends FunSuite with WiringIntegrationTest {
 
   val incoming = new Wiring[String](WiringName("lifecycle.incoming"))

@@ -1,10 +1,13 @@
 package com.itv.bucky.wiring
+import java.util.UUID
+
 import _root_.fs2.Stream
 import cats.effect.IO
 import cats.effect.IO.contextShift
 import cats.implicits._
 import com.itv.bucky.UnmarshalResult.Success
 import com.itv.bucky._
+import com.itv.bucky.ext.fs2.supersync.SuperSyncSimulator
 import com.itv.bucky.fs2._
 import org.scalatest.FunSuite
 
@@ -22,7 +25,7 @@ class WiringFs2IntegrationTest extends FunSuite with WiringIntegrationTest {
       for {
         publishMessage <- incoming.publisher(fixture.client)
         _              <- publishMessage("fs2 publisher test")
-      } yield eventually {
+      } yield {
         assert(fixture.sink.receivedMessages.size == 1)
         assert(fixture.sink.receivedMessages.head.body.unmarshal[String] == Success(s"Outgoing: fs2 publisher test"))
       }
@@ -30,7 +33,7 @@ class WiringFs2IntegrationTest extends FunSuite with WiringIntegrationTest {
   }
 
   case class Fixture(
-      client: IOAmqpClient,
+      client: SuperSyncSimulator,
       sink: StubConsumeHandler[IO, Delivery]
   )
 
@@ -49,8 +52,8 @@ class WiringFs2IntegrationTest extends FunSuite with WiringIntegrationTest {
   }
 
   def withApp(fn: Fixture => IO[_]) = {
+    val client = new SuperSyncSimulator
     val result = for {
-      client <- clientFrom(amqpConfig)
       _      <- createAppStream(client)
       sink   <- outgoing.fs2StubConsumeHandler(client)
       result <- Stream
