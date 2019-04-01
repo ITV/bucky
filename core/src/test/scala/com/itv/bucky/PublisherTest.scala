@@ -15,23 +15,16 @@ import scala.concurrent.duration._
 import org.scalatest.Matchers._
 
 import scala.collection.immutable.TreeMap
+import com.itv.bucky.SuperTest.withDefaultClient
 
 class PublisherTest extends FunSuite with ScalaFutures {
-  def withDefaultClient(test: AmqpClient[IO] => IO[Unit]): Unit = {
-    val ec                            = ExecutionContext.global
-    implicit val cs: ContextShift[IO] = IO.contextShift(ec)
-    implicit val timer: Timer[IO]     = IO.timer(ec)
-    AmqpClient[IO](AmqpClientConfig("172.17.0.2", 5672, "guest", "guest"))
-      .bracket(test)(_.shutdown()).unsafeRunSync()
-
-  }
 
   def withConnectionManager(test: AmqpClientConnectionManager[IO] => IO[Unit]): Unit = {
-    val ec                            = ExecutionContext.global
+    /*    val ec                            = ExecutionContext.global
     implicit val cs: ContextShift[IO] = IO.contextShift(ec)
     implicit val timer: Timer[IO]     = IO.timer(ec)
-    AmqpClientConnectionManager[IO](AmqpClientConfig("172.17.0.2", 5672, "guest", "guest"))
-      .bracket(test)(_.shutdown()).unsafeRunSync()
+    AmqpClientConnectionManager[IO](AmqpClientConfig("127.0.0.1", 5672, "guest", "guest"))
+      .bracket(test)(_.shutdown()).unsafeRunSync()*/
   }
 
   test("A message can be published") {
@@ -50,7 +43,7 @@ class PublisherTest extends FunSuite with ScalaFutures {
         Exchange(exchange).binding(rk -> queue)
       )
       client.declare(declarations).flatMap { _ =>
-        client.publisher(10.second)(commandBuilder)
+        client.publisher()(commandBuilder)
       }
     }
   }
@@ -67,14 +60,14 @@ class PublisherTest extends FunSuite with ScalaFutures {
         .using(rk)
         .toPublishCommand(message)
       client
-        .publisher(1.seconds)(commandBuilder)
+        .publisher()(commandBuilder)
         .attempt
         .map({
           _ shouldBe 'left
         })
     }
   }
-
+  /*
   test("Should clear confirmations map after a timeout") {
     withConnectionManager { connectionManager =>
       val exchange = ExchangeName("test-exchange")
@@ -109,7 +102,7 @@ class PublisherTest extends FunSuite with ScalaFutures {
           after shouldBe 'empty
         }
     }
-  }
+  }*/
 
   test("should have a publisherOf method") {
     fail("do some work")

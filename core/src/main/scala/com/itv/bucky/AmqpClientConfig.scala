@@ -10,8 +10,8 @@ case class AmqpClientConfig(host: String,
                             username: String,
                             password: String,
                             networkRecoveryInterval: Option[FiniteDuration] = Some(3.seconds),
-                            networkRecoveryIntervalOnStart: Option[NetworkRecoveryOnStart] = Some(
-                              NetworkRecoveryOnStart()),
+                            networkRecoveryIntervalOnStart: Option[NetworkRecoveryOnStart] = Some(NetworkRecoveryOnStart()),
+                            publishingTimeout: FiniteDuration,
                             virtualHost: Option[String] = None)
 
 case class NetworkRecoveryOnStart(interval: FiniteDuration = 3.seconds, max: FiniteDuration = 3.seconds) {

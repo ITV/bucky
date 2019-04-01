@@ -2,6 +2,7 @@ package com.itv
 
 import java.lang.management.ManagementFactory
 import java.util.Date
+import com.rabbitmq.client.{Envelope => RabbitEnvelope}
 
 import scala.language.higherKinds
 
@@ -31,10 +32,7 @@ package object bucky {
   type PayloadUnmarshaller[T]  = Unmarshaller[Payload, T]
   type DeliveryUnmarshaller[T] = Unmarshaller[Delivery, T]
 
-  case class PublishCommand(exchange: ExchangeName,
-                            routingKey: RoutingKey,
-                            basicProperties: MessageProperties,
-                            body: Payload) {
+  case class PublishCommand(exchange: ExchangeName, routingKey: RoutingKey, basicProperties: MessageProperties, body: Payload) {
     def description = s"${exchange.value}:${routingKey.value} $body"
   }
 
@@ -64,6 +62,10 @@ package object bucky {
   }
 
   case class Envelope(deliveryTag: Long, redeliver: Boolean, exchangeName: ExchangeName, routingKey: RoutingKey)
+  object Envelope {
+    def fromEnvelope(envelope: RabbitEnvelope) =
+      Envelope(envelope.getDeliveryTag, envelope.isRedeliver, ExchangeName(envelope.getExchange), RoutingKey(envelope.getRoutingKey))
+  }
 
   case class Delivery(body: Payload, consumerTag: ConsumerTag, envelope: Envelope, properties: MessageProperties)
 
@@ -114,13 +116,10 @@ package object bucky {
 
     val minimalPersistentBasic = minimalBasic.copy(deliveryMode = Some(DeliveryMode.persistent))
 
-    val basic = minimalBasic.copy(contentType = Some(ContentType.octetStream),
-                                  deliveryMode = Some(DeliveryMode.nonPersistent),
-                                  priority = Some(0))
+    val basic = minimalBasic.copy(contentType = Some(ContentType.octetStream), deliveryMode = Some(DeliveryMode.nonPersistent), priority = Some(0))
 
-    val persistentBasic = minimalBasic.copy(contentType = Some(ContentType.octetStream),
-                                            deliveryMode = Some(DeliveryMode.persistent),
-                                            priority = Some(0))
+    val persistentBasic =
+      minimalBasic.copy(contentType = Some(ContentType.octetStream), deliveryMode = Some(DeliveryMode.persistent), priority = Some(0))
 
     val textPlain = minimalBasic.copy(
       contentType = Some(ContentType.textPlain),

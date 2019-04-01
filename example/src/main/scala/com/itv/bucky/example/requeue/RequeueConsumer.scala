@@ -3,7 +3,6 @@ package com.itv.bucky.example.requeue
 import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
 import com.itv.bucky.decl._
 import com.itv.bucky._
-import com.itv.bucky.lifecycle.{AmqpClientLifecycle, DeclarationLifecycle}
 import com.itv.bucky.pattern.requeue._
 import com.itv.lifecycle.Lifecycle
 import com.typesafe.config.ConfigFactory
