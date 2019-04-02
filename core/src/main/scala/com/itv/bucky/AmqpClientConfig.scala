@@ -11,7 +11,7 @@ case class AmqpClientConfig(host: String,
                             password: String,
                             networkRecoveryInterval: Option[FiniteDuration] = Some(3.seconds),
                             networkRecoveryIntervalOnStart: Option[NetworkRecoveryOnStart] = Some(NetworkRecoveryOnStart()),
-                            publishingTimeout: FiniteDuration,
+                            publishingTimeout: FiniteDuration = 15.seconds,
                             virtualHost: Option[String] = None,
                             prefetchCount: Int = 0)
 

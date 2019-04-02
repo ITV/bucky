@@ -29,6 +29,7 @@ private[bucky] case class AmqpClientConnectionManager[F[_]](
 
   def publish(cmd: PublishCommand): F[Unit] =
     for {
+      _ <- cs.shift
       deliveryTag <- Ref.of[F, Option[Long]](None)
       _ <- (for {
         signal <- Deferred[F, Boolean]
