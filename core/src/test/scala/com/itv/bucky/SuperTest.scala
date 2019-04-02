@@ -47,7 +47,7 @@ object SuperTest {
         _        <- subscribedHandlers.traverse(_(delivery))
         _        <- confirmListeners.toList.traverse(cl => IO.delay(cl.handleAck(delivery.envelope.deliveryTag, false)))
       } yield ()).attempt
-        .flatTap(_ => IO.delay(publishSeq = publishSeq + 1))
+        .flatTap(_ => IO.delay(pubSeqLock.synchronized(publishSeq = publishSeq + 1)))
         .rethrow
     }
 
