@@ -1,6 +1,7 @@
 package com.itv.bucky
 
 import cats.Applicative
+import com.itv.bucky.consume.Delivery
 import com.typesafe.scalalogging.StrictLogging
 
 import scala.language.higherKinds

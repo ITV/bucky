@@ -4,7 +4,10 @@ import cats.effect._
 import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.implicits._
 import cats.implicits._
+import com.itv.bucky.consume._
+import com.itv.bucky.publish._
 import com.itv.bucky.decl.Declaration
+import com.itv.bucky.publish.PendingConfirmListener
 import com.typesafe.scalalogging.StrictLogging
 
 import scala.collection.immutable.TreeMap
@@ -74,7 +77,7 @@ private[bucky] object AmqpClientConnectionManager extends StrictLogging {
     for {
       pendingConfirmations <- Ref.of[F, TreeMap[Long, Deferred[F, Boolean]]](TreeMap.empty)
       _                    <- channel.confirmSelect
-      confirmListener      <- F.delay(PendingConfirmListener(pendingConfirmations))
+      confirmListener      <- F.delay(publish.PendingConfirmListener(pendingConfirmations))
       _                    <- channel.addConfirmListener(confirmListener)
     } yield AmqpClientConnectionManager(config, channel, confirmListener)
 }

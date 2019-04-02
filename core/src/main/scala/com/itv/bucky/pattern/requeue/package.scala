@@ -1,8 +1,9 @@
 package com.itv.bucky.pattern
 
 import cats.effect.Sync
-import com.itv.bucky.{AmqpClient, ConsumeAction, DeliveryUnmarshalHandler, _}
+import com.itv.bucky.{AmqpClient, DeliveryUnmarshalHandler, _}
 import com.itv.bucky.Unmarshaller._
+import com.itv.bucky.consume.{DeadLetter, Delivery, Requeue, RequeueConsumeAction}
 import com.itv.bucky.decl._
 
 import scala.concurrent.duration.{FiniteDuration, _}
@@ -15,7 +16,6 @@ package object requeue {
   def basicRequeueDeclarations(queueName: QueueName, retryAfter: FiniteDuration = 5.minutes): Iterable[Declaration] = {
     val deadLetterQueueName: QueueName = QueueName(s"${queueName.value}.dlq")
     val dlxExchangeName: ExchangeName  = ExchangeName(s"${queueName.value}.dlx")
-
     requeueDeclarations(queueName,
                         RoutingKey(queueName.value),
                         Exchange(dlxExchangeName).binding(RoutingKey(queueName.value) -> deadLetterQueueName),
@@ -53,7 +53,8 @@ package object requeue {
                             onFailure: RequeueConsumeAction = Requeue,
                             unmarshalFailureAction: RequeueConsumeAction = DeadLetter,
                             prefetchCount: Int = 0): F[Unit] =
-      requeueDeliveryHandlerOf(queueName,
+      requeueDeliveryHandlerOf(
+        queueName,
         handler,
         requeuePolicy,
         toDeliveryUnmarshaller(unmarshaller),
@@ -69,17 +70,15 @@ package object requeue {
                                              onFailure: RequeueConsumeAction = Requeue,
                                              onFailureAction: T => F[Unit],
                                              unmarshalFailureAction: RequeueConsumeAction = DeadLetter,
-                                             prefetchCount: Int = 0): F[Unit] = {
+                                             prefetchCount: Int = 0): F[Unit] =
       requeueDeliveryHandlerOf(queueName,
-        handler,
-        requeuePolicy,
-        toDeliveryUnmarshaller(unmarshaller),
-        onFailure,
-        onFailureAction,
-        unmarshalFailureAction,
-        prefetchCount
-      )
-    }
+                               handler,
+                               requeuePolicy,
+                               toDeliveryUnmarshaller(unmarshaller),
+                               onFailure,
+                               onFailureAction,
+                               unmarshalFailureAction,
+                               prefetchCount)
 
     def requeueDeliveryHandlerOf[T](queueName: QueueName,
                                     handler: RequeueHandler[F, T],
@@ -89,12 +88,9 @@ package object requeue {
                                     onFailureAction: T => F[Unit] = (_: T) => F.point(()),
                                     unmarshalFailureAction: RequeueConsumeAction = DeadLetter,
                                     prefetchCount: Int = 0): F[Unit] = {
-      val deserializeHandler =
-        new DeliveryUnmarshalHandler[F, T, RequeueConsumeAction](unmarshaller)(handler, unmarshalFailureAction)
 
-      val deserializeOnFailureAction: Delivery => F[Unit] =
-        new UnmarshalFailureAction[F, T](unmarshaller).apply(onFailureAction)
-
+      val deserializeHandler                              = new DeliveryUnmarshalHandler[F, T, RequeueConsumeAction](unmarshaller)(handler, unmarshalFailureAction)
+      val deserializeOnFailureAction: Delivery => F[Unit] = new UnmarshalFailureAction[F, T](unmarshaller).apply(onFailureAction)
       requeueOf(queueName, deserializeHandler, requeuePolicy, onFailure, deserializeOnFailureAction, prefetchCount = prefetchCount)
     }
 
@@ -105,8 +101,10 @@ package object requeue {
                   onFailureAction: Delivery => F[Unit] = (_: Delivery) => F.point(()),
                   prefetchCount: Int = 0): F[Unit] = {
       val requeueExchange = ExchangeName(s"${queueName.value}.requeue")
-      val requeuePublish = amqpClient.publisher()
-      amqpClient.registerConsumer(queueName, RequeueTransformer(requeuePublish, requeueExchange, requeuePolicy, onFailure, onFailureAction)(handler), prefetchCount = prefetchCount)
+      val requeuePublish  = amqpClient.publisher()
+      amqpClient.registerConsumer(queueName,
+                                  RequeueTransformer(requeuePublish, requeueExchange, requeuePolicy, onFailure, onFailureAction)(handler),
+                                  prefetchCount = prefetchCount)
     }
   }
 }

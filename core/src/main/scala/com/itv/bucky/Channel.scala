@@ -2,6 +2,7 @@ package com.itv.bucky
 import cats.effect.{ConcurrentEffect, Sync}
 import cats.effect.implicits._
 import cats.implicits._
+import com.itv.bucky.consume.{Ack, ConsumeAction, Consumer, ConsumerTag, DeadLetter, Delivery, PublishCommand, RequeueImmediately}
 import com.itv.bucky.decl.{Binding, Declaration, Exchange, ExchangeBinding, Queue}
 import com.rabbitmq.client.AMQP.BasicProperties
 import com.rabbitmq.client.{ConfirmListener, DefaultConsumer, Channel => RabbitChannel, Envelope => RabbitMQEnvelope}

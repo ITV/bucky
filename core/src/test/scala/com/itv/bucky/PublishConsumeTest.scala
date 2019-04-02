@@ -7,12 +7,13 @@ import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
-
+import com.itv.bucky.publish._
+import com.itv.bucky.consume._
 import scala.concurrent.duration._
 import scala.collection.mutable.ListBuffer
 import scala.language.reflectiveCalls
 import com.itv.bucky.SuperTest.{StubChannel, withDefaultClient}
-import com.itv.bucky.decl.{Binding, Exchange, Queue}
+import com.itv.bucky.decl.{Exchange, Queue}
 
 class PublishConsumeTest extends FunSuite with Eventually with IntegrationPatience with ScalaFutures {
 

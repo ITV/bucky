@@ -5,9 +5,9 @@ import cats.effect.concurrent.{Deferred, Ref}
 import org.scalatest.FunSuite
 import cats.implicits._
 import cats.effect.implicits._
+import com.itv.bucky.publish.PendingConfirmListener
 
 import scala.collection.immutable.TreeMap
-
 import org.scalatest.Matchers._
 
 class PendingConfirmationsTest extends FunSuite {
@@ -38,7 +38,7 @@ class PendingConfirmationsTest extends FunSuite {
       map = TreeMap(1L -> signal1, 2L -> signal2, 3L -> signal3)
       ref <- Ref.of[IO, TreeMap[Long, Deferred[IO, Boolean]]](map)
 
-      pendingConfirmListener = PendingConfirmListener(ref)
+      pendingConfirmListener = publish.PendingConfirmListener(ref)
       _ <- IO.delay(pendingConfirmListener.handleAck(2L, multiple = true))
 
       refAfterUpdate     <- ref.get
@@ -61,7 +61,7 @@ class PendingConfirmationsTest extends FunSuite {
       signal <- Deferred.tryable[IO, Boolean]
       map = TreeMap(1L -> signal)
       ref <- Ref.of[IO, TreeMap[Long, Deferred[IO, Boolean]]](map)
-      pendingConfirmListener = PendingConfirmListener(ref)
+      pendingConfirmListener = publish.PendingConfirmListener(ref)
       _                 <- IO.delay(pendingConfirmListener.handleAck(1L, multiple = false))
       refAfterUpdate    <- ref.get.attempt
       signalAfterUpdate <- signal.tryGet

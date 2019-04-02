@@ -1,12 +1,9 @@
-package com.itv.bucky
+package com.itv.bucky.consume
 
-import cats.effect.{ConcurrentEffect, Sync}
-import com.typesafe.scalalogging.StrictLogging
-
-import scala.language.higherKinds
-import scala.util.{Failure, Success, Try}
+import com.itv.bucky.{MessagePropertiesConverters, Payload}
 import com.rabbitmq.client.AMQP.BasicProperties
-import com.rabbitmq.client.{ConfirmListener, DefaultConsumer, Channel => RabbitChannel, Envelope => RabbitMQEnvelope}
+import com.rabbitmq.client.Envelope
+import com.typesafe.scalalogging.StrictLogging
 
 object Consumer extends StrictLogging {
 
@@ -39,10 +36,7 @@ object Consumer extends StrictLogging {
 //      }
 //    }
 
-  import cats.implicits._
-  import cats.effect.implicits._
-
-  def deliveryFrom(tag: String, envelope: RabbitMQEnvelope, properties: BasicProperties, body: Array[Byte]) =
+  def deliveryFrom(tag: String, envelope: Envelope, properties: BasicProperties, body: Array[Byte]) =
     Delivery(Payload(body), ConsumerTag(tag), MessagePropertiesConverters(envelope), MessagePropertiesConverters(properties))
 
 }

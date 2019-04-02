@@ -1,14 +1,15 @@
-package com.itv.bucky
+package com.itv.bucky.publish
 
-import cats.effect.ConcurrentEffect
+import cats._
+import cats.implicits._
+import cats.effect._
+import cats.effect.implicits._
 import cats.effect.concurrent.{Deferred, Ref}
 import com.rabbitmq.client.ConfirmListener
 import com.typesafe.scalalogging.StrictLogging
 import scala.language.higherKinds
+
 import scala.collection.immutable.TreeMap
-import cats._
-import cats.implicits._
-import cats.effect.implicits._
 
 private[bucky] case class PendingConfirmListener[F[_]](pendingConfirmations: Ref[F, TreeMap[Long, Deferred[F, Boolean]]])(
     implicit F: ConcurrentEffect[F])

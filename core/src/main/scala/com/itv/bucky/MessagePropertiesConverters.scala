@@ -1,5 +1,7 @@
 package com.itv.bucky
 
+import com.itv.bucky.consume.DeliveryMode
+import com.itv.bucky.publish.{ContentEncoding, ContentType, MessageProperties}
 import com.rabbitmq.client.AMQP.BasicProperties
 import com.rabbitmq.client.{Envelope => RabbitMQEnvelope}
 
@@ -8,10 +10,7 @@ object MessagePropertiesConverters {
   import scala.collection.JavaConverters._
 
   def apply(envelope: RabbitMQEnvelope): Envelope =
-    Envelope(envelope.getDeliveryTag,
-             envelope.isRedeliver,
-             ExchangeName(envelope.getExchange),
-             RoutingKey(envelope.getRoutingKey))
+    Envelope(envelope.getDeliveryTag, envelope.isRedeliver, ExchangeName(envelope.getExchange), RoutingKey(envelope.getRoutingKey))
 
   def apply(properties: BasicProperties): MessageProperties =
     MessageProperties(
@@ -51,12 +50,8 @@ object MessagePropertiesConverters {
 
   import java.util.Date
 
-  private def toJInt(value: Option[Int]): Integer = value.fold[Integer](null)(value => value)
-
-  private def toJString(value: Option[String]): String = value.fold[String](null)(identity)
-
-  private def toJDate(value: Option[Date]): Date = value.fold[Date](null)(identity)
-
-  private def priorityOf(properties: BasicProperties): Option[Int] =
-    if (properties.getPriority == null) None else Some(properties.getPriority)
+  private def toJInt(value: Option[Int]): Integer                  = value.fold[Integer](null)(value => value)
+  private def toJString(value: Option[String]): String             = value.fold[String](null)(identity)
+  private def toJDate(value: Option[Date]): Date                   = value.fold[Date](null)(identity)
+  private def priorityOf(properties: BasicProperties): Option[Int] = Option(properties.getPriority)
 }

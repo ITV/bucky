@@ -6,7 +6,8 @@ import cats.implicits._
 import com.itv.bucky
 import com.itv.bucky.decl.{Binding, Exchange, ExchangeBinding, Queue}
 import com.rabbitmq.client.ConfirmListener
-
+import com.itv.bucky.publish._
+import com.itv.bucky.consume._
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.ExecutionContext
@@ -14,13 +15,13 @@ import scala.concurrent.duration._
 
 object SuperTest {
   class StubChannel extends Channel[IO] {
-    var publishSeq: Long                                                               = 0L
-    val exchanges: ListBuffer[Exchange]                                                = ListBuffer.empty
-    val queues: ListBuffer[Queue]                                                      = ListBuffer.empty
-    val bindings: ListBuffer[Binding]                                                  = ListBuffer.empty
-    val exchangeBindings: ListBuffer[ExchangeBinding]                                  = ListBuffer.empty
-    val handlers: mutable.Map[QueueName, (Handler[IO, bucky.Delivery], ConsumeAction)] = mutable.Map.empty
-    val confirmListeners: ListBuffer[ConfirmListener]                                  = ListBuffer.empty
+    var publishSeq: Long                                                         = 0L
+    val exchanges: ListBuffer[Exchange]                                          = ListBuffer.empty
+    val queues: ListBuffer[Queue]                                                = ListBuffer.empty
+    val bindings: ListBuffer[Binding]                                            = ListBuffer.empty
+    val exchangeBindings: ListBuffer[ExchangeBinding]                            = ListBuffer.empty
+    val handlers: mutable.Map[QueueName, (Handler[IO, Delivery], ConsumeAction)] = mutable.Map.empty
+    val confirmListeners: ListBuffer[ConfirmListener]                            = ListBuffer.empty
 
     override def close(): IO[Unit]                        = IO.unit
     override def shutdownChannelAndConnection(): IO[Unit] = IO.unit
@@ -60,13 +61,10 @@ object SuperTest {
           publishCommand.basicProperties
         )
 
-    override def sendAction(action: bucky.ConsumeAction)(envelope: bucky.Envelope): IO[Unit] =
+    override def sendAction(action: ConsumeAction)(envelope: bucky.Envelope): IO[Unit] =
       IO.unit
 
-    override def registerConsumer(handler: Handler[IO, bucky.Delivery],
-                                  onFailure: ConsumeAction,
-                                  queue: bucky.QueueName,
-                                  consumerTag: bucky.ConsumerTag): IO[Unit] =
+    override def registerConsumer(handler: Handler[IO, Delivery], onFailure: ConsumeAction, queue: QueueName, consumerTag: ConsumerTag): IO[Unit] =
       IO.delay(handlers.synchronized(handlers.put(queue, handler -> onFailure))).void
 
     override def addConfirmListener(listener: ConfirmListener): IO[Unit] = IO.delay(confirmListeners.synchronized(confirmListeners += listener))
