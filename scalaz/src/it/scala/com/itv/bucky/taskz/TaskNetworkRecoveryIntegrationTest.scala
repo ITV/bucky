@@ -5,11 +5,13 @@ import com.itv.bucky.{AmqpClient, AmqpClientConfig}
 import com.itv.bucky.suite.NetworkRecoveryIntegrationTest
 import com.itv.bucky.taskz.AbstractTaskAmqpClient.TaskConsumer
 import com.itv.lifecycle.Lifecycle
+import org.scalatest.Ignore
 
 import scala.concurrent.duration.FiniteDuration
 import scala.language.postfixOps
 import scalaz.concurrent.Task
 
+@Ignore
 class TaskNetworkRecoveryIntegrationTest
     extends NetworkRecoveryIntegrationTest[Task, Throwable, TaskConsumer]
     with TaskEffectVerification

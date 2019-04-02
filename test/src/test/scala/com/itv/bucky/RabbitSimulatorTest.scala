@@ -167,6 +167,25 @@ class RabbitSimulatorTest extends FunSuite with ScalaFutures {
     messages.head.properties.headers("foo") shouldBe ("bar")
   }
 
+  test("It should pass custom headers with every message to the consumer") {
+    val rabbit = new RabbitSimulator[Id]()
+
+    val messages = rabbit.watchQueue(QueueName("queue.name"))
+
+    val publisher = rabbit.publisherWithHeadersOf(
+      PublishCommandBuilder.publishCommandBuilder(StringPayloadMarshaller)
+        .using(ExchangeName(""))
+        .using(RoutingKey("queue.name"))
+    )
+
+    val result = publisher("Test", Map("custom-header" -> "custom-value"))
+
+    result.futureValue shouldBe (())
+
+    messages.size shouldBe 1
+    messages.head.properties.headers("custom-header") shouldBe "custom-value"
+  }
+
   test("Can publish and consume via simulator with headers") {
     val rabbit   = new RabbitSimulator[Id]()
     val messages = rabbit.watchQueue(QueueName("my.routing.key"))
