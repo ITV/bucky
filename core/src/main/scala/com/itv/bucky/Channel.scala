@@ -27,7 +27,13 @@ trait Channel[F[_]] {
     val queues           = declaration.collect { case q: Queue            => q }.toList
     val exchanges        = declaration.collect { case e: Exchange         => e }.toList
     val exchangeBindings = declaration.collect { case eb: ExchangeBinding => eb }.toList
-    val bindings         = declaration.collect { case b: Binding          => b }.toList
+    val bindings = declaration
+      .collect {
+        case b: Binding  => List(b)
+        case e: Exchange => e.bindings
+      }
+      .toList
+      .flatten
 
     for {
       _ <- queues.traverse(declareQueue)

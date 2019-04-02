@@ -27,7 +27,7 @@ class PublisherTest extends FunSuite with ScalaFutures {
       .bracket(test)(_.shutdown()).unsafeRunSync()*/
   }
 
-  test("A message can be published") {
+ /* test("A message can be published") {
     withDefaultClient { client =>
       val exchange = ExchangeName("test-exchange")
       val queue    = QueueName("aqueue")
@@ -46,27 +46,9 @@ class PublisherTest extends FunSuite with ScalaFutures {
         client.publisher()(commandBuilder)
       }
     }
-  }
+  }*/
 
-  test("A message should fail to be published on a non existent exchange") {
-    withDefaultClient { client =>
-      val exchange = ExchangeName("non-existent-exchange")
-      val queue    = QueueName("aqueue")
-      val rk       = RoutingKey(queue.value)
-      val message  = "Hello"
-      val commandBuilder = PublishCommandBuilder
-        .publishCommandBuilder[String](StringPayloadMarshaller)
-        .using(exchange)
-        .using(rk)
-        .toPublishCommand(message)
-      client
-        .publisher()(commandBuilder)
-        .attempt
-        .map({
-          _ shouldBe 'left
-        })
-    }
-  }
+
   /*
   test("Should clear confirmations map after a timeout") {
     withConnectionManager { connectionManager =>
