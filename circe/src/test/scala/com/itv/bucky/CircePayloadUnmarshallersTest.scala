@@ -14,36 +14,34 @@ import scala.util.Random
 class CircePayloadUnmarshallersTest extends FunSuite {
 
   import UnmarshalResultOps._
-  import com.itv.bucky.CirceSupport._
+  import com.itv.bucky.circe._
 
-  case class Some(foo: String)
+  case class Entity(foo: String)
 
   test("it should parse a json object") {
     val expectedValue    = s"bar ${new Random().nextInt(10)}"
     val payload: Payload = validJson(expectedValue)
-    val jsonResult: Json = unmarshallerFromDecodeJson[Json].unmarshal(payload).success
+    val jsonResult: Json = implicitly[PayloadUnmarshaller[Json]].unmarshal(payload).success
 
     jsonResult.hcursor.get[String]("foo") shouldBe Right(expectedValue)
   }
 
   test("it should not parse an invalid json") {
     val payload = invalidJson()
-    unmarshallerFromDecodeJson[Json].unmarshal(payload) shouldBe a[Failure]
-
+    implicitly[PayloadUnmarshaller[Json]].unmarshal(payload) shouldBe a[Failure]
   }
 
   test(s"it should convert to a type") {
     val expectedValue = s"Random-${new Random().nextInt(100)}"
     val payload       = validJson(expectedValue)
 
-    val someResult = unmarshallerFromDecodeJson[Some].unmarshal(payload).success
+    val someResult = implicitly[PayloadUnmarshaller[Entity]].unmarshal(payload).success
     someResult.foo shouldBe expectedValue
   }
 
   test("it should not parse to a type with an invalid json") {
     val payload    = invalidJson()
-    unmarshallerFromDecodeJson[Some].unmarshal(payload) shouldBe a[Failure]
-
+    implicitly[PayloadUnmarshaller[Entity]].unmarshal(payload) shouldBe a[Failure]
   }
 
   test("can implicitly unmarshal a json") {
@@ -56,7 +54,7 @@ class CircePayloadUnmarshallersTest extends FunSuite {
   test("can implicitly unmarshal a type") {
     val jsonPayload = validJson("Hello")
 
-    val result   = jsonPayload.unmarshal(unmarshallerFromDecodeJson[Some]).success.asJson.noSpaces
+    val result   = jsonPayload.unmarshal(unmarshallerFromDecodeJson[Entity]).success.asJson.noSpaces
     val expected = StringPayloadUnmarshaller.unmarshal(jsonPayload).success
 
     result shouldBe expected

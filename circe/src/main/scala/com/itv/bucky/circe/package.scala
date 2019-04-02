@@ -1,19 +1,21 @@
 package com.itv.bucky
 
+import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
+import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
+import io.circe.{Decoder, Encoder, Json}
+
 import io.circe._
 import io.circe.parser.decode
-import PayloadMarshaller.StringPayloadMarshaller
-import Unmarshaller.StringPayloadUnmarshaller
 
-object CirceSupport {
+package object circe {
 
-  def unmarshallerFromDecodeJson[T](implicit decoder: Decoder[T]): PayloadUnmarshaller[T] =
+  implicit def unmarshallerFromDecodeJson[T](implicit decoder: Decoder[T]): PayloadUnmarshaller[T] =
     StringPayloadUnmarshaller
       .map(decode[T])
       .flatMap(Unmarshaller.liftResult(res =>
         res.fold(error => UnmarshalResult.Failure(error.getMessage, Option(error)), UnmarshalResult.Success.apply)))
 
-  def marshallerFromEncodeJson[T](implicit encoder: Encoder[T]): PayloadMarshaller[T] =
+  implicit def marshallerFromEncodeJson[T](implicit encoder: Encoder[T]): PayloadMarshaller[T] =
     StringPayloadMarshaller.contramap { value =>
       encoder(value).noSpaces
     }

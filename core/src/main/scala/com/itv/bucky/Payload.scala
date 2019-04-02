@@ -55,6 +55,8 @@ object UnmarshalResult {
   case class Failure(reason: String, throwable: Option[Throwable] = None) extends UnmarshalResult[Nothing] {
     override def flatMap[U](f: (Nothing) => UnmarshalResult[U]): UnmarshalResult[U] = this
     override def map[U](f: (Nothing) => U): UnmarshalResult[U]                      = this
+    def toThrowable: Throwable =
+      new RuntimeException(s"Unmarshalling failure: $reason", throwable.orNull)
   }
 
   implicit class SuccessConverter[T](val value: T) {

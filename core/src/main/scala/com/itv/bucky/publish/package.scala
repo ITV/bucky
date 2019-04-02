@@ -4,6 +4,8 @@ import java.util.Date
 
 import com.itv.bucky.consume.DeliveryMode
 
+import scala.language.higherKinds
+
 package object publish {
   case class ContentType(value: String)
   object ContentType {
@@ -58,5 +60,25 @@ package object publish {
       deliveryMode = Some(DeliveryMode.persistent),
       priority = Some(0)
     )
+  }
+
+  implicit class PublisherSugar[F[_]](amqpClient: AmqpClient[F]) {
+
+    def publisherOf[T](implicit publishCommandBuilder: PublishCommandBuilder[T]): Publisher[F, T] = {
+      val basePublisher = amqpClient.publisher()
+      value: T => {
+        val command = publishCommandBuilder.toPublishCommand(value)
+        basePublisher.apply(command)
+      }
+    }
+
+    def publisherOf[T](exchangeName: ExchangeName, routingKey: RoutingKey)(implicit marshaller: PayloadMarshaller[T]): Publisher[F, T] = {
+      val pcb =
+        PublishCommandBuilder.publishCommandBuilder(marshaller)
+            .using(exchangeName)
+            .using(routingKey)
+      publisherOf[T](pcb)
+    }
+
   }
 }

@@ -12,7 +12,8 @@ case class AmqpClientConfig(host: String,
                             networkRecoveryInterval: Option[FiniteDuration] = Some(3.seconds),
                             networkRecoveryIntervalOnStart: Option[NetworkRecoveryOnStart] = Some(NetworkRecoveryOnStart()),
                             publishingTimeout: FiniteDuration,
-                            virtualHost: Option[String] = None)
+                            virtualHost: Option[String] = None,
+                            prefetchCount: Int = 0)
 
 case class NetworkRecoveryOnStart(interval: FiniteDuration = 3.seconds, max: FiniteDuration = 3.seconds) {
   val numberOfRetries = max.toMillis / interval.toMillis
