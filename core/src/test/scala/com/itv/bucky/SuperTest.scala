@@ -16,6 +16,7 @@ import scala.concurrent.duration._
 object SuperTest {
   class StubChannel extends Channel[IO] {
     var publishSeq: Long                                                         = 0L
+    var pubSeqLock: Object                                                       = new Object
     val exchanges: ListBuffer[Exchange]                                          = ListBuffer.empty
     val queues: ListBuffer[Queue]                                                = ListBuffer.empty
     val bindings: ListBuffer[Binding]                                            = ListBuffer.empty
@@ -95,14 +96,14 @@ object SuperTest {
   object StubChannel {
     def working: StubChannel = new StubChannel
     def publishTimeout: StubChannel = new StubChannel {
-      override def publish(cmd: PublishCommand): IO[Unit] = IO.unit
+      override def publish(cmd: PublishCommand): IO[Unit] = IO {
+        pubSeqLock.synchronized(publishSeq = publishSeq + 1)
+      }
     }
-
   }
 
-  def withDefaultClient(publishTimeout: FiniteDuration = 5.seconds, channel: Channel[IO] = StubChannel.working)(
-      test: AmqpClient[IO] => IO[Unit]): Unit = {
-    val ec                            = ExecutionContext.global
+  def withDefaultClient(publishTimeout: FiniteDuration = 5.seconds, channel: Channel[IO] = StubChannel.working)(test: AmqpClient[IO] => IO[Unit])(
+      implicit ec: ExecutionContext = ExecutionContext.global): Unit = {
     implicit val cs: ContextShift[IO] = IO.contextShift(ec)
     implicit val timer: Timer[IO]     = IO.timer(ec)
     val config                        = AmqpClientConfig("127.0.0.1", 5672, "guest", "guest", publishingTimeout = publishTimeout)
