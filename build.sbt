@@ -18,6 +18,7 @@ val catsEffectVersion  = "1.2.0"
 val scalaXmlVersion     = "1.1.1"
 val scalaz = "7.2.22"
 val logbackVersion = "1.2.3"
+val kamonVersion        = "1.1.0"
 
 releaseProcess := Seq[ReleaseStep](
   checkSnapshotDependencies,
@@ -209,6 +210,25 @@ lazy val circe = project
       "io.circe"                   %% "circe-parser"  % circeVersion,
       "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
       "org.scalatest"              %% "scalatest"     % scalaTestVersion % "test, it"
+    )
+  )
+
+lazy val kamon = project
+  .settings(name := "com.itv")
+  .settings(moduleName := "bucky-kamon")
+  .settings(kernelSettings: _*)
+  .dependsOn(core, test % "test,it")
+  .configs(IntegrationTest)
+  .settings(Defaults.itSettings)
+  .settings(
+    internalDependencyClasspath in IntegrationTest += Attributed.blank((classDirectory in Test).value),
+    parallelExecution in IntegrationTest := false
+  )
+  .settings(
+    libraryDependencies ++= Seq(
+      "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
+      "org.scalatest"              %% "scalatest"     % scalaTestVersion % "test, it",
+      "io.kamon"                   %% "kamon-core"    % kamonVersion
     )
   )
 

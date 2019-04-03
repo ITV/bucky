@@ -1,5 +1,8 @@
 package com.itv
 
+import java.nio.charset.{Charset, StandardCharsets}
+
+import cats.effect.ConcurrentEffect
 import com.itv.bucky.consume.{ConsumeAction, Delivery, RequeueConsumeAction}
 import com.itv.bucky.publish.PublishCommandBuilder
 
@@ -24,4 +27,9 @@ package object bucky {
     com.itv.bucky.publish.PublisherSugar[F]
   def publishCommandBuilder[T](marshaller: PayloadMarshaller[T]): PublishCommandBuilder.NothingSet[T] =
     PublishCommandBuilder.publishCommandBuilder[T](marshaller)
+
+  implicit class LoggingSyntax[F[_]](client: AmqpClient[F])(implicit F: ConcurrentEffect[F]) {
+    def withLogging(charset: Charset = StandardCharsets.UTF_8) = LoggingAmqpClient(client, charset)
+  }
+
 }

@@ -3,7 +3,7 @@ package com.itv.bucky
 import cats.effect.{ContextShift, IO, Resource, Timer}
 import cats._
 import cats.implicits._
-import com.itv.bucky
+import com.itv.bucky._
 import com.itv.bucky.decl.{Binding, Exchange, ExchangeBinding, Queue}
 import com.rabbitmq.client.ConfirmListener
 import com.itv.bucky.publish._
@@ -25,10 +25,10 @@ object SuperTest {
     val handlers: mutable.Map[QueueName, (Handler[IO, Delivery], ConsumeAction)] = mutable.Map.empty
     val confirmListeners: ListBuffer[ConfirmListener]                            = ListBuffer.empty
 
-    override def close(): IO[Unit]                        = IO.unit
-    override def purgeQueue(name: QueueName): IO[Unit]    = IO.unit
-    override def basicQos(prefetchCount: Int): IO[Unit]   = IO.unit
-    override def confirmSelect: IO[Unit]                  = IO.unit
+    override def close(): IO[Unit]                      = IO.unit
+    override def purgeQueue(name: QueueName): IO[Unit]  = IO.unit
+    override def basicQos(prefetchCount: Int): IO[Unit] = IO.unit
+    override def confirmSelect: IO[Unit]                = IO.unit
     override def getNextPublishSeqNo: IO[Long] = IO.delay {
       publishSeq
     }
@@ -62,7 +62,7 @@ object SuperTest {
           publishCommand.basicProperties
         )
 
-    override def sendAction(action: ConsumeAction)(envelope: bucky.Envelope): IO[Unit] =
+    override def sendAction(action: ConsumeAction)(envelope: Envelope): IO[Unit] =
       IO.unit
 
     override def registerConsumer(handler: Handler[IO, Delivery], onFailure: ConsumeAction, queue: QueueName, consumerTag: ConsumerTag): IO[Unit] =
@@ -108,6 +108,10 @@ object SuperTest {
     implicit val timer: Timer[IO]     = IO.timer(ec)
     val config                        = AmqpClientConfig("127.0.0.1", 5672, "guest", "guest", publishingTimeout = publishTimeout)
 
-    AmqpClient.apply[IO](config, Resource.pure[IO, Channel[IO]](channel)).use(test).unsafeRunSync()
+    AmqpClient
+      .apply[IO](config, Resource.pure[IO, Channel[IO]](channel))
+      .map(c => c.withLogging())
+      .use(test)
+      .unsafeRunSync()
   }
 }
