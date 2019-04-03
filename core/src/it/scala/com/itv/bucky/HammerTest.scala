@@ -1,3 +1,5 @@
+package com.itv.bucky
+
 import java.util.UUID
 import java.util.concurrent.Executors
 
@@ -8,8 +10,6 @@ import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
 import com.itv.bucky.consume._
 import com.itv.bucky.decl.{Exchange, Queue}
-import com.itv.bucky.publish._
-import com.itv.bucky._
 import com.typesafe.config.ConfigFactory
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._

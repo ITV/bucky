@@ -56,11 +56,12 @@ package object consume {
       }, exceptionalAction)
     }
 
-    def registerRequeueConsumerOf[T](queueName: QueueName,
-                            handler: RequeueHandler[F, T],
-                            requeuePolicy: RequeuePolicy = RequeuePolicy(maximumProcessAttempts = 10, requeueAfter = 3.minutes),
-                            onFailure: RequeueConsumeAction = Requeue,
-                            unmarshalFailureAction: RequeueConsumeAction = DeadLetter)(implicit unmarshaller: PayloadUnmarshaller[T], F: Sync[F]): F[Unit] =
+    def registerRequeueConsumerOf[T](
+                                      queueName: QueueName,
+                                      handler: RequeueHandler[F, T],
+                                      requeuePolicy: RequeuePolicy = RequeuePolicy(maximumProcessAttempts = 10, requeueAfter = 3.minutes),
+                                      onFailure: RequeueConsumeAction = Requeue,
+                                      unmarshalFailureAction: RequeueConsumeAction = DeadLetter)(implicit unmarshaller: PayloadUnmarshaller[T], F: Sync[F]): F[Unit] =
       new RequeueOps(amqpClient).requeueDeliveryHandlerOf(
         queueName,
         handler,
@@ -69,6 +70,15 @@ package object consume {
         onFailure,
         unmarshalFailureAction = unmarshalFailureAction
       )
+
+    def registerRequeueConsumer(
+                                queueName: QueueName,
+                                handler: RequeueHandler[F, Delivery],
+                                requeuePolicy: RequeuePolicy = RequeuePolicy(maximumProcessAttempts = 10, requeueAfter = 3.minutes),
+                                onFailure: RequeueConsumeAction = Requeue
+    )(implicit F: Sync[F]): F[Unit] =
+      new RequeueOps(amqpClient).requeueOf(queueName, handler, requeuePolicy, onFailure)
+
 
   }
 }

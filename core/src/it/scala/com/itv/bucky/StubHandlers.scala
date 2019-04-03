@@ -1,17 +1,14 @@
-package com.itv.bucky.test.stubs
+package com.itv.bucky
 
 import cats.effect.Sync
-import com.itv.bucky.{Handler, RequeueHandler}
 import com.itv.bucky.consume.{ConsumeAction, RequeueConsumeAction}
 
 import scala.language.higherKinds
-import cats.effect._
 import cats.implicits._
 
 import scala.collection.mutable.ListBuffer
 
 case class ExecutionResult[T, CA](message: T, result: Either[Throwable, CA])
-
 
 class RecordingHandler[F[_], T](handler: Handler[F, T])(implicit F: Sync[F]) extends Handler[F, T] {
   private val results: ListBuffer[ExecutionResult[T, ConsumeAction]]         = ListBuffer.empty
