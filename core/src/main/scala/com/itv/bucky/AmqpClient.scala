@@ -1,7 +1,5 @@
 package com.itv.bucky
 
-import java.util.concurrent.TimeUnit
-
 import cats.effect._
 import cats.implicits._
 import com.itv.bucky.consume.{ConsumeAction, DeadLetter, Delivery, PublishCommand}
@@ -10,7 +8,6 @@ import com.itv.bucky.decl._
 import com.rabbitmq.client.{ConnectionFactory, ShutdownSignalException}
 import com.typesafe.scalalogging.StrictLogging
 
-import scala.concurrent.duration.FiniteDuration
 import scala.language.higherKinds
 
 trait AmqpClient[F[_]] {

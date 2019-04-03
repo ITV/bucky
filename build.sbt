@@ -129,14 +129,17 @@ lazy val core = project
   .settings(name := "com.itv")
   .settings(moduleName := "bucky-core")
   .settings(kernelSettings: _*)
+  .configs(IntegrationTest)
+  .settings(Defaults.itSettings)
   .settings(
     libraryDependencies ++= Seq(
-      "com.typesafe.scala-logging" %% "scala-logging"  % scalaLoggingVersion,
-      "org.scalatest"              %% "scalatest"      % scalaTestVersion % "test",
-      "org.typelevel"              %% "cats-core"      % "1.6.0",
-      "org.typelevel"              %% "cats-effect"    % "1.2.0",
-      "com.rabbitmq"               % "amqp-client"     % amqpClientVersion,
-      "ch.qos.logback"             % "logback-classic" % "1.2.3" % "test"
+      "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
+      "org.scalatest"              %% "scalatest"     % scalaTestVersion % "test,it",
+      "org.typelevel" %% "cats-core" % "1.6.0",
+      "org.typelevel" %% "cats-effect" % "1.2.0",
+      "com.rabbitmq"               % "amqp-client"    % amqpClientVersion,
+      "ch.qos.logback"             % "logback-classic"            % "1.2.3" % "test,it",
+      "com.typesafe"               % "config"         % typeSafeVersion % "it"
     )
   )
   .configs(IntegrationTest)
