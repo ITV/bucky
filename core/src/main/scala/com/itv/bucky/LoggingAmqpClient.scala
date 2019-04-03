@@ -1,8 +1,6 @@
 package com.itv.bucky
 
-import java.nio.charset.StandardCharsets
-
-import cats.effect.{ConcurrentEffect, ContextShift, Timer}
+import cats.effect.{ConcurrentEffect}
 import com.typesafe.scalalogging.StrictLogging
 import cats._
 import cats.implicits._

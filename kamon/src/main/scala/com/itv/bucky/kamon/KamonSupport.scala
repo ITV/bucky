@@ -12,12 +12,15 @@ import kamon.trace.Span
 import kamon.trace.Tracer.SpanBuilder
 
 import scala.language.higherKinds
+import scala.util.Try
 
 object KamonSupport {
 
   def apply[F[_]](amqpClient: AmqpClient[F])(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F]): AmqpClient[F] =
     new AmqpClient[F] {
-      val includePublishRK = true
+      private val config            = Kamon.config()
+      private val includePublishRK  = Try { config.getBoolean("kamon.bucky.publish. add-routing-key-as-metric-tag") }.getOrElse(true)
+      private val includeConsumehRK = Try { config.getBoolean("kamon.bucky.publish. add-routing-key-as-metric-tag") }.getOrElse(true)
 
       override def declare(declarations: decl.Declaration*): F[Unit]          = amqpClient.declare(declarations)
       override def declare(declarations: Iterable[decl.Declaration]): F[Unit] = amqpClient.declare(declarations)
@@ -48,7 +51,7 @@ object KamonSupport {
           .buildSpan(operationName)
           .asChildOf(ctx.get(Span.ContextKey))
           .withFrom(now)
-          .withMetricTag("span.kind", "client")
+          .withMetricTag("span.kind", "publisher")
           .withMetricTag("component", "bucky.publish")
           .withMetricTag("exchange", cmd.exchange.value)
 
@@ -85,14 +88,19 @@ object KamonSupport {
         amqpClient.registerConsumer(queueName, newHandler, exceptionalAction)
       }
 
-      private def consumerSpanFor(queueName: QueueName, d: Delivery, context: Context, start: Instant): SpanBuilder =
-        Kamon
+      private def consumerSpanFor(queueName: QueueName, d: Delivery, context: Context, start: Instant): SpanBuilder = {
+        val span = Kamon
           .buildSpan(s"bucky.consume.${queueName.value}")
           .asChildOf(context.get(Span.ContextKey))
           .withFrom(start)
-          .withMetricTag("span.kind", "consume")
+          .withMetricTag("span.kind", "consumer")
           .withMetricTag("component", "bucky.consumer")
-          .withTag("rk", d.envelope.routingKey.value)
+        if (includeConsumehRK) {
+          span.withMetricTag("rk", d.envelope.routingKey.value)
+        } else {
+          span.withTag("rk", d.envelope.routingKey.value)
+        }
+      }
 
     }
 
