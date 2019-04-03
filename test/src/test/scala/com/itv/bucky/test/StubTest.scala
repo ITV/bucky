@@ -26,21 +26,21 @@ class StubTest extends FunSuite with Matchers {
     val config                        = Config.empty(3.seconds)
     implicit val cs: ContextShift[IO] = IO.contextShift(ec)
     implicit val timer: Timer[IO]     = IO.timer(ec)
-    TestAmqpClient.allShallAckSimulator[IO](config).flatMap(test).unsafeRunSync()
+    TestAmqpClient.allShallAckSimulator[IO](config).use(test).unsafeRunSync()
   }
 
   def withForgivingClient(test: AmqpClient[IO] => IO[Unit])(implicit ec: ExecutionContext = ExecutionContext.global) = {
     val config                        = Config.empty(3.seconds)
     implicit val cs: ContextShift[IO] = IO.contextShift(ec)
     implicit val timer: Timer[IO]     = IO.timer(ec)
-    TestAmqpClient.forgivingSimulator[IO](config).flatMap(test).unsafeRunSync()
+    TestAmqpClient.forgivingSimulator[IO](config).use(test).unsafeRunSync()
   }
 
   def withStrictSimulator(test: AmqpClient[IO] => IO[Unit])(implicit ec: ExecutionContext = ExecutionContext.global) = {
     val config                        = Config.empty(3.seconds)
     implicit val cs: ContextShift[IO] = IO.contextShift(ec)
     implicit val timer: Timer[IO]     = IO.timer(ec)
-    TestAmqpClient.strictSimulator[IO](config).flatMap(test).unsafeRunSync()
+    TestAmqpClient.strictSimulator[IO](config).use(test).unsafeRunSync()
   }
 
   test("An ack Recording Handlers should accumulate publish results and ack") {

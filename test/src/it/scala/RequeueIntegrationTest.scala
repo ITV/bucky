@@ -1,9 +1,8 @@
-package com.itv.bucky
-
 import java.util.UUID
 import java.util.concurrent.Executors
 
 import cats.effect.{ContextShift, IO, Sync, Timer}
+import com.itv.bucky._
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
 import com.itv.bucky.consume.{Ack, Delivery, PublishCommand, Requeue}
@@ -11,6 +10,8 @@ import com.itv.bucky.decl.{Exchange, Queue}
 import com.itv.bucky.pattern.requeue
 import com.itv.bucky.pattern.requeue.RequeuePolicy
 import com.itv.bucky.publish.{MessageProperties, PublishCommandBuilder}
+import com.itv.bucky.test.StubHandlers
+import com.itv.bucky.test.stubs.{RecordingHandler, RecordingRequeueHandler}
 import com.typesafe.config.ConfigFactory
 import org.scalatest.FunSuite
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
@@ -22,9 +23,6 @@ import org.scalatest.Matchers._
 import scala.language.higherKinds
 
 class RequeueIntegrationTest extends FunSuite with Eventually with IntegrationPatience {
-
-  def requeueingHandler[F[_], T](implicit F: Sync[F]): RecordingRequeueHandler[F, T] = new RecordingRequeueHandler[F, T](_ => F.point(Requeue))
-  def ackHandler[F[_], T](implicit F: Sync[F]): RecordingHandler[F, T] = new RecordingHandler[F, T](_ => F.delay(Ack))
 
   case class TestFixture(
                           stubHandler: RecordingRequeueHandler[IO, Delivery],
@@ -57,8 +55,8 @@ class RequeueIntegrationTest extends FunSuite with Eventually with IntegrationPa
     ) ++ requeue.requeueDeclarations(queueName, routingKey)
 
     AmqpClient[IO](config).use { client =>
-      val handler = requeueingHandler[IO, Delivery]
-      val dlqHandler = ackHandler[IO, Delivery]
+      val handler = StubHandlers.requeueHandler[IO, Delivery]
+      val dlqHandler = StubHandlers.ackHandler[IO, Delivery]
 
       for {
         _ <- client.declare(declarations)

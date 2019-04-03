@@ -127,17 +127,14 @@ lazy val core = project
   .settings(name := "com.itv")
   .settings(moduleName := "bucky-core")
   .settings(kernelSettings: _*)
-  .configs(IntegrationTest)
-  .settings(Defaults.itSettings)
   .settings(
     libraryDependencies ++= Seq(
       "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
-      "org.scalatest"              %% "scalatest"     % scalaTestVersion % "test,it",
+      "org.scalatest"              %% "scalatest"     % scalaTestVersion % "test",
       "org.typelevel" %% "cats-core" % "1.6.0",
       "org.typelevel" %% "cats-effect" % "1.2.0",
       "com.rabbitmq"               % "amqp-client"    % amqpClientVersion,
-      "ch.qos.logback"             % "logback-classic"            % logbackVersion % "test,it",
-      "com.typesafe"               % "config"         % typeSafeVersion % "it"
+      "ch.qos.logback"             % "logback-classic"            % logbackVersion % "test,it"
     )
   )
   .configs(IntegrationTest)
@@ -147,12 +144,16 @@ lazy val test = project
   .settings(moduleName := "bucky-test")
   .settings(kernelSettings: _*)
   .dependsOn(core)
+  .configs(IntegrationTest)
+  .settings(Defaults.itSettings)
   .settings(
     libraryDependencies ++= Seq(
       "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
-      "org.scalatest"              %% "scalatest"     % scalaTestVersion,
+      "org.scalatest"              %% "scalatest"     % scalaTestVersion % "test,it",
       "org.typelevel"              %% "cats-effect"   % catsEffectVersion,
-      "com.rabbitmq"               % "amqp-client"    % amqpClientVersion
+      "com.rabbitmq"               % "amqp-client"    % amqpClientVersion,
+      "com.typesafe"               % "config"         % typeSafeVersion % "it",
+      "ch.qos.logback"             % "logback-classic"            % logbackVersion % "it"
     )
   )
 

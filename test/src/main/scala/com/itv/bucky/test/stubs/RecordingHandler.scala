@@ -12,7 +12,6 @@ import scala.collection.mutable.ListBuffer
 
 case class ExecutionResult[T, CA](message: T, result: Either[Throwable, CA])
 
-
 class RecordingHandler[F[_], T](handler: Handler[F, T])(implicit F: Sync[F]) extends Handler[F, T] {
   private val results: ListBuffer[ExecutionResult[T, ConsumeAction]]         = ListBuffer.empty
   def executions: List[ExecutionResult[T, ConsumeAction]]                    = results.synchronized(results.toList)

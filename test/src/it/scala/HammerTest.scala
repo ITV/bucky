@@ -1,40 +1,28 @@
-package com.itv.bucky
-
 import java.util.UUID
 import java.util.concurrent.Executors
 
 import cats.effect.concurrent.Deferred
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
+import com.itv.bucky._
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
-import com.itv.bucky.consume._
 import com.itv.bucky.decl.{Exchange, Queue}
+import com.itv.bucky.test.StubHandlers
+import com.itv.bucky.test.stubs.RecordingHandler
 import com.typesafe.config.ConfigFactory
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 
 import scala.collection.immutable.TreeSet
-import scala.collection.mutable.ListBuffer
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.higherKinds
 
 class HammerTest extends FunSuite with Eventually with IntegrationPatience {
 
-  class StubHandler[F[_], T, S](var nextResponse: F[S], var nextException: Option[Throwable] = None) extends (T => F[S]) {
-    val receivedMessages = ListBuffer[T]()
-    private val lock = new Object
-    override def apply(message: T): F[S] = lock.synchronized {
-      receivedMessages += message
-      nextException.fold[F[S]](nextResponse)(throw _)
-    }
-  }
-
-  class StubConsumeHandler[T] extends StubHandler[IO, T, ConsumeAction](IO.pure(Ack))
-
-  case class TestFixture(stubHandler: StubConsumeHandler[String], publisher: Publisher[IO, String])
+  case class TestFixture(stubHandler: RecordingHandler[IO, String], publisher: Publisher[IO, String])
 
   implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(300))
   implicit val cs: ContextShift[IO] = IO.contextShift(ec)
@@ -61,7 +49,7 @@ class HammerTest extends FunSuite with Eventually with IntegrationPatience {
     )
 
     AmqpClient[IO](config).use { client =>
-      val handler = new StubConsumeHandler[String]
+      val handler = StubHandlers.ackHandler[IO, String]
       for {
         _ <- client.declare(declarations)
         _ <- client.registerConsumerOf(queueName, handler)

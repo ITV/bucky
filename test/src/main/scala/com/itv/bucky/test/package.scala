@@ -4,7 +4,7 @@ import cats.effect.{ConcurrentEffect, ContextShift, Resource, Sync, Timer}
 import com.itv.bucky.consume._
 import cats.implicits._
 import cats.effect._
-import com.itv.bucky.test.stubs.{RecordingHandler, StubChannel, StubPublisher}
+import com.itv.bucky.test.stubs.{RecordingHandler, RecordingRequeueHandler, StubChannel, StubPublisher}
 
 import scala.concurrent.duration.FiniteDuration
 import scala.language.higherKinds
@@ -50,7 +50,7 @@ package object test {
   object StubHandlers {
     def ackHandler[F[_], T](implicit F: Sync[F]): RecordingHandler[F, T]                               = new RecordingHandler[F, T](_ => F.delay(Ack))
     def deadLetterHandler[F[_], T](implicit F: Sync[F]): RecordingHandler[F, T]                        = new RecordingHandler[F, T](_ => F.delay(DeadLetter))
-    def requeueHandler[F[_], T](implicit F: Sync[F]): RecordingHandler[F, T]                           = new RecordingHandler[F, T](_ => F.delay(RequeueImmediately))
+    def requeueHandler[F[_], T](implicit F: Sync[F]): RecordingRequeueHandler[F, T]                    = new RecordingRequeueHandler[F, T](_ => F.delay(Requeue))
     def recordingHandler[F[_], T](handler: Handler[F, T])(implicit F: Sync[F]): RecordingHandler[F, T] = new RecordingHandler[F, T](handler)
   }
 
