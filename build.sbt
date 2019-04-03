@@ -6,6 +6,7 @@ import com.typesafe.sbt.pgp.PgpKeys.{publishSigned, publishLocalSigned}
 name := "bucky"
 
 crossScalaVersions := Seq("2.11.8", "2.12.7")
+scalacOptions += "-Ypartial-unification"
 
 val itvLifecycleVersion = "1.0.0-RC5"
 val amqpClientVersion   = "5.6.0" //
@@ -130,13 +131,12 @@ lazy val core = project
   .settings(kernelSettings: _*)
   .settings(
     libraryDependencies ++= Seq(
-      "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
-      "org.scalatest"              %% "scalatest"     % scalaTestVersion % "test",
-      "org.typelevel" %% "cats-core" % "1.6.0",
-      "org.typelevel" %% "cats-effect" % "1.2.0",
-      "com.rabbitmq"               % "amqp-client"    % amqpClientVersion,
-      "ch.qos.logback"             % "logback-classic"            % "1.2.3" % "test"
-
+      "com.typesafe.scala-logging" %% "scala-logging"  % scalaLoggingVersion,
+      "org.scalatest"              %% "scalatest"      % scalaTestVersion % "test",
+      "org.typelevel"              %% "cats-core"      % "1.6.0",
+      "org.typelevel"              %% "cats-effect"    % "1.2.0",
+      "com.rabbitmq"               % "amqp-client"     % amqpClientVersion,
+      "ch.qos.logback"             % "logback-classic" % "1.2.3" % "test"
     )
   )
   .configs(IntegrationTest)
@@ -145,7 +145,6 @@ lazy val test = project
   .settings(name := "com.itv")
   .settings(moduleName := "bucky-test")
   .settings(kernelSettings: _*)
-  .aggregate(core)
   .dependsOn(core)
   .settings(
     libraryDependencies ++= Seq(
@@ -155,7 +154,7 @@ lazy val test = project
       "io.netty"                   % "netty"          % "3.4.2.Final",
       "org.scalatest"              %% "scalatest"     % scalaTestVersion,
       "co.fs2"                     %% "fs2-core"      % fs2Version,
-      "co.fs2"                     %% "fs2-io"      % fs2Version,
+      "co.fs2"                     %% "fs2-io"        % fs2Version,
       "org.typelevel"              %% "cats-effect"   % catsEffectsVersion,
       "com.rabbitmq"               % "amqp-client"    % amqpClientVersion,
       "org.mockito"                % "mockito-core"   % mockitoVersion
@@ -263,7 +262,6 @@ lazy val rabbitmq = project
       "org.mockito"                % "mockito-core"   % mockitoVersion % "test"
     )
   )
-
 
 lazy val root = (project in file("."))
   .aggregate(rabbitmq, xml, circe, argonaut, example, test, core)

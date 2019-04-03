@@ -34,7 +34,7 @@ object SuperTest {
     }
 
     override def publish(cmd: PublishCommand): IO[Unit] = {
-      val queues = bindings.find(binding => binding.exchangeName == cmd.exchange && binding.routingKey == cmd.routingKey).map(_.queueName)
+      val queues = bindings.filter(binding => binding.exchangeName == cmd.exchange && binding.routingKey == cmd.routingKey).map(_.queueName)
       val subscribedHandlers = handlers
         .filterKeys(queues.contains)
         .mapValues {
