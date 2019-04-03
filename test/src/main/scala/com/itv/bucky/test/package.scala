@@ -4,7 +4,9 @@ import cats.effect.{ConcurrentEffect, ContextShift, Sync, Timer}
 import com.itv.bucky.consume._
 import cats._
 import cats.implicits._
-import com.itv.bucky.test.stubs.{StubChannel, StubHandler, StubPublisher}
+import cats.effect._
+import com.itv.bucky.test.stubs.{RecordingHandler, StubChannel, StubPublisher}
+
 import scala.concurrent.duration.FiniteDuration
 import scala.language.higherKinds
 
@@ -46,14 +48,14 @@ package object test {
       forgivingSimulator(config)
   }
 
-  object Consumer {
-    def ackConsumer[F[_], T](implicit F: Sync[F]): StubHandler[F, T]        = new StubHandler[F, T](Ack)
-    def deadLetterConsumer[F[_], T](implicit F: Sync[F]): StubHandler[F, T] = new StubHandler[F, T](DeadLetter)
-    def requeueConsumer[F[_], T](implicit F: Sync[F]): StubHandler[F, T]    = new StubHandler[F, T](RequeueImmediately)
+  object StubHandlers {
+    def ackHandler[F[_], T](implicit F: Sync[F]): RecordingHandler[F, T]                               = new RecordingHandler[F, T](_ => F.delay(Ack))
+    def deadLetterHandler[F[_], T](implicit F: Sync[F]): RecordingHandler[F, T]                        = new RecordingHandler[F, T](_ => F.delay(DeadLetter))
+    def requeueHandler[F[_], T](implicit F: Sync[F]): RecordingHandler[F, T]                           = new RecordingHandler[F, T](_ => F.delay(RequeueImmediately))
+    def recordingHandler[F[_], T](handler: Handler[F, T])(implicit F: Sync[F]): RecordingHandler[F, T] = new RecordingHandler[F, T](handler)
   }
 
-  object Publisher {
-    def stubHandler[F[_], T](implicit F: Sync[F]): StubPublisher[F, T] = new StubPublisher[F, T]()
+  object Publishers {
+    def stubPublisher[F[_], T](implicit F: Sync[F]): StubPublisher[F, T] = new StubPublisher[F, T]()
   }
-
 }

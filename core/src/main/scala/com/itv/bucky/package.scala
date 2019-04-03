@@ -16,4 +16,9 @@ package object bucky {
   case class RoutingKey(value: String)
   case class ExchangeName(value: String)
   case class QueueName(value: String)
+
+  implicit def consumerSyntax[F[_]]: AmqpClient[F] => consume.ConsumerSugar[F] =
+    com.itv.bucky.consume.ConsumerSugar[F]
+  implicit def publisherSyntax[F[_]]: AmqpClient[F] => publish.PublisherSugar[F] =
+    com.itv.bucky.publish.PublisherSugar[F]
 }

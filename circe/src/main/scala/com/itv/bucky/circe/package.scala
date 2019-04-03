@@ -23,5 +23,4 @@ package object circe {
   implicit object JsonPayloadMarshaller extends PayloadMarshaller[Json] {
     override def apply(json: Json): Payload = Payload.from(json.noSpaces)
   }
-
 }
