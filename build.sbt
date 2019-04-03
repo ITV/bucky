@@ -254,7 +254,7 @@ lazy val xml = project
   )
 
 lazy val root = (project in file("."))
-  .aggregate(xml, circe, argonaut, example, test, core)
+  .aggregate(xml, circe, kamon,  argonaut, example, test, core)
   .settings(publishArtifact := false)
 
 lazy val readme = scalatex
