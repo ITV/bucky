@@ -1,6 +1,7 @@
 package com.itv
 
 import com.itv.bucky.consume.{ConsumeAction, Delivery, RequeueConsumeAction}
+import com.itv.bucky.publish.PublishCommandBuilder
 
 import scala.language.higherKinds
 
@@ -21,4 +22,6 @@ package object bucky {
     com.itv.bucky.consume.ConsumerSugar[F]
   implicit def publisherSyntax[F[_]]: AmqpClient[F] => publish.PublisherSugar[F] =
     com.itv.bucky.publish.PublisherSugar[F]
+  def publishCommandBuilder[T](marshaller: PayloadMarshaller[T]): PublishCommandBuilder.NothingSet[T] =
+    PublishCommandBuilder.publishCommandBuilder[T](marshaller)
 }

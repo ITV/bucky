@@ -60,22 +60,20 @@ class HammerTest extends FunSuite with Eventually with IntegrationPatience {
       Exchange(exchangeName).binding(routingKey -> queueName).autoDelete.expires(20.minutes)
     )
 
-    val fixture =
+    AmqpClient[IO](config).use { client =>
+      val handler = new StubConsumeHandler[String]
       for {
-        client <- AmqpClient[IO](config)
-        handler = new StubConsumeHandler[String]
         _ <- client.declare(declarations)
         _ <- client.registerConsumerOf(queueName, handler)
         pub = client.publisherOf[String](exchangeName, routingKey)
-      }
-        yield TestFixture(handler, pub)
-
-    fixture.flatMap(test).unsafeRunSync()
+        fixture = TestFixture(handler, pub)
+        _ <- test(fixture)
+      } yield ()
+    }.unsafeRunSync()
   }
 
   test("can handle concurrency") {
     withTestFixture { testFixture =>
-
       val hammerStrength = 10000
       val parallelPublish = 250
 

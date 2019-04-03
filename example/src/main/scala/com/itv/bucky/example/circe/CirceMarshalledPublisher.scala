@@ -1,22 +1,20 @@
 package com.itv.bucky.example.circe
 
-import com.itv.bucky.PublishCommandBuilder.publishCommandBuilder
-import com.itv.lifecycle.Lifecycle
+import cats.effect.{ExitCode, IO, IOApp}
 import com.itv.bucky._
+import com.itv.bucky.circe._
 import com.itv.bucky.decl._
 import com.itv.bucky.example.circe.Shared.Person
-import com.itv.bucky.lifecycle.{AmqpClientLifecycle, DeclarationLifecycle}
+import com.itv.bucky.publish.PublisherSugar
 import com.typesafe.config.ConfigFactory
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
 
 /*
   The only difference between this and itv.bucky.example.marshalling.MarshalledPublisher
   is the way the PayloadMarshaller is defined in itv.bucky.example.circe.Shared!
  */
-object CirceMarshalledPublisher extends App {
+object CirceMarshalledPublisher extends IOApp {
 
   object Declarations {
     val queue      = Queue(QueueName("queue.people.circe"))
@@ -29,27 +27,15 @@ object CirceMarshalledPublisher extends App {
   val config                             = ConfigFactory.load("bucky")
   val amqpClientConfig: AmqpClientConfig = AmqpClientConfig(config.getString("rmq.host"), 5672, "guest", "guest")
 
-  /**
-    * A publisher delivers a message of a fixed type to an exchange.
-    * The routing key (along with exchange configuration) determine where the message will reach.
-    */
-  val publisherConfig =
-    publishCommandBuilder(Shared.personMarshaller) using Declarations.routingKey using Declarations.exchange.name
+  override def run(args: List[String]): IO[ExitCode] =
+    AmqpClient[IO](amqpClientConfig).use { client =>
+      for {
+        _ <- client.declare(Declarations.all)
+        publisher = client.publisherOf[Person](Declarations.exchange.name, Declarations.routingKey)
+        _ <- publisher(Person("bob", 22))
+      }
+        yield ExitCode.Success
+    }
 
-  /**
-    * A lifecycle is a monadic try/finally statement.
-    * More detailed information is available here https://github.com/ITV/lifecycle
-    */
-  val lifecycle: Lifecycle[Publisher[Future, Person]] =
-    for {
-      amqpClient <- AmqpClientLifecycle(amqpClientConfig)
-      _          <- DeclarationLifecycle(Declarations.all, amqpClient)
-      publisher  <- amqpClient.publisherOf(publisherConfig)
-    } yield publisher
-
-  Lifecycle.using(lifecycle) { publisher: Publisher[Future, Person] =>
-    val result: Future[Unit] = publisher(Person("Bob", 21))
-    Await.result(result, 1.second)
-  }
 
 }

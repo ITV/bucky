@@ -1,33 +1,30 @@
 package com.itv.bucky.example.requeue
 
+import cats.effect.{ExitCode, IO, IOApp}
 import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
 import com.itv.bucky.decl._
 import com.itv.bucky._
+import com.itv.bucky.consume.{_}
 import com.itv.bucky.pattern.requeue._
-import com.itv.lifecycle.Lifecycle
-import com.typesafe.config.ConfigFactory
+import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.StrictLogging
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
 import scala.concurrent.duration._
 
-object RequeueConsumer extends App with StrictLogging {
+object RequeueConsumer extends IOApp with StrictLogging {
 
   object Declarations {
     val queue = Queue(QueueName(s"requeue_string-1"))
-    val all = basicRequeueDeclarations(queue.name, retryAfter = 1.second) collect {
-      case ex: Exchange => ex.autoDelete.expires(1.minute)
-      case q: Queue     => q.autoDelete.expires(1.minute)
-    }
+    val all: Iterable[Declaration] = basicRequeueDeclarations(queue.name, retryAfter = 1.second)
   }
 
-  val config                             = ConfigFactory.load("bucky")
+  val config: Config = ConfigFactory.load("bucky")
   val amqpClientConfig: AmqpClientConfig = AmqpClientConfig(config.getString("rmq.host"), 5672, "guest", "guest")
 
-  val stringToLogRequeueHandler =
-    RequeueHandler[Future, String] { message: String =>
-      Future {
+  val stringToLogRequeueHandler: RequeueHandler[IO, String] =
+    RequeueHandler[IO, String] { message: String =>
+      IO.delay {
         logger.info(message)
 
         message match {
@@ -38,22 +35,12 @@ object RequeueConsumer extends App with StrictLogging {
       }
     }
 
-  val requeuePolicy = RequeuePolicy(maximumProcessAttempts = 5, requeueAfter = 10.seconds)
-
-  /**
-    * A lifecycle is a monadic try/finally statement.
-    * More detailed information is available here https://github.com/ITV/lifecycle
-    */
-  val lifecycle: Lifecycle[Unit] =
-    for {
-      amqpClient <- AmqpClientLifecycle(amqpClientConfig)
-      _          <- DeclarationLifecycle(Declarations.all, amqpClient)
-      _ <- amqpClient.requeueHandlerOf(Declarations.queue.name,
-                                       stringToLogRequeueHandler,
-                                       requeuePolicy,
-                                       StringPayloadUnmarshaller)
-    } yield ()
-
-  lifecycle.runUntilJvmShutdown()
-
+  override def run(args: List[String]): IO[ExitCode] =
+    AmqpClient[IO](amqpClientConfig).use { amqpClient =>
+      for {
+        _ <- amqpClient.declare(Declarations.all)
+        _ <- amqpClient.registerRequeueConsumerOf(Declarations.queue.name,
+          stringToLogRequeueHandler)
+      } yield ExitCode.Success
+    }
 }

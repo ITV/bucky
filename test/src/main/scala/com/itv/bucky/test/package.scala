@@ -1,8 +1,7 @@
 package com.itv.bucky
 
-import cats.effect.{ConcurrentEffect, ContextShift, Sync, Timer}
+import cats.effect.{ConcurrentEffect, ContextShift, Resource, Sync, Timer}
 import com.itv.bucky.consume._
-import cats._
 import cats.implicits._
 import cats.effect._
 import com.itv.bucky.test.stubs.{RecordingHandler, StubChannel, StubPublisher}
@@ -17,25 +16,25 @@ package object test {
   }
 
   object TestAmqpClient {
-    def forgivingSimulator[F[_]](config: AmqpClientConfig)(implicit F: ConcurrentEffect[F], t: Timer[F], cs: ContextShift[F]): F[AmqpClient[F]] =
-      AmqpClient.apply[F](config, new StubChannel[F]() {
+    def forgivingSimulator[F[_]](config: AmqpClientConfig)(implicit F: ConcurrentEffect[F], t: Timer[F], cs: ContextShift[F]): Resource[F, AmqpClient[F]] =
+      AmqpClient.apply[F](config, Resource.pure[F, Channel[F]](new StubChannel[F]() {
         override def handlePublishHandlersResult(result: Either[Throwable, List[consume.ConsumeAction]]): F[Unit] =
           F.unit
-      })
+      }))
 
-    def strictSimulator[F[_]](config: AmqpClientConfig)(implicit F: ConcurrentEffect[F], t: Timer[F], cs: ContextShift[F]): F[AmqpClient[F]] =
+    def strictSimulator[F[_]](config: AmqpClientConfig)(implicit F: ConcurrentEffect[F], t: Timer[F], cs: ContextShift[F]): Resource[F, AmqpClient[F]] =
       AmqpClient.apply[F](
         config,
-        new StubChannel[F]() {
+        Resource.pure[F, Channel[F]](new StubChannel[F]() {
           override def handlePublishHandlersResult(result: Either[Throwable, List[consume.ConsumeAction]]): F[Unit] =
             F.fromEither(result).void
-        }
+        })
       )
 
-    def allShallAckSimulator[F[_]](config: AmqpClientConfig)(implicit F: ConcurrentEffect[F], t: Timer[F], cs: ContextShift[F]): F[AmqpClient[F]] =
+    def allShallAckSimulator[F[_]](config: AmqpClientConfig)(implicit F: ConcurrentEffect[F], t: Timer[F], cs: ContextShift[F]): Resource[F, AmqpClient[F]] =
       AmqpClient.apply[F](
         config,
-        new StubChannel[F]() {
+        Resource.pure[F, Channel[F]](new StubChannel[F]() {
           override def handlePublishHandlersResult(result: Either[Throwable, List[consume.ConsumeAction]]): F[Unit] =
             F.fromEither(result)
               .flatMap { result =>
@@ -43,8 +42,8 @@ package object test {
               }
               .void
         }
-      )
-    def superSyncSimulator[F[_]](config: AmqpClientConfig)(implicit F: ConcurrentEffect[F], t: Timer[F], cs: ContextShift[F]): F[AmqpClient[F]] =
+      ))
+    def superSyncSimulator[F[_]](config: AmqpClientConfig)(implicit F: ConcurrentEffect[F], t: Timer[F], cs: ContextShift[F]): Resource[F, AmqpClient[F]] =
       forgivingSimulator(config)
   }
 

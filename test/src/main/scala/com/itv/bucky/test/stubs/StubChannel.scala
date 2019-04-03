@@ -28,7 +28,6 @@ abstract class StubChannel[F[_]](implicit F: ConcurrentEffect[F]) extends Channe
   val confirmListeners: ListBuffer[ConfirmListener]                           = ListBuffer.empty
 
   override def close(): F[Unit]                        = F.unit
-  override def shutdownChannelAndConnection(): F[Unit] = F.unit
   override def purgeQueue(name: QueueName): F[Unit]    = F.unit
   override def basicQos(prefetchCount: Int): F[Unit]   = F.unit
   override def confirmSelect: F[Unit]                  = F.unit

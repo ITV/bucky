@@ -12,7 +12,6 @@ import scala.language.higherKinds
 
 trait Channel[F[_]] {
   def close(): F[Unit]
-  def shutdownChannelAndConnection(): F[Unit]
   def purgeQueue(name: QueueName): F[Unit]
   def basicQos(prefetchCount: Int): F[Unit]
   def confirmSelect: F[Unit]
@@ -51,7 +50,6 @@ object Channel {
     import scala.collection.JavaConverters._
 
     override def close(): F[Unit]                                       = F.delay(channel.close())
-    override def shutdownChannelAndConnection(): F[Unit]                = close() *> F.delay(channel.getConnection.close())
     override def purgeQueue(name: QueueName): F[Unit]                   = F.delay { channel.queuePurge(name.value) }
     override def basicQos(prefetchCount: Int): F[Unit]                  = F.delay(channel.basicQos(prefetchCount)).void
     override def confirmSelect: F[Unit]                                 = F.delay(channel.confirmSelect)

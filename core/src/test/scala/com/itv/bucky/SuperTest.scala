@@ -1,6 +1,6 @@
 package com.itv.bucky
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{ContextShift, IO, Resource, Timer}
 import cats._
 import cats.implicits._
 import com.itv.bucky
@@ -8,6 +8,7 @@ import com.itv.bucky.decl.{Binding, Exchange, ExchangeBinding, Queue}
 import com.rabbitmq.client.ConfirmListener
 import com.itv.bucky.publish._
 import com.itv.bucky.consume._
+
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.ExecutionContext
@@ -25,7 +26,6 @@ object SuperTest {
     val confirmListeners: ListBuffer[ConfirmListener]                            = ListBuffer.empty
 
     override def close(): IO[Unit]                        = IO.unit
-    override def shutdownChannelAndConnection(): IO[Unit] = IO.unit
     override def purgeQueue(name: QueueName): IO[Unit]    = IO.unit
     override def basicQos(prefetchCount: Int): IO[Unit]   = IO.unit
     override def confirmSelect: IO[Unit]                  = IO.unit
@@ -107,6 +107,7 @@ object SuperTest {
     implicit val cs: ContextShift[IO] = IO.contextShift(ec)
     implicit val timer: Timer[IO]     = IO.timer(ec)
     val config                        = AmqpClientConfig("127.0.0.1", 5672, "guest", "guest", publishingTimeout = publishTimeout)
-    AmqpClient.apply[IO](config, channel).flatMap(test).unsafeRunSync()
+
+    AmqpClient.apply[IO](config, Resource.pure[IO, Channel[IO]](channel)).use(test).unsafeRunSync()
   }
 }

@@ -20,7 +20,7 @@ val fs2Version          = "1.0.3" //1.0.3
 val catsEffectsVersion  = "1.2.0"
 val scalaXmlVersion     = "1.1.1"
 val qpidVersion         = "6.0.4"
-val scalazStreamVersion = "0.8.6a"
+val scalaz = "7.2.22"
 
 releaseProcess := Seq[ReleaseStep](
   checkSnapshotDependencies,
@@ -177,7 +177,9 @@ lazy val example = project
       "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
       "org.apache.qpid"            % "qpid-broker"    % qpidVersion,
       "org.scalatest"              %% "scalatest"     % scalaTestVersion,
-      "com.typesafe"               % "config"         % typeSafeVersion
+      "com.typesafe"               % "config"         % typeSafeVersion,
+      "io.chrisdavenport" %% "scalaz-task-effect" % "0.1.0",
+      "org.scalaz" %% "scalaz-concurrent" % scalaz
     )
   )
 

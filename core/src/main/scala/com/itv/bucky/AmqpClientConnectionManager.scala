@@ -67,7 +67,6 @@ private[bucky] case class AmqpClientConnectionManager[F[_]](
       _           <- F.delay(logger.debug("Consumer for queue: {} with tag {} was successfully registered.", queueName.value, consumerTag.value))
       _           <- F.delay(logger.debug("Successfully registered consumer for queue: {} with tag.", queueName.value), consumerTag.value)
     } yield ()
-  def shutdown(): F[Unit]                                   = channel.shutdownChannelAndConnection()
   def declare(declarations: Iterable[Declaration]): F[Unit] = channel.runDeclarations(declarations)
 }
 

@@ -17,29 +17,33 @@ trait AmqpClient[F[_]] {
   def registerConsumer(queueName: QueueName,
                        handler: Handler[F, Delivery],
                        exceptionalAction: ConsumeAction = DeadLetter): F[Unit]
-  def shutdown(): F[Unit]
 }
 
 object AmqpClient extends StrictLogging {
 
-  private def createChannel[F[_]](connection: RabbitConnection)(implicit F: Sync[F]): F[RabbitChannel] =
-    F.delay {
+  private def createChannel[F[_]](connection: RabbitConnection)(implicit F: Sync[F], cs: ContextShift[F]): Resource[F, RabbitChannel] = {
+    val make =
+      F.delay {
         logger.info(s"Starting Channel")
         val channel = connection.createChannel()
         channel.addShutdownListener((cause: ShutdownSignalException) => logger.warn(s"Channel shut down", cause))
         channel
       }
-      .attempt
-      .flatTap {
-        case Right(_) =>
-          F.delay(logger.info(s"Channel has been started successfully!"))
-        case Left(exception) =>
-          F.delay(logger.error(s"Failure when starting Channel because ${exception.getMessage}", exception))
-      }
-      .rethrow
+        .attempt
+        .flatTap {
+          case Right(_) =>
+            F.delay(logger.info(s"Channel has been started successfully!"))
+          case Left(exception) =>
+            F.delay(logger.error(s"Failure when starting Channel because ${exception.getMessage}", exception))
+        }
+        .rethrow
 
-  private def createConnection[F[_]](config: AmqpClientConfig)(implicit F: Sync[F]): F[RabbitConnection] =
-    F.delay {
+    Resource.make(cs.shift.flatMap(_ => make))(channel => F.delay(channel.close()))
+  }
+
+  private def createConnection[F[_]](config: AmqpClientConfig)(implicit F: Sync[F], cs: ContextShift[F]): Resource[F, RabbitConnection] = {
+    val make =
+      F.delay {
         logger.info(s"Starting AmqpClient")
         val connectionFactory = new ConnectionFactory()
         connectionFactory.setHost(config.host)
@@ -51,29 +55,36 @@ object AmqpClient extends StrictLogging {
         config.virtualHost.foreach(connectionFactory.setVirtualHost)
         connectionFactory.newConnection()
       }
-      .attempt
-      .flatTap {
-        case Right(_) =>
-          logger.info(s"AmqpClient has been started successfully!").pure[F]
-        case Left(exception) =>
-          logger.error(s"Failure when starting AmqpClient because ${exception.getMessage}", exception).pure[F]
-      }
-      .rethrow
+        .attempt
+        .flatTap {
+          case Right(_) =>
+            logger.info(s"AmqpClient has been started successfully!").pure[F]
+          case Left(exception) =>
+            logger.error(s"Failure when starting AmqpClient because ${exception.getMessage}", exception).pure[F]
+        }
+        .rethrow
 
-  def apply[F[_]](config: AmqpClientConfig)(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F]): F[AmqpClient[F]] =
+    Resource.make(cs.shift.flatMap(_ => make))(connection => F.delay(connection.close()))
+  }
+
+  def apply[F[_]](config: AmqpClientConfig)(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F]): Resource[F, AmqpClient[F]] =
     for {
-      _          <- cs.shift
       connection <- createConnection(config)
-      channel    <- createChannel(connection)
-      client     <- apply(config, Channel(channel))
+      rabbitChannel = createChannel(connection).map(Channel.apply[F])
+      client <- apply[F](config, rabbitChannel)
     } yield client
 
   def apply[F[_]](config: AmqpClientConfig,
-                  channel: Channel[F])(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F]): F[AmqpClient[F]] =
-    for {
-      _                 <- cs.shift
-      connectionManager <- AmqpClientConnectionManager(config, channel)
-    } yield mkClient(connectionManager)
+                  channel: Resource[F, Channel[F]])(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F]): Resource[F, AmqpClient[F]] =
+    channel.flatMap { channel =>
+      val make =
+        for {
+          _ <- cs.shift
+          connectionManager <- AmqpClientConnectionManager(config, channel)
+        }
+          yield mkClient(connectionManager)
+      Resource.make(make)(_ => F.unit)
+    }
 
   private def mkClient[F[_]](
       connectionManager: AmqpClientConnectionManager[F])(implicit F: Concurrent[F], cs: ContextShift[F], t: Timer[F]): AmqpClient[F] =
@@ -89,7 +100,6 @@ object AmqpClient extends StrictLogging {
                                     exceptionalAction: ConsumeAction): F[Unit] =
         connectionManager.registerConsumer(queueName, handler, exceptionalAction)
 
-      override def shutdown(): F[Unit]                                   = connectionManager.shutdown()
       override def declare(declarations: Declaration*): F[Unit]          = connectionManager.declare(declarations)
       override def declare(declarations: Iterable[Declaration]): F[Unit] = connectionManager.declare(declarations)
     }

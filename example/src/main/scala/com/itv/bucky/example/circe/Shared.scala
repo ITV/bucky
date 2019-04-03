@@ -1,20 +1,15 @@
 package com.itv.bucky.example.circe
 
-import com.itv.bucky.{PayloadMarshaller, PayloadUnmarshaller}
+import io.circe.{Decoder, Encoder}
 
 object Shared {
 
   case class Person(name: String, age: Int)
 
-  //begin snippet 1
-  import io.circe.generic.auto._
-  import com.itv.bucky.CirceSupport._
-
-  val personMarshaller: PayloadMarshaller[Person] =
-    marshallerFromEncodeJson
-  //end snippet 1
-
-  val personUnmarshaller: PayloadUnmarshaller[Person] =
-    unmarshallerFromDecodeJson
+  object Person {
+    import io.circe.generic.semiauto._
+    implicit val PersonEncoder: Encoder[Person] = deriveEncoder[Person]
+    implicit val PersonDecoder: Decoder[Person] = deriveDecoder[Person]
+  }
 
 }

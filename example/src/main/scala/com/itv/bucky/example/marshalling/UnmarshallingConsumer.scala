@@ -1,18 +1,14 @@
 package com.itv.bucky.example.marshalling
 
+import cats.effect.{ExitCode, IO, IOApp}
 import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
 import com.itv.bucky._
+import com.itv.bucky.consume._
 import com.itv.bucky.decl._
-import com.itv.bucky.example.marshalling.Shared.Person
-import com.itv.bucky.lifecycle.{AmqpClientLifecycle, DeclarationLifecycle}
-import com.itv.lifecycle.Lifecycle
 import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.StrictLogging
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
-
-object UnmarshallingConsumer extends App with StrictLogging {
+object UnmarshallingConsumer extends IOApp with StrictLogging {
 
   //start snippet 1
   val config                             = ConfigFactory.load("bucky")
@@ -42,16 +38,14 @@ object UnmarshallingConsumer extends App with StrictLogging {
         UnmarshalResult.Failure(s"Expected message to be in format <name>,<age>: got '$csvString'")
     }
 
-  val personUnmarshaller: PayloadUnmarshaller[Person] =
-    StringPayloadUnmarshaller.flatMap[Person](new Unmarshaller[String, Person] {
-      override def unmarshal(thing: String): UnmarshalResult[Person] = csvStringToPerson(thing)
-    })
+  implicit val personUnmarshaller: PayloadUnmarshaller[Person] =
+    StringPayloadUnmarshaller.flatMap[Person]((thing: String) => csvStringToPerson(thing))
   //end snippet 2
 
   //start snippet 3
-  val personHandler =
-    Handler[Future, Person] { message: Person =>
-      Future {
+  val personHandler: Handler[IO, Person] =
+    Handler[IO, Person] { message: Person =>
+      IO {
         logger.info(s"${message.name} is ${message.age} years old")
         Ack
       }
@@ -59,20 +53,14 @@ object UnmarshallingConsumer extends App with StrictLogging {
   //end snippet 3
 
   //start snippet 4
-  /**
-    * A lifecycle is a monadic try/finally statement.
-    * More detailed information is available here https://github.com/ITV/lifecycle
-    */
-  val lifecycle: Lifecycle[Unit] =
-    for {
-      amqpClient <- AmqpClientLifecycle(amqpClientConfig)
-      _          <- DeclarationLifecycle(Declarations.all, amqpClient)
-      effectMonad = amqpClient.effectMonad
-      _ <- amqpClient.consumer(Declarations.queue.name,
-                               AmqpClient.handlerOf(personHandler, personUnmarshaller)(effectMonad))
-    } yield ()
-
-  lifecycle.runUntilJvmShutdown()
+  override def run(args: List[String]): IO[ExitCode] =
+    AmqpClient[IO](amqpClientConfig).use { amqpClient =>
+      for {
+        _ <- amqpClient.declare(Declarations.all)
+             _ <- amqpClient.registerConsumerOf(Declarations.queue.name, personHandler)
+      } yield ExitCode.Success
+    }
   //end snippet 4
+
 
 }
