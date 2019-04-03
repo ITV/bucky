@@ -8,19 +8,16 @@ name := "bucky"
 crossScalaVersions := Seq("2.11.8", "2.12.7")
 scalacOptions += "-Ypartial-unification"
 
-val itvLifecycleVersion = "1.0.0-RC5"
-val amqpClientVersion   = "5.6.0" //
+val amqpClientVersion   = "5.6.0"
 val scalaLoggingVersion = "3.9.0"
 val scalaTestVersion    = "3.0.5"
-val mockitoVersion      = "2.24.0"
 val argonautVersion     = "6.2.2"
 val circeVersion        = "0.11.1"
 val typeSafeVersion     = "1.3.3"
-val fs2Version          = "1.0.3" //1.0.3
-val catsEffectsVersion  = "1.2.0"
+val catsEffectVersion  = "1.2.0"
 val scalaXmlVersion     = "1.1.1"
-val qpidVersion         = "6.0.4"
 val scalaz = "7.2.22"
+val logbackVersion = "1.2.3"
 
 releaseProcess := Seq[ReleaseStep](
   checkSnapshotDependencies,
@@ -138,7 +135,7 @@ lazy val core = project
       "org.typelevel" %% "cats-core" % "1.6.0",
       "org.typelevel" %% "cats-effect" % "1.2.0",
       "com.rabbitmq"               % "amqp-client"    % amqpClientVersion,
-      "ch.qos.logback"             % "logback-classic"            % "1.2.3" % "test,it",
+      "ch.qos.logback"             % "logback-classic"            % logbackVersion % "test,it",
       "com.typesafe"               % "config"         % typeSafeVersion % "it"
     )
   )
@@ -151,16 +148,10 @@ lazy val test = project
   .dependsOn(core)
   .settings(
     libraryDependencies ++= Seq(
-      "com.itv"                    %% "lifecycle"     % itvLifecycleVersion,
       "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
-      "org.apache.qpid"            % "qpid-broker"    % qpidVersion,
-      "io.netty"                   % "netty"          % "3.4.2.Final",
       "org.scalatest"              %% "scalatest"     % scalaTestVersion,
-      "co.fs2"                     %% "fs2-core"      % fs2Version,
-      "co.fs2"                     %% "fs2-io"        % fs2Version,
-      "org.typelevel"              %% "cats-effect"   % catsEffectsVersion,
-      "com.rabbitmq"               % "amqp-client"    % amqpClientVersion,
-      "org.mockito"                % "mockito-core"   % mockitoVersion
+      "org.typelevel"              %% "cats-effect"   % catsEffectVersion,
+      "com.rabbitmq"               % "amqp-client"    % amqpClientVersion
     )
   )
 
@@ -168,18 +159,14 @@ lazy val example = project
   .settings(name := "com.itv")
   .settings(moduleName := "bucky-example")
   .settings(kernelSettings: _*)
-  .aggregate(core, rabbitmq, argonaut, circe)
-  .dependsOn(core, rabbitmq, argonaut, circe)
+  .aggregate(core, argonaut, circe)
+  .dependsOn(core, argonaut, circe)
   .settings(
     libraryDependencies ++= Seq(
       "io.argonaut"                %% "argonaut"      % argonautVersion,
-      "com.itv"                    %% "lifecycle"     % itvLifecycleVersion,
       "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
-      "org.apache.qpid"            % "qpid-broker"    % qpidVersion,
       "org.scalatest"              %% "scalatest"     % scalaTestVersion,
-      "com.typesafe"               % "config"         % typeSafeVersion,
-      "io.chrisdavenport" %% "scalaz-task-effect" % "0.1.0",
-      "org.scalaz" %% "scalaz-concurrent" % scalaz
+      "com.typesafe"               % "config"         % typeSafeVersion
     )
   )
 
@@ -245,31 +232,8 @@ lazy val xml = project
     )
   )
 
-lazy val rabbitmq = project
-  .settings(name := "com.itv")
-  .settings(moduleName := "bucky-rabbitmq")
-  .settings(kernelSettings: _*)
-  .aggregate(core, test)
-  .dependsOn(core, test % "test,it")
-  .configs(IntegrationTest)
-  .settings(Defaults.itSettings)
-  .settings(
-    internalDependencyClasspath in IntegrationTest += Attributed.blank((classDirectory in Test).value),
-    parallelExecution in IntegrationTest := false
-  )
-  .settings(
-    libraryDependencies ++= Seq(
-      "com.itv"                    %% "lifecycle"     % itvLifecycleVersion,
-      "com.rabbitmq"               % "amqp-client"    % amqpClientVersion,
-      "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
-      "org.scalatest"              %% "scalatest"     % scalaTestVersion % "test, it",
-      "com.typesafe"               % "config"         % typeSafeVersion % "it",
-      "org.mockito"                % "mockito-core"   % mockitoVersion % "test"
-    )
-  )
-
 lazy val root = (project in file("."))
-  .aggregate(rabbitmq, xml, circe, argonaut, example, test, core)
+  .aggregate(xml, circe, argonaut, example, test, core)
   .settings(publishArtifact := false)
 
 lazy val readme = scalatex
