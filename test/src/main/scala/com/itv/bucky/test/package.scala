@@ -51,7 +51,9 @@ package object test {
   object StubHandlers {
     def ackHandler[F[_], T](implicit F: Sync[F]): RecordingHandler[F, T]                               = new RecordingHandler[F, T](_ => F.delay(Ack))
     def deadLetterHandler[F[_], T](implicit F: Sync[F]): RecordingHandler[F, T]                        = new RecordingHandler[F, T](_ => F.delay(DeadLetter))
-    def requeueHandler[F[_], T](implicit F: Sync[F]): RecordingRequeueHandler[F, T]                    = new RecordingRequeueHandler[F, T](_ => F.delay(Requeue))
+    def requeueRequeueHandler[F[_], T](implicit F: Sync[F]): RecordingRequeueHandler[F, T]                    = new RecordingRequeueHandler[F, T](_ => F.delay(Requeue))
+    def ackRequeueHandler[F[_], T](implicit F: Sync[F]): RecordingRequeueHandler[F, T]                    = new RecordingRequeueHandler[F, T](_ => F.delay(Ack))
+    def deadletterRequeueHandler[F[_], T](implicit F: Sync[F]): RecordingRequeueHandler[F, T]                    = new RecordingRequeueHandler[F, T](_ => F.delay(DeadLetter))
     def recordingHandler[F[_], T](handler: Handler[F, T])(implicit F: Sync[F]): RecordingHandler[F, T] = new RecordingHandler[F, T](handler)
   }
 
