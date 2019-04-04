@@ -57,7 +57,7 @@ package object test {
     def recordingHandler[F[_], T](handler: Handler[F, T])(implicit F: Sync[F]): RecordingHandler[F, T] = new RecordingHandler[F, T](handler)
   }
 
-  object Publishers {
+  object StubPublishers {
     def stubPublisher[F[_], T](implicit F: Sync[F]): StubPublisher[F, T] = new StubPublisher[F, T]()
   }
 
