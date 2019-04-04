@@ -4,6 +4,7 @@ import cats.effect.{ConcurrentEffect, ContextShift, Resource, Sync, Timer}
 import com.itv.bucky.consume._
 import cats.implicits._
 import cats.effect._
+import com.itv.bucky.UnmarshalResult.{Failure, Success}
 import com.itv.bucky.test.stubs.{RecordingHandler, RecordingRequeueHandler, StubChannel, StubPublisher}
 
 import scala.concurrent.duration.FiniteDuration
@@ -56,5 +57,19 @@ package object test {
 
   object Publishers {
     def stubPublisher[F[_], T](implicit F: Sync[F]): StubPublisher[F, T] = new StubPublisher[F, T]()
+  }
+
+  implicit class UnmarshalResultOps[T](result: UnmarshalResult[T]) {
+    def fail(message: String, throwable: Throwable = null): Nothing = throw new RuntimeException(message, throwable)
+    def getSuccess: T = result match {
+      case Success(actualElem) => actualElem
+      case Failure(reason, cause) =>
+        val message = s"Unmarshal result ops for '$reason'"
+        cause.fold(fail(message))(exception => fail(message, exception))
+    }
+    def getFailure: String = result match {
+      case Success(actualElem)    => fail(s"It should not convert when an invalid payload is provided: $actualElem")
+      case Failure(reason, _) => reason
+    }
   }
 }

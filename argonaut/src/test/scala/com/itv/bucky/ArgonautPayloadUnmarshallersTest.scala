@@ -11,7 +11,7 @@ import scala.util.Random
 
 class ArgonautPayloadUnmarshallersTest extends FunSuite {
 
-  import UnmarshalResultOps._
+  import com.itv.bucky.test._
   import com.itv.bucky.ArgonautSupport._
 
   case class Some(foo: String)
@@ -20,46 +20,46 @@ class ArgonautPayloadUnmarshallersTest extends FunSuite {
   test("it should parse a json object") {
     val expectedValue    = s"bar ${new Random().nextInt(10)}"
     val payload: Payload = validJson(expectedValue)
-    val jsonResult: Json = new UnmarshalResultOps(unmarshallerFromDecodeJson[Json].unmarshal(payload)).success
+    val jsonResult: Json = unmarshallerFromDecodeJson[Json].unmarshal(payload).getSuccess
 
     jsonResult.fieldOr("foo", fail).stringOr(fail) shouldBe expectedValue
   }
 
   test("it should not parse an invalid json") {
     val payload = invalidJson()
-    val failure = unmarshallerFromDecodeJson[Json].unmarshal(payload).failure
+    val failure = unmarshallerFromDecodeJson[Json].unmarshal(payload).getFailure
 
-    failure should include(StringPayloadUnmarshaller.unmarshal(payload).success)
+    failure should include(StringPayloadUnmarshaller.unmarshal(payload).getSuccess)
   }
 
   test("it should convert to a type") {
     val expectedValue = s"Test-${new Random().nextInt().toString.take(10)}"
     val payload       = validJson(expectedValue)
 
-    val someResult = unmarshallerFromDecodeJson[Some].unmarshal(payload).success
+    val someResult = unmarshallerFromDecodeJson[Some].unmarshal(payload).getSuccess
 
     someResult.foo shouldBe expectedValue
   }
 
   test("it should not parse to a type with an invalid json") {
     val payload    = invalidJson()
-    val jsonResult = unmarshallerFromDecodeJson[Some].unmarshal(payload).failure
+    val jsonResult = unmarshallerFromDecodeJson[Some].unmarshal(payload).getFailure
 
-    jsonResult should include(StringPayloadUnmarshaller.unmarshal(payload).success)
+    jsonResult should include(StringPayloadUnmarshaller.unmarshal(payload).getSuccess)
   }
 
   test("can implicitly unmarshal a json") {
     val jsonPayload = validJson("Hello")
-    val result      = jsonPayload.unmarshal(unmarshallerFromDecodeJson[Json]).success.nospaces
-    val expected    = StringPayloadUnmarshaller.unmarshal(jsonPayload).success
+    val result      = jsonPayload.unmarshal(unmarshallerFromDecodeJson[Json]).getSuccess.nospaces
+    val expected    = StringPayloadUnmarshaller.unmarshal(jsonPayload).getSuccess
     result shouldBe expected
   }
 
   test("can implicitly unmarshal a type") {
     val jsonPayload = validJson("Hello")
 
-    val result   = jsonPayload.unmarshal(unmarshallerFromDecodeJson[Some]).success.asJson.nospaces
-    val expected = StringPayloadUnmarshaller.unmarshal(jsonPayload).success
+    val result   = jsonPayload.unmarshal(unmarshallerFromDecodeJson[Some]).getSuccess.asJson.nospaces
+    val expected = StringPayloadUnmarshaller.unmarshal(jsonPayload).getSuccess
 
     result shouldBe expected
   }

@@ -13,7 +13,7 @@ import scala.util.Random
 
 class CircePayloadUnmarshallersTest extends FunSuite {
 
-  import UnmarshalResultOps._
+  import com.itv.bucky.test._
   import com.itv.bucky.circe._
 
   case class Entity(foo: String)
@@ -21,7 +21,7 @@ class CircePayloadUnmarshallersTest extends FunSuite {
   test("it should parse a json object") {
     val expectedValue    = s"bar ${new Random().nextInt(10)}"
     val payload: Payload = validJson(expectedValue)
-    val jsonResult: Json = implicitly[PayloadUnmarshaller[Json]].unmarshal(payload).success
+    val jsonResult: Json = implicitly[PayloadUnmarshaller[Json]].unmarshal(payload).getSuccess
 
     jsonResult.hcursor.get[String]("foo") shouldBe Right(expectedValue)
   }
@@ -35,7 +35,7 @@ class CircePayloadUnmarshallersTest extends FunSuite {
     val expectedValue = s"Random-${new Random().nextInt(100)}"
     val payload       = validJson(expectedValue)
 
-    val someResult = implicitly[PayloadUnmarshaller[Entity]].unmarshal(payload).success
+    val someResult = implicitly[PayloadUnmarshaller[Entity]].unmarshal(payload).getSuccess
     someResult.foo shouldBe expectedValue
   }
 
@@ -46,16 +46,16 @@ class CircePayloadUnmarshallersTest extends FunSuite {
 
   test("can implicitly unmarshal a json") {
     val jsonPayload = validJson("Hello")
-    val result      = jsonPayload.unmarshal(unmarshallerFromDecodeJson[Json]).success.noSpaces
-    val expected    = StringPayloadUnmarshaller.unmarshal(jsonPayload).success
+    val result      = jsonPayload.unmarshal(unmarshallerFromDecodeJson[Json]).getSuccess.noSpaces
+    val expected    = StringPayloadUnmarshaller.unmarshal(jsonPayload).getSuccess
     result shouldBe expected
   }
 
   test("can implicitly unmarshal a type") {
     val jsonPayload = validJson("Hello")
 
-    val result   = jsonPayload.unmarshal(unmarshallerFromDecodeJson[Entity]).success.asJson.noSpaces
-    val expected = StringPayloadUnmarshaller.unmarshal(jsonPayload).success
+    val result   = jsonPayload.unmarshal(unmarshallerFromDecodeJson[Entity]).getSuccess.asJson.noSpaces
+    val expected = StringPayloadUnmarshaller.unmarshal(jsonPayload).getSuccess
 
     result shouldBe expected
   }

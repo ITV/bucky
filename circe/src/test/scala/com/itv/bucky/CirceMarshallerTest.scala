@@ -1,6 +1,6 @@
 package com.itv.bucky
 
-import com.itv.bucky.CirceSupport._
+import com.itv.bucky.circe._
 import io.circe._
 import io.circe.generic.auto._
 import io.circe.syntax._

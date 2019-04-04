@@ -7,7 +7,7 @@ import scala.util.Random
 import scala.xml.Elem
 
 class XmlPayloadUnmarshallersTest extends FunSuite {
-  import UnmarshalResultOps._
+  import com.itv.bucky.test._
   import com.itv.bucky.XmlSupport._
 
   test("it should parse a xml object") {
@@ -15,7 +15,7 @@ class XmlPayloadUnmarshallersTest extends FunSuite {
     val elem             = <foo><bar>{expectedValue}</bar></foo>
     val payload: Payload = Payload.from(elem.toString)
 
-    val elemResult: Elem = unmarshallerToElem.unmarshal(payload).success
+    val elemResult: Elem = unmarshallerToElem.unmarshal(payload).getSuccess
 
     (elemResult \ "bar").map(_.text.toInt).head shouldBe expectedValue
   }
@@ -25,7 +25,7 @@ class XmlPayloadUnmarshallersTest extends FunSuite {
     val invalidElem      = expectedValue
     val payload: Payload = Payload.from(invalidElem.toString)
 
-    val failure = unmarshallerToElem.unmarshal(payload).failure
+    val failure = unmarshallerToElem.unmarshal(payload).getFailure
 
     failure should include(invalidElem.toString)
   }
