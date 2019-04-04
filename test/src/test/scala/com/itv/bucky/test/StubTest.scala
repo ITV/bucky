@@ -58,6 +58,23 @@ class StubTest extends FunSuite with Matchers {
     }
   }
 
+  test("Should not suffer from deadlock") {
+    withAllAckClient { client =>
+      val publisher = client.publisherOf[String](ExchangeName("x"), RoutingKey("y"))
+      val handler = new Handler[IO, String] {
+        override def apply(delivery: String): IO[consume.ConsumeAction] =
+          publisher(delivery).map(_ => Ack)
+      }
+
+      for {
+        _         <- client.declare(declarations)
+        consumer  = handler
+        _         <- client.registerConsumerOf(queue, consumer)
+        publisher = client.publisherOf[String](exchange, rk)
+        _         <- publisher(message)
+      } yield ()
+    }
+  }
 
   test("Stub publisher should capture messages") {
     withAllAckClient { client =>

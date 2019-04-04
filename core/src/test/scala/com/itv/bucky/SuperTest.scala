@@ -91,6 +91,8 @@ object SuperTest {
         IO.raiseError(new RuntimeException(s"Exchange Binding $binding had destination $hasDestExchange and source $hasSourceExchange"))
       }
     }
+
+    override def synchroniseIfNeeded[T](f: => T): T = f
   }
 
   object StubChannel {
