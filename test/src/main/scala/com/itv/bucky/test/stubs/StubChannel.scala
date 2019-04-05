@@ -47,8 +47,8 @@ abstract class StubChannel[F[_]](implicit F: ConcurrentEffect[F]) extends Channe
     (for {
       id       <- F.delay(UUID.randomUUID())
       _        <- F.delay(logger.debug("Publishing message with rk: {}, exchange: {} ,body: {} and pid {}", cmd.routingKey, cmd.exchange, cmd.body, id))
-      _        <- F.delay(logger.debug("Found {} queues for pid {}.", id, queues.size))
-      _        <- F.delay(logger.debug("Found {} handlers for pid {}.", id, subscribedHandlers.size))
+      _        <- F.delay(logger.debug("Found {} queues for pid {}.", queues.size, id))
+      _        <- F.delay(logger.debug("Found {} handlers for pid {}.", subscribedHandlers.size, id))
       delivery <- deliveryFor(cmd)
       _        <- F.delay(pubSeqLock.synchronized(publishSeq = publishSeq + 1))
       result   <- subscribedHandlers.traverse(_(delivery)).attempt
