@@ -17,7 +17,7 @@ import scala.concurrent.duration._
 object SuperTest {
   class StubChannel extends Channel[IO] {
     var publishSeq: Long                                                         = 0L
-    var pubSeqLock: Object                                                       = new Object
+    val pubSeqLock: Object                                                       = new Object
     val exchanges: ListBuffer[Exchange]                                          = ListBuffer.empty
     val queues: ListBuffer[Queue]                                                = ListBuffer.empty
     val bindings: ListBuffer[Binding]                                            = ListBuffer.empty
@@ -44,10 +44,10 @@ object SuperTest {
         .toList
       (for {
         delivery <- deliveryFor(cmd)
+        _        <- IO.delay(pubSeqLock.synchronized(publishSeq = publishSeq + 1))
         _        <- subscribedHandlers.traverse(_(delivery))
         _        <- confirmListeners.toList.traverse(cl => IO.delay(cl.handleAck(delivery.envelope.deliveryTag, false)))
       } yield ()).attempt
-        .flatTap(_ => IO.delay(pubSeqLock.synchronized(publishSeq = publishSeq + 1)))
         .rethrow
     }
 
