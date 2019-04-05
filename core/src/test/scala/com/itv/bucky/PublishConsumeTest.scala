@@ -58,6 +58,34 @@ class PublishConsumeTest extends FunSuite with Eventually with IntegrationPatien
     }
   }
 
+  test("Can publish messages with headers") {
+    withDefaultClient() { client =>
+      val exchange = ExchangeName("anexchange")
+      val queue    = QueueName("aqueue")
+      val rk       = RoutingKey("ark")
+      val message  = "Hello"
+      val commandBuilder = PublishCommandBuilder
+        .publishCommandBuilder[String](StringPayloadMarshaller)
+        .using(exchange)
+        .using(rk)
+
+      val handler      = accHandler
+      val declarations = List(Queue(queue), Exchange(exchange).binding((rk, queue)))
+
+      val headers: Map[String, AnyRef] = Map("foo" -> "bar")
+
+      for {
+        _ <- client.declare(declarations)
+        _ <- client.registerConsumer(queue, handler)
+        publisher = new PublisherSugar(client).publisherWithHeadersOf(commandBuilder)
+        _ <- publisher(message, headers)
+      } yield {
+        handler.acc should have size 1
+        handler.acc.head.properties.headers shouldBe headers
+      }
+    }
+  }
+
   test("A message should fail publication if an ack is never returned") {
     withDefaultClient(publishTimeout = 2.seconds, channel = StubChannel.publishTimeout) { client =>
       val exchange = ExchangeName("anexchange")

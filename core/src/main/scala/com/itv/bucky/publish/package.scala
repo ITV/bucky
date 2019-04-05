@@ -2,7 +2,8 @@ package com.itv.bucky
 
 import java.util.Date
 
-import com.itv.bucky.consume.DeliveryMode
+import cats.effect.Sync
+import com.itv.bucky.consume.{DeliveryMode, PublishCommand}
 
 import scala.language.higherKinds
 
@@ -79,6 +80,24 @@ package object publish {
             .using(routingKey)
       publisherOf[T](pcb)
     }
+
+    def publisherWithHeadersOf[T](exchangeName: ExchangeName, routingKey: RoutingKey)(implicit F: Sync[F], marshaller: PayloadMarshaller[T]): PublisherWithHeaders[F, T] ={
+      val pcb =
+        PublishCommandBuilder.publishCommandBuilder(marshaller)
+        .using(exchangeName)
+        .using(routingKey)
+      publisherWithHeadersOf[T](pcb)
+    }
+
+    def publisherWithHeadersOf[T](commandBuilder: PublishCommandBuilder[T])(implicit F: Sync[F]): PublisherWithHeaders[F, T] =
+      (message: T, headers: Map[String, AnyRef]) =>
+        F.flatMap(F.delay {
+          val command = commandBuilder.toPublishCommand(message)
+
+          command.copy(basicProperties = headers.foldLeft(command.basicProperties) {
+            case (props, (headerName, headerValue)) => props.withHeader(headerName -> headerValue)
+          })
+        })(amqpClient.publisher())
 
   }
 }

@@ -11,6 +11,7 @@ import scala.language.higherKinds
 package object bucky {
 
   type Publisher[F[_], -T]      = T => F[Unit]
+  type PublisherWithHeaders[F[_], -T] = (T, Map[String, AnyRef]) => F[Unit]
   type Handler[F[_], -T]        = T => F[ConsumeAction]
   type RequeueHandler[F[_], -T] = T => F[RequeueConsumeAction]
   type Bindings                 = PartialFunction[RoutingKey, QueueName]
