@@ -30,8 +30,8 @@ package object bucky {
   def publishCommandBuilder[T](marshaller: PayloadMarshaller[T]): PublishCommandBuilder.NothingSet[T] =
     PublishCommandBuilder.publishCommandBuilder[T](marshaller)
 
-  implicit class LoggingSyntax[F[_]](client: AmqpClient[F])(implicit F: ConcurrentEffect[F]) {
-    def withLogging(charset: Charset = StandardCharsets.UTF_8): AmqpClient[F] = LoggingAmqpClient(client, charset)
+  implicit class LoggingSyntax[F[_]](client: AmqpClient[F]) {
+    def withLogging(charset: Charset = StandardCharsets.UTF_8)(implicit F: ConcurrentEffect[F]): AmqpClient[F] = LoggingAmqpClient(client, charset)
   }
 
 }

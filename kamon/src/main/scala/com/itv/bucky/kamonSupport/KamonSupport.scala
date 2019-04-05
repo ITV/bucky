@@ -102,6 +102,7 @@ object KamonSupport {
         }
       }
 
+      override def isConnectionOpen: F[Boolean] = amqpClient.isConnectionOpen
     }
 
 }
