@@ -63,7 +63,7 @@ class StubTest extends FunSuite with Matchers {
       val publisher = client.publisherOf[String](ExchangeName("x"), RoutingKey("y"))
       val handler = new Handler[IO, String] {
         override def apply(delivery: String): IO[consume.ConsumeAction] =
-          publisher(delivery).map(_ => Ack)
+          publisher("publish from handler").map(_ => Ack)
       }
 
       for {

@@ -19,7 +19,7 @@ import scala.collection.mutable.ListBuffer
 
 abstract class StubChannel[F[_]](implicit F: ConcurrentEffect[F]) extends Channel[F] with StrictLogging {
   var publishSeq: Long                                                        = 0L
-  var pubSeqLock: Object                                                      = new Object
+  val pubSeqLock: Object                                                      = new Object
   val exchanges: ListBuffer[Exchange]                                         = ListBuffer.empty
   val queues: ListBuffer[Queue]                                               = ListBuffer.empty
   val bindings: ListBuffer[Binding]                                           = ListBuffer.empty
@@ -50,12 +50,12 @@ abstract class StubChannel[F[_]](implicit F: ConcurrentEffect[F]) extends Channe
       _        <- F.delay(logger.debug("Found {} queues for pid {}.", id, queues.size))
       _        <- F.delay(logger.debug("Found {} handlers for pid {}.", id, subscribedHandlers.size))
       delivery <- deliveryFor(cmd)
+      _        <- F.delay(pubSeqLock.synchronized(publishSeq = publishSeq + 1))
       result   <- subscribedHandlers.traverse(_(delivery)).attempt
       _        <- F.delay(logger.debug("Message pid {} published with result {}."), id, result)
       _        <- handlePublishHandlersResult(result)
       _        <- confirmListeners.toList.traverse(cl => F.delay(cl.handleAck(delivery.envelope.deliveryTag, false)))
     } yield ()).attempt
-      .flatTap(_ => F.delay(pubSeqLock.synchronized(publishSeq = publishSeq + 1)))
       .rethrow
   }
 
