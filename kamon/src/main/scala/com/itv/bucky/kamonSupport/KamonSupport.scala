@@ -1,4 +1,4 @@
-package com.itv.bucky.kamon
+package com.itv.bucky.kamonSupport
 import java.time.Instant
 
 import cats.effect.{ConcurrentEffect, ContextShift, Timer}
@@ -16,7 +16,7 @@ import scala.util.Try
 
 object KamonSupport {
 
-  def apply[F[_]](amqpClient: AmqpClient[F])(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F]): AmqpClient[F] =
+  def apply[F[_]](amqpClient: AmqpClient[F])(implicit F: ConcurrentEffect[F]): AmqpClient[F] =
     new AmqpClient[F] {
       private val config            = Kamon.config()
       private val includePublishRK  = Try { config.getBoolean("kamon.bucky.publish. add-routing-key-as-metric-tag") }.getOrElse(true)

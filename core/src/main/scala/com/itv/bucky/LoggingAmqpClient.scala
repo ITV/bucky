@@ -1,6 +1,6 @@
 package com.itv.bucky
 
-import cats.effect.{ConcurrentEffect}
+import cats.effect.ConcurrentEffect
 import com.typesafe.scalalogging.StrictLogging
 import cats._
 import cats.implicits._
