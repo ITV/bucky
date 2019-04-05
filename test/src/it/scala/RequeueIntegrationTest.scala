@@ -92,7 +92,7 @@ class RequeueIntegrationTest extends FunSuite with Eventually with IntegrationPa
             properties.correlationId shouldBe expectedCorrelationId
           }
           testFixture.stubHandler.receivedMessages.map(_.body.unmarshal(StringPayloadUnmarshaller)).foreach {
-            case UnmarshalResult.Success(value) => value shouldBe message
+            case Right(value) => value shouldBe message
             case _ => fail("could not unmarsal")
           }
         }

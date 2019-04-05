@@ -26,16 +26,9 @@ object UnmarshallingConsumer extends IOApp with StrictLogging {
     //split csv into parts
     csvString.split(",") match {
       //when the csv has 2 parts, and second is all digits
-      case Array(name, ageString) if ageString.forall(_.isDigit) =>
-        //success! there's some chance that's someone's name and age!
-        UnmarshalResult.Success(Person(name, ageString.toInt))
-
-      //otherwise fail in an appropriate way
-      case Array(name, ageNotInteger) =>
-        UnmarshalResult.Failure(s"Age was not an integer in '$csvString'")
-
-      case _ =>
-        UnmarshalResult.Failure(s"Expected message to be in format <name>,<age>: got '$csvString'")
+      case Array(name, ageString) if ageString.forall(_.isDigit) => Right(Person(name, ageString.toInt))
+      case Array(name, ageNotInteger)                            => Left(UnmarshalFailure(s"Age was not an integer in '$csvString'"))
+      case _                                                     => Left(UnmarshalFailure(s"Expected message to be in format <name>,<age>: got '$csvString'"))
     }
 
   implicit val personUnmarshaller: PayloadUnmarshaller[Person] =
@@ -57,10 +50,9 @@ object UnmarshallingConsumer extends IOApp with StrictLogging {
     AmqpClient[IO](amqpClientConfig).use { amqpClient =>
       for {
         _ <- amqpClient.declare(Declarations.all)
-             _ <- amqpClient.registerConsumerOf(Declarations.queue.name, personHandler)
+        _ <- amqpClient.registerConsumerOf(Declarations.queue.name, personHandler)
       } yield ExitCode.Success
     }
   //end snippet 4
-
 
 }

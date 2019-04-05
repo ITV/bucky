@@ -15,7 +15,7 @@ class XmlPayloadUnmarshallersTest extends FunSuite {
     val elem             = <foo><bar>{expectedValue}</bar></foo>
     val payload: Payload = Payload.from(elem.toString)
 
-    val elemResult: Elem = unmarshallerToElem.unmarshal(payload).getSuccess
+    val elemResult: Elem = unmarshallerToElem.unmarshal(payload).right.get
 
     (elemResult \ "bar").map(_.text.toInt).head shouldBe expectedValue
   }
@@ -25,9 +25,9 @@ class XmlPayloadUnmarshallersTest extends FunSuite {
     val invalidElem      = expectedValue
     val payload: Payload = Payload.from(invalidElem.toString)
 
-    val failure = unmarshallerToElem.unmarshal(payload).getFailure
+    val failure = unmarshallerToElem.unmarshal(payload).left.get
 
-    failure should include(invalidElem.toString)
+    failure.getMessage should include(invalidElem.toString)
   }
 
 }

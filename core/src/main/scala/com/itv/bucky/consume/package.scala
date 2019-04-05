@@ -48,10 +48,10 @@ package object consume {
     def registerConsumerOf[T](queueName: QueueName, handler: Handler[F, T], exceptionalAction: ConsumeAction = DeadLetter)(implicit payloadUnmarshaller: PayloadUnmarshaller[T], ae: ApplicativeError[F, Throwable]): F[Unit] = {
       amqpClient.registerConsumer(queueName, (delivery: Delivery) => {
         payloadUnmarshaller.unmarshal(delivery.body) match {
-          case UnmarshalResult.Success(value) =>
+          case Right(value) =>
             handler.apply(value)
-          case failure@UnmarshalResult.Failure(_, _) =>
-            ae.raiseError(failure.toThrowable)
+          case Left(e) =>
+            ae.raiseError(e)
         }
       }, exceptionalAction)
     }

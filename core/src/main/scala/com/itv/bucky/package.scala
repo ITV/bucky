@@ -16,6 +16,7 @@ package object bucky {
   type Bindings                 = PartialFunction[RoutingKey, QueueName]
   type PayloadUnmarshaller[T]   = Unmarshaller[Payload, T]
   type DeliveryUnmarshaller[T]  = Unmarshaller[Delivery, T]
+  type UnmarshalResult[T]       = Either[Throwable, T]
 
   case class RoutingKey(value: String)
   case class ExchangeName(value: String)

@@ -11,10 +11,9 @@ object XmlSupport {
   def unmarshallerToElem: PayloadUnmarshaller[Elem] = StringPayloadUnmarshaller.flatMap {
     Unmarshaller.liftResult { value =>
       Try(XML.loadString(value)) match {
-        case Success(elem) => UnmarshalResult.Success.apply(elem)
+        case Success(elem) => Right(elem)
         case Failure(failure) =>
-          UnmarshalResult.Failure.apply(s"Could not convert to xml: '$value' because [${failure.getMessage}]",
-                                        Some(failure))
+          Left(UnmarshalFailure(s"Could not convert to xml: '$value' because [${failure.getMessage}]", Some(failure)))
       }
     }
   }
