@@ -13,9 +13,9 @@
     </appender>
 
     <logger name="ch.qos.logback" level="WARN"/>
-    <logger name="com.itv" level="DEBUG"/>
+    <logger name="com.itv" level="ERROR"/>
 
-    <root level="DEBUG">
+    <root level="ERROR">
         <appender-ref ref="STDOUT"/>
         <appender-ref ref="ITVSYSLOG"/>
     </root>
