@@ -102,4 +102,6 @@ abstract class StubChannel[F[_]](implicit F: ConcurrentEffect[F]) extends Channe
       )
     }
   }
+
+  override def synchroniseIfNeeded[T](f: => T): T = f
 }

@@ -21,7 +21,7 @@ private[bucky] case class AmqpClientConnectionManager[F[_]](
     extends StrictLogging {
 
   private def runWithChannelSync[T](action: F[T]): F[T] =
-    channel.synchronized {
+    channel.synchroniseIfNeeded {
       F.fromTry(Try {
         action.toIO.unsafeRunSync()
       })

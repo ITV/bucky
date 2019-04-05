@@ -8,6 +8,6 @@ import scala.language.higherKinds
 
 class StubPublisher[F[_], T](implicit F: Sync[F]) extends Publisher[F, T] {
   private val published: ListBuffer[T] = ListBuffer[T]()
-  val recordedMessages: List[T]        = published.synchronized(published.toList)
+  def recordedMessages: List[T]        = published.synchronized(published.toList)
   override def apply(v1: T): F[Unit]   = F.delay(published.synchronized(published += v1)).void
 }
