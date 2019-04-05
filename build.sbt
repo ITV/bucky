@@ -120,7 +120,7 @@ lazy val kernelSettings = Seq(
           <organizationUrl>http://www.itv.com</organizationUrl>
         </developer>
       </developers>
-  )
+    )
 )
 
 lazy val core = project
