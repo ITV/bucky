@@ -93,6 +93,8 @@ object SuperTest {
     }
 
     override def synchroniseIfNeeded[T](f: => T): T = f
+
+    override def isConnectionOpen: IO[Boolean] = IO.pure(true)
   }
 
   object StubChannel {

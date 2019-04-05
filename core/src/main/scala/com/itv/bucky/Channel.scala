@@ -5,12 +5,14 @@ import cats.implicits._
 import com.itv.bucky.consume.{Ack, ConsumeAction, Consumer, ConsumerTag, DeadLetter, Delivery, PublishCommand, RequeueImmediately}
 import com.itv.bucky.decl.{Binding, Declaration, Exchange, ExchangeBinding, Queue}
 import com.rabbitmq.client.AMQP.BasicProperties
+import com.rabbitmq.client.impl.recovery.AutorecoveringConnection
 import com.rabbitmq.client.{ConfirmListener, DefaultConsumer, Channel => RabbitChannel, Envelope => RabbitMQEnvelope}
 import com.typesafe.scalalogging.StrictLogging
 
 import scala.language.higherKinds
 
 trait Channel[F[_]] {
+  def isConnectionOpen: F[Boolean]
   def synchroniseIfNeeded[T](f: =>T): T
   def close(): F[Unit]
   def purgeQueue(name: QueueName): F[Unit]
@@ -135,6 +137,8 @@ object Channel {
     }
 
     override def synchroniseIfNeeded[T](f: => T): T = this.synchronized(f)
+
+    override def isConnectionOpen: F[Boolean] = F.delay(channel.getConnection.isOpen)
   }
 
 }

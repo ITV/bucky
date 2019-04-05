@@ -17,6 +17,7 @@ trait AmqpClient[F[_]] {
   def registerConsumer(queueName: QueueName,
                        handler: Handler[F, Delivery],
                        exceptionalAction: ConsumeAction = DeadLetter): F[Unit]
+  def isConnectionOpen: F[Boolean]
 }
 
 object AmqpClient extends StrictLogging {
@@ -102,5 +103,7 @@ object AmqpClient extends StrictLogging {
 
       override def declare(declarations: Declaration*): F[Unit]          = connectionManager.declare(declarations)
       override def declare(declarations: Iterable[Declaration]): F[Unit] = connectionManager.declare(declarations)
+
+      override def isConnectionOpen: F[Boolean] = connectionManager.channel.isConnectionOpen
     }
 }

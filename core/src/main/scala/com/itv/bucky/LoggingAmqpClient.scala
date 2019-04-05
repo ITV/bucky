@@ -72,5 +72,6 @@ object LoggingAmqpClient extends StrictLogging {
         amqpClient.registerConsumer(queueName, newHandler, exceptionalAction)
       }
 
+      override def isConnectionOpen: F[Boolean] = amqpClient.isConnectionOpen
     }
 }
