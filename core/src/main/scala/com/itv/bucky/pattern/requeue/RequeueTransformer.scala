@@ -1,19 +1,23 @@
 package com.itv.bucky.pattern.requeue
 
+import cats.effect.Sync
 import com.typesafe.scalalogging.StrictLogging
-import com.itv.bucky.{Ack, ConsumeAction, DeadLetter, _}
 
 import scala.concurrent.duration.FiniteDuration
 import scala.language.higherKinds
 import scala.util.Try
+import cats.implicits._
+import cats.effect.implicits._
+import com.itv.bucky.{ExchangeName, Handler, Publisher, RequeueHandler}
+import com.itv.bucky.consume.{Ack, ConsumeAction, DeadLetter, Delivery, PublishCommand, RequeueConsumeAction}
 
-case class RequeueTransformer[F[_], E](
+case class RequeueTransformer[F[_]](
     requeuePublisher: Publisher[F, PublishCommand],
     requeueExchange: ExchangeName,
     requeuePolicy: RequeuePolicy,
     onFailure: RequeueConsumeAction,
     onFailureAction: Delivery => F[Unit]
-                                      )(handler: RequeueHandler[F, Delivery])(implicit F: MonadError[F, E])
+)(handler: RequeueHandler[F, Delivery])(implicit F: Sync[F])
     extends Handler[F, Delivery]
     with StrictLogging {
 
@@ -25,9 +29,7 @@ case class RequeueTransformer[F[_], E](
       requeueCount       <- Try(requeueCountAnyRef.toString.toInt).toOption
     } yield requeueCount
 
-  private def buildRequeuePublishCommand(delivery: Delivery,
-                                         remainingAttempts: Int,
-                                         requeueAfter: FiniteDuration): PublishCommand = {
+  private def buildRequeuePublishCommand(delivery: Delivery, remainingAttempts: Int, requeueAfter: FiniteDuration): PublishCommand = {
     val properties = delivery.properties
       .withHeader(requeueCountHeaderName -> remainingAttempts.toString)
       .copy(expiration = Some(requeueAfter.toMillis.toString))
@@ -38,32 +40,28 @@ case class RequeueTransformer[F[_], E](
   override def apply(delivery: Delivery): F[ConsumeAction] = {
     def perform(action: RequeueConsumeAction): F[ConsumeAction] =
       action match {
-        case com.itv.bucky.Requeue =>
+        case com.itv.bucky.consume.Requeue =>
           remainingAttempts(delivery) match {
-            case Some(value) if value < 1 => F.map(onFailureAction(delivery))(_ => DeadLetter)
+            case Some(value) if value < 1 =>
+              onFailureAction(delivery).map(_ => DeadLetter)
             case Some(value) =>
-              F.map(requeuePublisher(buildRequeuePublishCommand(delivery, value - 1, requeuePolicy.requeueAfter)))(_ =>
-                Ack)
+              requeuePublisher(buildRequeuePublishCommand(delivery, value - 1, requeuePolicy.requeueAfter)).map(_ => Ack)
             case None =>
               if (requeuePolicy.maximumProcessAttempts <= 1)
-                F.map(onFailureAction(delivery))(_ => DeadLetter)
+                onFailureAction(delivery).map(_ => DeadLetter)
               else {
                 val initialRemainingAttempts = requeuePolicy.maximumProcessAttempts - 2
-                F.map(
-                  requeuePublisher(
-                    buildRequeuePublishCommand(delivery, initialRemainingAttempts, requeuePolicy.requeueAfter)))(_ =>
-                  Ack)
+                requeuePublisher(buildRequeuePublishCommand(delivery, initialRemainingAttempts, requeuePolicy.requeueAfter)).map(_ => Ack)
               }
           }
-        case other: ConsumeAction => F.apply(other)
+        case other: ConsumeAction => F.point(other)
       }
 
-    val safePerform = F.flatMap(F.apply(handler(delivery)))(identity)
-    F.handleError(F.flatMap(safePerform)(perform)) {
-      case t: Throwable =>
-        logger.error(s"Unable to process ${delivery.body} due to handler failure, will $onFailure", t)
-        perform(onFailure)
-    }
+    for {
+      wrapper       <- F.delay(handler(delivery))
+      handlerAction <- wrapper
+      channelAction <- perform(handlerAction)
+    } yield channelAction
   }
 
 }

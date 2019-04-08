@@ -2,7 +2,7 @@ package com.itv.bucky.example.marshalling
 
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
-import com.itv.bucky.{PayloadMarshaller, UnmarshalResult, Unmarshaller}
+import com.itv.bucky.{PayloadMarshaller, UnmarshalFailure, UnmarshalResult, Unmarshaller}
 
 object Shared {
 
@@ -19,14 +19,9 @@ object Shared {
 
   val personUnmarshaller = StringPayloadUnmarshaller flatMap Unmarshaller.liftResult { incoming =>
     incoming.split(",") match {
-      case Array(name, ageString) if ageString.forall(_.isDigit) =>
-        UnmarshalResult.Success(Person(name, ageString.toInt))
-
-      case Array(name, ageNotInteger) =>
-        UnmarshalResult.Failure(s"Age was not an integer in '$ageNotInteger'")
-
-      case _ =>
-        UnmarshalResult.Failure(s"Expected message to be in format <name>,<age>: got '$incoming'")
+      case Array(name, ageString) if ageString.forall(_.isDigit) => Right(Person(name, ageString.toInt))
+      case Array(name, ageNotInteger)                            => Left(UnmarshalFailure(s"Age was not an integer in '$ageNotInteger'"))
+      case _                                                     => Left(UnmarshalFailure("Expected message to be in format <name>,<age>: got '$incoming'"))
     }
   }
 

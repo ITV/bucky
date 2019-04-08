@@ -1,83 +1,109 @@
 package com.itv.bucky
 
-import java.util.concurrent.TimeUnit
-
+import cats.effect._
+import cats.implicits._
+import com.itv.bucky.consume.{ConsumeAction, DeadLetter, Delivery, PublishCommand}
+import com.rabbitmq.client.{Channel => RabbitChannel, Connection => RabbitConnection}
 import com.itv.bucky.decl._
+import com.rabbitmq.client.{ConnectionFactory, ShutdownSignalException}
 import com.typesafe.scalalogging.StrictLogging
 
-import scala.concurrent.duration.{Duration, FiniteDuration}
-import scala.util.Try
 import scala.language.higherKinds
 
-trait BaseAmqpClient {
-  def performOps(thunk: AmqpOps => Try[Unit]): Try[Unit]
-  def estimatedMessageCount(queueName: QueueName): Try[Int]
-}
-
-trait AmqpClient[B[_], F[_], E, C] extends BaseAmqpClient {
-
-  implicit def monad: Monad[B]
-  implicit def effectMonad: MonadError[F, E]
-
-  def publisherOf[T](builder: PublishCommandBuilder[T],
-                     timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): B[Publisher[F, T]] =
-    monad.map(publisher(timeout))(p => AmqpClient.publisherOf(builder)(p)(effectMonad))
-
-  def publisherWithHeadersOf[T](builder: PublishCommandBuilder[T],
-                                timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): B[PublisherWithHeaders[F, T]] =
-    monad.map(publisher(timeout))(p => AmqpClient.publisherWithHeadersOf(builder)(p)(effectMonad))
-
-  def publisher(timeout: Duration = FiniteDuration(10, TimeUnit.SECONDS)): B[Publisher[F, PublishCommand]]
-
-  def consumer(queueName: QueueName,
-               handler: Handler[F, Delivery],
-               exceptionalAction: ConsumeAction = DeadLetter,
-               prefetchCount: Int = 0): B[C]
-
-}
-
-trait AmqpOps {
-  def declareQueue(queue: Queue): Try[Unit]
-  def declareExchange(exchange: Exchange): Try[Unit]
-  def bindQueue(binding: Binding): Try[Unit]
-  def bindExchange(binding: ExchangeBinding): Try[Unit]
-  def purgeQueue(name: QueueName): Try[Unit]
+trait AmqpClient[F[_]] {
+  def declare(declarations: Declaration*): F[Unit]
+  def declare(declarations: Iterable[Declaration]): F[Unit]
+  def publisher(): Publisher[F, PublishCommand]
+  def registerConsumer(queueName: QueueName,
+                       handler: Handler[F, Delivery],
+                       exceptionalAction: ConsumeAction = DeadLetter): F[Unit]
+  def isConnectionOpen: F[Boolean]
 }
 
 object AmqpClient extends StrictLogging {
 
-  type Closeable[F[_]] = F[Unit]
+  private def createChannel[F[_]](connection: RabbitConnection)(implicit F: Sync[F], cs: ContextShift[F]): Resource[F, RabbitChannel] = {
+    val make =
+      F.delay {
+        logger.info(s"Starting Channel")
+        val channel = connection.createChannel()
+        channel.addShutdownListener((cause: ShutdownSignalException) => logger.warn(s"Channel shut down", cause))
+        channel
+      }
+        .attempt
+        .flatTap {
+          case Right(_) =>
+            F.delay(logger.info(s"Channel has been started successfully!"))
+          case Left(exception) =>
+            F.delay(logger.error(s"Failure when starting Channel because ${exception.getMessage}", exception))
+        }
+        .rethrow
 
-  case class WithCloseable[B[_], F[_], E, C](client: AmqpClient[B, F, E, C], close: Closeable[F])
+    Resource.make(cs.shift.flatMap(_ => make))(channel => F.delay(channel.close()))
+  }
 
-  def publisherOf[F[_], T](commandBuilder: PublishCommandBuilder[T])(publisher: Publisher[F, PublishCommand])(
-      implicit F: Monad[F]): Publisher[F, T] =
-    (message: T) =>
-      F.flatMap(F.apply {
-        commandBuilder.toPublishCommand(message)
-      }) { publisher }
+  private def createConnection[F[_]](config: AmqpClientConfig)(implicit F: Sync[F], cs: ContextShift[F]): Resource[F, RabbitConnection] = {
+    val make =
+      F.delay {
+        logger.info(s"Starting AmqpClient")
+        val connectionFactory = new ConnectionFactory()
+        connectionFactory.setHost(config.host)
+        connectionFactory.setPort(config.port)
+        connectionFactory.setUsername(config.username)
+        connectionFactory.setPassword(config.password)
+        connectionFactory.setAutomaticRecoveryEnabled(config.networkRecoveryInterval.isDefined)
+        config.networkRecoveryInterval.map(_.toMillis.toInt).foreach(connectionFactory.setNetworkRecoveryInterval)
+        config.virtualHost.foreach(connectionFactory.setVirtualHost)
+        connectionFactory.newConnection()
+      }
+        .attempt
+        .flatTap {
+          case Right(_) =>
+            logger.info(s"AmqpClient has been started successfully!").pure[F]
+          case Left(exception) =>
+            logger.error(s"Failure when starting AmqpClient because ${exception.getMessage}", exception).pure[F]
+        }
+        .rethrow
 
-  def publisherWithHeadersOf[F[_], T](commandBuilder: PublishCommandBuilder[T])(publisher: Publisher[F, PublishCommand])(
-      implicit F: Monad[F]): PublisherWithHeaders[F, T] =
-    (message: T, headers: Map[String, AnyRef]) =>
-      F.flatMap(F.apply {
-        val command = commandBuilder.toPublishCommand(message)
+    Resource.make(cs.shift.flatMap(_ => make))(connection => F.delay(connection.close()))
+  }
 
-        command.copy(basicProperties = headers.foldLeft(command.basicProperties) {
-          case (props, (headerName, headerValue)) => props.withHeader(headerName -> headerValue)
-        })
-      }) { publisher }
+  def apply[F[_]](config: AmqpClientConfig)(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F]): Resource[F, AmqpClient[F]] =
+    for {
+      connection <- createConnection(config)
+      rabbitChannel = createChannel(connection).map(Channel.apply[F])
+      client <- apply[F](config, rabbitChannel)
+    } yield client
 
-  def deliveryHandlerOf[F[_], T](
-      handler: Handler[F, T],
-      unmarshaller: DeliveryUnmarshaller[T],
-      unmarshalFailureAction: ConsumeAction = DeadLetter)(implicit monad: Monad[F]): Handler[F, Delivery] =
-    new DeliveryUnmarshalHandler[F, T, ConsumeAction](unmarshaller)(handler, unmarshalFailureAction)
+  def apply[F[_]](config: AmqpClientConfig,
+                  channel: Resource[F, Channel[F]])(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F]): Resource[F, AmqpClient[F]] =
+    channel.flatMap { channel =>
+      val make =
+        for {
+          _ <- cs.shift
+          connectionManager <- AmqpClientConnectionManager(config, channel)
+        }
+          yield mkClient(connectionManager)
+      Resource.make(make)(_ => F.unit)
+    }
 
-  def handlerOf[F[_], T](
-      handler: Handler[F, T],
-      unmarshaller: PayloadUnmarshaller[T],
-      unmarshalFailureAction: ConsumeAction = DeadLetter)(implicit monad: Monad[F]): Handler[F, Delivery] =
-    deliveryHandlerOf(handler, Unmarshaller.toDeliveryUnmarshaller(unmarshaller), unmarshalFailureAction)
+  private def mkClient[F[_]](
+      connectionManager: AmqpClientConnectionManager[F])(implicit F: Concurrent[F], cs: ContextShift[F], t: Timer[F]): AmqpClient[F] =
+    new AmqpClient[F] {
+      override def publisher(): Publisher[F, PublishCommand] = cmd => {
+        for {
+          _ <- cs.shift
+          _ <- connectionManager.publish(cmd)
+        } yield ()
+      }
+      override def registerConsumer(queueName: QueueName,
+                                    handler: Handler[F, Delivery],
+                                    exceptionalAction: ConsumeAction): F[Unit] =
+        connectionManager.registerConsumer(queueName, handler, exceptionalAction)
 
+      override def declare(declarations: Declaration*): F[Unit]          = connectionManager.declare(declarations)
+      override def declare(declarations: Iterable[Declaration]): F[Unit] = connectionManager.declare(declarations)
+
+      override def isConnectionOpen: F[Boolean] = connectionManager.channel.isConnectionOpen
+    }
 }
