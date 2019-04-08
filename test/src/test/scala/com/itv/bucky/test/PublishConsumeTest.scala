@@ -14,7 +14,7 @@ import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
 
 import scala.language.reflectiveCalls
 
-class PublishConsumeTest extends FunSuite with AmqpClientTest with Eventually with IntegrationPatience with ScalaFutures {
+class PublishConsumeTest extends FunSuite with IOAmqpClientTest with Eventually with IntegrationPatience with ScalaFutures {
 
   test("A message can be published and consumed") {
     runAmqpTest { client =>

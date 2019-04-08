@@ -9,7 +9,7 @@ import com.typesafe.scalalogging.StrictLogging
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 
-class WiringPublishConsumeTest extends FunSuite with AmqpClientTest with StrictLogging {
+class WiringPublishConsumeTest extends FunSuite with IOAmqpClientTest with StrictLogging {
 
   val incoming = new Wiring[String](WiringName("fs2.incoming"))
   val outgoing = new Wiring[String](WiringName("fs2.outgoing"))

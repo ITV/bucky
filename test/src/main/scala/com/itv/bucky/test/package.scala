@@ -5,6 +5,8 @@ import com.itv.bucky.consume._
 import cats.implicits._
 import cats.effect._
 import com.itv.bucky.test.stubs.{RecordingHandler, RecordingRequeueHandler, StubChannel, StubPublisher}
+import cats.effect.implicits._
+import com.itv.bucky.test.AmqpClientTest
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -49,25 +51,42 @@ package object test {
       }
   }
 
-  object AmqpClientTest {
-    def apply: AmqpClientTest = new AmqpClientTest {}
-    def apply(implicit executionContext: ExecutionContext, t: Timer[IO], contextShift: ContextShift[IO]): AmqpClientTest = new AmqpClientTest {
-      override implicit val ec: ExecutionContext = executionContext
-      override implicit val cs: ContextShift[IO] = contextShift
-      override implicit val timer: Timer[IO] = t
-    }
+  object IOAmqpClientTest {
+    def apply(executionContext: ExecutionContext, t: Timer[IO], cs: ContextShift[IO]): AmqpClientTest[IO] =
+      new AmqpClientTest[IO] {
+        implicit val ec: ExecutionContext = executionContext
+        override implicit val timer: Timer[IO] = IO.timer(executionContext)
+        override implicit val contextShift: ContextShift[IO] = IO.contextShift(executionContext)
+        override implicit val F: ConcurrentEffect[IO] = IO.ioConcurrentEffect(contextShift)
+      }
   }
 
-  trait AmqpClientTest {
+  trait IOAmqpClientTest extends AmqpClientTest[IO] {
+    implicit val globalExecutionContext: ExecutionContext = ExecutionContext.Implicits.global
+    override implicit val timer: Timer[IO] = IO.timer(globalExecutionContext)
+    override implicit val contextShift: ContextShift[IO] = IO.contextShift(globalExecutionContext)
+    override implicit val F: ConcurrentEffect[IO] = IO.ioConcurrentEffect(contextShift)
+  }
 
-    implicit val ec: ExecutionContext = ExecutionContext.global
-    implicit val cs: ContextShift[IO] = IO.contextShift(ec)
-    implicit val timer: Timer[IO]     = IO.timer(ec)
+  object AmqpClientTest {
+    def apply[F[_]](implicit concurrentEffect: ConcurrentEffect[F], t: Timer[F], cs: ContextShift[F]): AmqpClientTest[F] =
+      new AmqpClientTest[F]() {
+        override implicit val F: ConcurrentEffect[F] = concurrentEffect
+        override implicit val timer: Timer[F] = t
+        override implicit val contextShift: ContextShift[F] = cs
+      }
+  }
 
-    def client(channel: StubChannel[IO], config: AmqpClientConfig): Resource[IO, AmqpClient[IO]] =
-      AmqpClient[IO](
+  trait AmqpClientTest[F[_]] {
+
+    implicit val F: ConcurrentEffect[F]
+    implicit val timer: Timer[F]
+    implicit val contextShift: ContextShift[F]
+
+    def client(channel: StubChannel[F], config: AmqpClientConfig): Resource[F, AmqpClient[F]] =
+      AmqpClient[F](
         config,
-        Resource.pure[IO, Channel[IO]](channel)
+        Resource.pure[F, Channel[F]](channel)
       )
 
     /**
@@ -75,7 +94,7 @@ package object test {
       * @param config
       * @return
       */
-    def client(config: AmqpClientConfig = Config.empty()): Resource[IO, AmqpClient[IO]] =
+    def client(config: AmqpClientConfig = Config.empty()): Resource[F, AmqpClient[F]] =
       clientStrict(config)
 
     /**
@@ -83,69 +102,69 @@ package object test {
       * @param config
       * @return
       */
-    def clientAllAck(config: AmqpClientConfig = Config.empty()): Resource[IO, AmqpClient[IO]] =
-      client(StubChannels.allShallAck[IO], config)
+    def clientAllAck(config: AmqpClientConfig = Config.empty()): Resource[F, AmqpClient[F]] =
+      client(StubChannels.allShallAck[F], config)
 
     /**
       * A publish will fail if any handler throws an exception
       * @param config
       * @return
       */
-    def clientStrict(config: AmqpClientConfig = Config.empty()): Resource[IO, AmqpClient[IO]] =
-      client(StubChannels.strict[IO], config)
+    def clientStrict(config: AmqpClientConfig = Config.empty()): Resource[F, AmqpClient[F]] =
+      client(StubChannels.strict[F], config)
 
     /**
       * Publishes always succeed, even if a handler throws an exception or does not Ack
       * @param config
       * @return
       */
-    def clientForgiving(config: AmqpClientConfig = Config.empty()): Resource[IO, AmqpClient[IO]] =
-      client(StubChannels.forgiving[IO], config)
+    def clientForgiving(config: AmqpClientConfig = Config.empty()): Resource[F, AmqpClient[F]] =
+      client(StubChannels.forgiving[F], config)
 
     /**
       * Every attempt to publish will result in a timeout (after the time specified in config)
       * @param config
       * @return
       */
-    def clientPublishTimeout(config: AmqpClientConfig = Config.empty()): Resource[IO, AmqpClient[IO]] =
-      client(StubChannels.publishTimeout[IO], config)
+    def clientPublishTimeout(config: AmqpClientConfig = Config.empty()): Resource[F, AmqpClient[F]] =
+      client(StubChannels.publishTimeout[F], config)
 
-    def runAmqpTest(clientResource: Resource[IO, AmqpClient[IO]])(test: AmqpClient[IO] => IO[Unit]): Unit =
-      clientResource.map(_.withLogging()).use(test).unsafeRunSync()
+    def runAmqpTest(clientResource: Resource[F, AmqpClient[F]])(test: AmqpClient[F] => F[Unit]): Unit =
+      F.toIO(clientResource.map(_.withLogging()).use(test)).unsafeRunSync()
 
     /**
       * A publish will fail if any handler throws an exception
       * @param test
       */
-    def runAmqpTest(test: AmqpClient[IO] => IO[Unit]): Unit =
+    def runAmqpTest(test: AmqpClient[F] => F[Unit]): Unit =
       runAmqpTestStrict(test)
 
     /**
       * For a publish to succeed all handlers must respond with Ack
       * @param test
       */
-    def runAmqpTestAllAck(test: AmqpClient[IO] => IO[Unit]): Unit =
+    def runAmqpTestAllAck(test: AmqpClient[F] => F[Unit]): Unit =
       runAmqpTest(clientAllAck())(test)
 
     /**
       * A publish will fail if any handler throws an exception
       * @param test
       */
-    def runAmqpTestStrict(test: AmqpClient[IO] => IO[Unit]): Unit =
+    def runAmqpTestStrict(test: AmqpClient[F] => F[Unit]): Unit =
       runAmqpTest(clientStrict())(test)
 
     /**
       * Publishes always succeed, even if a handler throws an exception or does not Ack
       * @param test
       */
-    def runAmqpTestForgiving(test: AmqpClient[IO] => IO[Unit]): Unit =
+    def runAmqpTestForgiving(test: AmqpClient[F] => F[Unit]): Unit =
       runAmqpTest(clientForgiving())(test)
 
     /**
       * Every attempt to publish will result in a timeout (after the time specified in config)
       * @param test
       */
-    def runAmqpTestPublishTimeout(test: AmqpClient[IO] => IO[Unit]): Unit =
+    def runAmqpTestPublishTimeout(test: AmqpClient[F] => F[Unit]): Unit =
       runAmqpTest(clientPublishTimeout())(test)
 
   }
