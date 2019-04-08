@@ -107,7 +107,7 @@ class KamonSupportTest extends FunSuite with Matchers with Eventually with SpanS
         implicit val ec    = ExecutionContext.fromExecutor(executor)
         implicit val timer = IO.timer(ec)
         implicit val cs    = IO.contextShift(ec)
-        val result = AmqpClientTest(ec, timer, cs)
+        val result = IOAmqpClientTest(ec, timer, cs)
           .clientForgiving()
           .map(_.withKamonSupport())
           .use(client => {
