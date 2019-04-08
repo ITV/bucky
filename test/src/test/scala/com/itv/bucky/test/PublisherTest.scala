@@ -1,16 +1,16 @@
-package com.itv.bucky
+package com.itv.bucky.test
 
-import cats.effect.{ContextShift, IO, Timer}
-import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
-import org.scalatest.{FunSuite, Matchers}
-import com.itv.bucky.SuperTest.{StubChannel, withDefaultClient}
-import com.itv.bucky.publish.{PendingConfirmListener, PublishCommandBuilder}
-
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future, TimeoutException}
-import scala.concurrent.duration._
+import cats.effect.IO
 import cats.implicits._
+import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
+import com.itv.bucky.publish.{PendingConfirmListener, PublishCommandBuilder}
+import com.itv.bucky.{ExchangeName, QueueName, RoutingKey, consume}
+import org.scalatest.{FunSuite, Matchers}
 
-class PublisherTest extends FunSuite with Matchers {
+import scala.concurrent.duration._
+import scala.concurrent.{Future, TimeoutException}
+
+class PublisherTest extends FunSuite with Matchers with IOAmqpTest {
   val exchange = ExchangeName("anexchange")
   val queue    = QueueName("aqueue")
   val rk       = RoutingKey("ark")
@@ -22,11 +22,8 @@ class PublisherTest extends FunSuite with Matchers {
     .toPublishCommand(message)
 
   test("A message publishing should only complete when an ack is returned.") {
-    val channel                               = StubChannel.publishTimeout
-    implicit val ec: ExecutionContextExecutor = ExecutionContext.global
-    implicit val timer: Timer[IO]             = IO.timer(ec)
-    implicit val cs: ContextShift[IO]         = IO.contextShift(ec)
-    withDefaultClient(publishTimeout = 10.seconds, channel = channel)({ client =>
+    val channel                               = StubChannels.publishTimeout[IO]
+    runAmqpTest(simulator(channel, Config.empty(10.seconds))) { client =>
       for {
         pubSeq       <- IO(channel.publishSeq)
         future       <- IO(client.publisher()(commandBuilder).unsafeToFuture())
@@ -37,15 +34,12 @@ class PublisherTest extends FunSuite with Matchers {
       } yield {
         isCompleted1 shouldBe false
       }
-    })
+    }
   }
 
   test("A message publishing should timeout if no ack is ever received.") {
-    val channel                               = StubChannel.publishTimeout
-    implicit val ec: ExecutionContextExecutor = ExecutionContext.global
-    implicit val timer: Timer[IO]             = IO.timer(ec)
-    implicit val cs: ContextShift[IO]         = IO.contextShift(ec)
-    withDefaultClient(publishTimeout = 1.seconds, channel = channel)({ client =>
+    val channel                               = StubChannels.publishTimeout[IO]
+    runAmqpTest(simulator(channel, Config.empty(1.second))) { client =>
       for {
         future      <- IO(client.publisher()(commandBuilder).unsafeToFuture())
         result      <- IO.fromFuture(IO(future)).attempt
@@ -58,15 +52,12 @@ class PublisherTest extends FunSuite with Matchers {
           pendingConf.flatMap(_.values) shouldBe 'empty
         }
       }
-    })
+    }
   }
 
   test("Multiple messages can be ack when the channel acks multiple messages") {
-    val channel                               = StubChannel.publishTimeout
-    implicit val ec: ExecutionContextExecutor = ExecutionContext.global
-    implicit val timer: Timer[IO]             = IO.timer(ec)
-    implicit val cs: ContextShift[IO]         = IO.contextShift(ec)
-    withDefaultClient(publishTimeout = 30.seconds, channel = channel)({ client =>
+    val channel                               = StubChannels.publishTimeout[IO]
+    runAmqpTest(simulator(channel, Config.empty(30.seconds))) { client =>
       for {
         publish1      <- IO(client.publisher()(commandBuilder).unsafeToFuture())
         publish2      <- IO(client.publisher()(commandBuilder).unsafeToFuture())
@@ -81,15 +72,12 @@ class PublisherTest extends FunSuite with Matchers {
         areCompleted1 shouldBe List(false, false, false)
         areCompleted2 shouldBe List(true, true, true)
       }
-    })
+    }
   }
 
   test("Multiple messages can be Nack when the channel Nacks multiple messages") {
-    val channel                               = StubChannel.publishTimeout
-    implicit val ec: ExecutionContextExecutor = ExecutionContext.global
-    implicit val timer: Timer[IO]             = IO.timer(ec)
-    implicit val cs: ContextShift[IO]         = IO.contextShift(ec)
-    withDefaultClient(publishTimeout = 15.seconds, channel = channel)({ client =>
+    val channel                               = StubChannels.publishTimeout[IO]
+    runAmqpTest(simulator(channel, Config.empty(15.seconds))) { client =>
       for {
         publish1      <- IO(client.publisher()(commandBuilder).unsafeToFuture())
         publish2      <- IO(client.publisher()(commandBuilder).unsafeToFuture())
@@ -113,15 +101,12 @@ class PublisherTest extends FunSuite with Matchers {
         result3 shouldBe 'left
         result3.left.get shouldBe a[RuntimeException]
       }
-    })
+    }
   }
 
   test("Multiple messages can be published and some can be acked and some can be Nacked.") {
-    val channel                               = StubChannel.publishTimeout
-    implicit val ec: ExecutionContextExecutor = ExecutionContext.global
-    implicit val timer: Timer[IO]             = IO.timer(ec)
-    implicit val cs: ContextShift[IO]         = IO.contextShift(ec)
-    withDefaultClient(publishTimeout = 10.seconds, channel = channel)({ client =>
+    val channel                               = StubChannels.publishTimeout[IO]
+    runAmqpTest(simulator(channel, Config.empty(10.seconds))) { client =>
       for {
         publish1      <- IO(client.publisher()(commandBuilder).unsafeToFuture())
         publish2      <- IO(client.publisher()(commandBuilder).unsafeToFuture())
@@ -143,7 +128,7 @@ class PublisherTest extends FunSuite with Matchers {
         result.filter(r => r.isLeft && r.left.get.isInstanceOf[RuntimeException]) should have size 2
         result.filter(r => r.isLeft && r.left.get.isInstanceOf[TimeoutException]) should have size 1
       }
-    })
+    }
   }
 
 }

@@ -1,33 +1,18 @@
-package com.itv.bucky
+package com.itv.bucky.test
 
 import cats.effect.IO
-import com.itv.bucky.consume.{Ack, Delivery}
+import com.itv.bucky.AmqpClient
+import com.itv.bucky.consume.Ack
+import com.itv.bucky.test.stubs.RecordingHandler
 import com.itv.bucky.wiring._
 import com.typesafe.scalalogging.StrictLogging
 import org.scalatest.FunSuite
-
-import scala.collection.mutable.ListBuffer
-import cats.implicits._
 import org.scalatest.Matchers._
 
-class WiringPublishConsumeTest extends FunSuite with StrictLogging {
-
-  import SuperTest._
+class WiringPublishConsumeTest extends FunSuite with IOAmqpTest with StrictLogging {
 
   val incoming = new Wiring[String](WiringName("fs2.incoming"))
   val outgoing = new Wiring[String](WiringName("fs2.outgoing"))
-
-  val executionContext = scala.concurrent.ExecutionContext.Implicits.global
-
-  implicit val cs = IO.contextShift(executionContext)
-
-  def accHandler: (ListBuffer[String], Handler[IO, String]) = {
-    val acc: ListBuffer[String] = ListBuffer.empty[String]
-    (acc, (delivery: String) => IO.delay {
-      acc.append(delivery)
-      Ack
-    })
-  }
 
   test("Wirings should publish and consume messages") {
     withApp { fixture =>
@@ -35,20 +20,20 @@ class WiringPublishConsumeTest extends FunSuite with StrictLogging {
         publishMessage <- incoming.publisher(fixture.client)
         _              <- publishMessage("fs2 publisher test")
       } yield {
-        fixture.sink should have size 1
-        fixture.sink.head shouldBe "Outgoing: fs2 publisher test"
+        fixture.sink.receivedMessages should have size 1
+        fixture.sink.receivedMessages.head shouldBe "Outgoing: fs2 publisher test"
       }
     }
   }
 
   case class Fixture(
                       client: AmqpClient[IO],
-                      sink: ListBuffer[String]
+                      sink: RecordingHandler[IO, String]
                     )
 
   def withApp[A](fn: Fixture => IO[A]): Unit = {
-    withDefaultClient() { client =>
-      val (acc, handler) = accHandler
+    runAmqpTest { client =>
+      val handler = StubHandlers.ackHandler[IO, String]
 
       for {
         sendOutgoingMessage <- outgoing.publisher(client)
@@ -57,7 +42,7 @@ class WiringPublishConsumeTest extends FunSuite with StrictLogging {
           sendOutgoingMessage(s"Outgoing: $message").map(_ => Ack)
         }
         _ <- outgoing.registerConsumer(client)(handler)
-        fixture = Fixture(client, acc)
+        fixture = Fixture(client, handler)
         _ <- fn(fixture)
       }
         yield ()

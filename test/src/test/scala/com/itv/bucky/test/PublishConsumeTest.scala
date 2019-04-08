@@ -1,41 +1,23 @@
-package com.itv.bucky
+package com.itv.bucky.test
 
 import java.util.concurrent.TimeoutException
 
 import cats.effect.IO
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
+import com.itv.bucky.consume._
+import com.itv.bucky.decl.{Exchange, Queue}
+import com.itv.bucky.publish._
+import com.itv.bucky.{ExchangeName, PayloadMarshaller, QueueName, RoutingKey}
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
-import com.itv.bucky.publish._
-import com.itv.bucky.consume._
 
-import scala.concurrent.duration._
-import scala.collection.mutable.ListBuffer
 import scala.language.reflectiveCalls
-import com.itv.bucky.SuperTest.{StubChannel, withDefaultClient}
-import com.itv.bucky.decl.{Exchange, Queue}
 
-class PublishConsumeTest extends FunSuite with Eventually with IntegrationPatience with ScalaFutures {
-
-  def accHandler = new Handler[IO, Delivery] {
-    val acc: ListBuffer[Delivery] = ListBuffer.empty[Delivery]
-    override def apply(v1: Delivery): IO[ConsumeAction] = IO.delay {
-      acc.append(v1)
-      Ack
-    }
-  }
-
-  def stringAccHandler = new Handler[IO, String] {
-    val acc: ListBuffer[String] = ListBuffer.empty
-    override def apply(v1: String): IO[ConsumeAction] = IO.delay {
-      acc.append(v1)
-      Ack
-    }
-  }
+class PublishConsumeTest extends FunSuite with IOAmqpTest with Eventually with IntegrationPatience with ScalaFutures {
 
   test("A message can be published and consumed") {
-    withDefaultClient() { client =>
+    runAmqpTest { client =>
       val exchange = ExchangeName("anexchange")
       val queue    = QueueName("aqueue")
       val rk       = RoutingKey("ark")
@@ -45,7 +27,7 @@ class PublishConsumeTest extends FunSuite with Eventually with IntegrationPatien
         .using(exchange)
         .using(rk)
         .toPublishCommand(message)
-      val handler      = accHandler
+      val handler      = StubHandlers.ackHandler[IO, Delivery]
       val declarations = List(Queue(queue), Exchange(exchange).binding((rk, queue)))
 
       for {
@@ -53,13 +35,13 @@ class PublishConsumeTest extends FunSuite with Eventually with IntegrationPatien
         _ <- client.registerConsumer(queue, handler)
         _ <- client.publisher()(commandBuilder)
       } yield {
-        handler.acc should have size 1
+        handler.receivedMessages should have size 1
       }
     }
   }
 
   test("Can publish messages with headers") {
-    withDefaultClient() { client =>
+    runAmqpTest { client =>
       val exchange = ExchangeName("anexchange")
       val queue    = QueueName("aqueue")
       val rk       = RoutingKey("ark")
@@ -69,7 +51,7 @@ class PublishConsumeTest extends FunSuite with Eventually with IntegrationPatien
         .using(exchange)
         .using(rk)
 
-      val handler      = accHandler
+      val handler      = StubHandlers.ackHandler[IO, Delivery]
       val declarations = List(Queue(queue), Exchange(exchange).binding((rk, queue)))
 
       val headers: Map[String, AnyRef] = Map("foo" -> "bar")
@@ -80,14 +62,14 @@ class PublishConsumeTest extends FunSuite with Eventually with IntegrationPatien
         publisher = new PublisherSugar(client).publisherWithHeadersOf(commandBuilder)
         _ <- publisher(message, headers)
       } yield {
-        handler.acc should have size 1
-        handler.acc.head.properties.headers shouldBe headers
+        handler.receivedMessages should have size 1
+        handler.receivedMessages.head.properties.headers shouldBe headers
       }
     }
   }
 
   test("A message should fail publication if an ack is never returned") {
-    withDefaultClient(publishTimeout = 2.seconds, channel = StubChannel.publishTimeout) { client =>
+    runAmqpTestPublishTimeout { client =>
       val exchange = ExchangeName("anexchange")
       val queue    = QueueName("aqueue")
       val rk       = RoutingKey("ark")
@@ -97,7 +79,7 @@ class PublishConsumeTest extends FunSuite with Eventually with IntegrationPatien
         .using(exchange)
         .using(rk)
         .toPublishCommand(message)
-      val handler      = accHandler
+      val handler      = StubHandlers.ackHandler[IO, Delivery]
       val declarations = List(Queue(queue))
       for {
         _             <- client.declare(declarations)
@@ -106,13 +88,13 @@ class PublishConsumeTest extends FunSuite with Eventually with IntegrationPatien
       } yield {
         publishResult shouldBe 'left
         publishResult.left.get shouldBe a[TimeoutException]
-        handler.acc should have size 0
+        handler.receivedMessages should have size 0
       }
     }
   }
 
   test("should have a publisherOf method that takes an implicit PublishCommandBuilder") {
-    withDefaultClient() { client =>
+    runAmqpTest { client =>
       val exchange = ExchangeName("anexchange")
       val queue = QueueName("aqueue")
       val rk = RoutingKey("ark")
@@ -122,7 +104,7 @@ class PublishConsumeTest extends FunSuite with Eventually with IntegrationPatien
           .publishCommandBuilder[String](StringPayloadMarshaller)
           .using(exchange)
           .using(rk)
-      val handler = accHandler
+      val handler = StubHandlers.ackHandler[IO, Delivery]
       val declarations = List(Queue(queue), Exchange(exchange).binding((rk, queue)))
 
       for {
@@ -131,20 +113,20 @@ class PublishConsumeTest extends FunSuite with Eventually with IntegrationPatien
         publisher = client.publisherOf[String]
         _ <- publisher(message)
       } yield {
-        handler.acc should have size 1
+        handler.receivedMessages should have size 1
       }
     }
   }
 
   test("should have a publisherOf method that takes an implicit PayloadMarshaller") {
-    withDefaultClient() { client =>
+    runAmqpTest { client =>
       val exchange = ExchangeName("anexchange")
       val queue = QueueName("aqueue")
       val rk = RoutingKey("ark")
       val message = "Hello"
       implicit val stringPayloadMarshaller: PayloadMarshaller[String] = StringPayloadMarshaller
 
-      val handler = accHandler
+      val handler = StubHandlers.ackHandler[IO, Delivery]
       val declarations = List(Queue(queue), Exchange(exchange).binding((rk, queue)))
 
       for {
@@ -153,7 +135,7 @@ class PublishConsumeTest extends FunSuite with Eventually with IntegrationPatien
         publisher = client.publisherOf[String](exchange, rk)
         _ <- publisher(message)
       } yield {
-        handler.acc should have size 1
+        handler.receivedMessages should have size 1
       }
     }
   }

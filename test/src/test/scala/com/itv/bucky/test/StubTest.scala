@@ -1,20 +1,14 @@
 package com.itv.bucky.test
 
-import cats.effect.{ContextShift, IO, Timer}
-import com.itv.bucky.{AmqpClient, ExchangeName, QueueName, RoutingKey, consume}
-import org.scalatest.{FunSuite, Matchers}
-
-import scala.concurrent.duration._
+import cats.effect.IO
 import cats.implicits._
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
+import com.itv.bucky.consume.{Ack, DeadLetter}
 import com.itv.bucky.decl.{Exchange, Queue}
-import com.itv.bucky.publish.PublishCommandBuilder
-import com.itv.bucky._
-import com.itv.bucky.consume.{Ack, DeadLetter, Delivery}
+import com.itv.bucky.{ExchangeName, QueueName, RoutingKey, consume, _}
+import org.scalatest.{FunSuite, Matchers}
 
-import scala.concurrent.ExecutionContext
-
-class StubTest extends FunSuite with Matchers {
+class StubTest extends FunSuite with Matchers with IOAmqpTest {
   val exchange     = ExchangeName("anexchange")
   val queue        = QueueName("aqueue")
   val rk           = RoutingKey("ark")
@@ -22,29 +16,8 @@ class StubTest extends FunSuite with Matchers {
   val exception    = new RuntimeException("expected")
   val declarations = List(Queue(queue), Exchange(exchange).binding((rk, queue)))
 
-  def withAllAckClient(test: AmqpClient[IO] => IO[Unit])(implicit ec: ExecutionContext = ExecutionContext.global) = {
-    val config                        = Config.empty(3.seconds)
-    implicit val cs: ContextShift[IO] = IO.contextShift(ec)
-    implicit val timer: Timer[IO]     = IO.timer(ec)
-    TestAmqpClient.allShallAckSimulator[IO](config).use(test).unsafeRunSync()
-  }
-
-  def withForgivingClient(test: AmqpClient[IO] => IO[Unit])(implicit ec: ExecutionContext = ExecutionContext.global) = {
-    val config                        = Config.empty(3.seconds)
-    implicit val cs: ContextShift[IO] = IO.contextShift(ec)
-    implicit val timer: Timer[IO]     = IO.timer(ec)
-    TestAmqpClient.forgivingSimulator[IO](config).use(test).unsafeRunSync()
-  }
-
-  def withStrictSimulator(test: AmqpClient[IO] => IO[Unit])(implicit ec: ExecutionContext = ExecutionContext.global) = {
-    val config                        = Config.empty(3.seconds)
-    implicit val cs: ContextShift[IO] = IO.contextShift(ec)
-    implicit val timer: Timer[IO]     = IO.timer(ec)
-    TestAmqpClient.strictSimulator[IO](config).use(test).unsafeRunSync()
-  }
-
   test("An ack Recording Handlers should accumulate publish results and ack") {
-    withAllAckClient { client =>
+    runAmqpTestAllAck { client =>
       for {
         _         <- client.declare(declarations)
         consumer  <- IO.pure(StubHandlers.ackHandler[IO, String])
@@ -59,7 +32,7 @@ class StubTest extends FunSuite with Matchers {
   }
 
   test("Should not suffer from deadlock") {
-    withAllAckClient { client =>
+    runAmqpTestAllAck { client =>
       val publisher = client.publisherOf[String](ExchangeName("x"), RoutingKey("y"))
       val handler = new Handler[IO, String] {
         override def apply(delivery: String): IO[consume.ConsumeAction] =
@@ -77,7 +50,7 @@ class StubTest extends FunSuite with Matchers {
   }
 
   test("Stub publisher should capture messages") {
-    withAllAckClient { client =>
+    runAmqpTestAllAck { client =>
       val stubPubslisher = StubPublishers.stubPublisher[IO, String]
       val handler = new Handler[IO, String] {
         override def apply(delivery: String): IO[consume.ConsumeAction] =
@@ -97,7 +70,7 @@ class StubTest extends FunSuite with Matchers {
   }
 
   test("Multiple Recording Handlers can be registered") {
-    withAllAckClient { client =>
+    runAmqpTestAllAck { client =>
       val queue2 = QueueName("queue2")
       for {
         _         <- client.declare(declarations ++ List(Queue(queue2), Exchange(exchange).binding(rk -> queue2)))
@@ -118,7 +91,7 @@ class StubTest extends FunSuite with Matchers {
   }
 
   test("An all shall ack client should fail to publish if a handler doesn't return an Ack") {
-    withAllAckClient { client =>
+    runAmqpTestAllAck { client =>
       for {
         _          <- client.declare(declarations)
         consumer   <- IO.pure(StubHandlers.deadLetterHandler[IO, String])
@@ -133,7 +106,7 @@ class StubTest extends FunSuite with Matchers {
   }
 
   test("An all shall ack client should fail to publish if a handler returns an exception") {
-    withAllAckClient { client =>
+    runAmqpTestAllAck { client =>
       for {
         _          <- client.declare(declarations)
         consumer   <- IO.pure(StubHandlers.recordingHandler[IO, String](_ => IO.raiseError(exception)))
@@ -149,7 +122,7 @@ class StubTest extends FunSuite with Matchers {
   }
 
   test("Forgiving client should not fail to publish if a handler doesn't return an Ack") {
-    withForgivingClient { client =>
+    runAmqpTestForgiving { client =>
       for {
         _          <- client.declare(declarations)
         consumer   <- IO.pure(StubHandlers.deadLetterHandler[IO, String])
@@ -164,7 +137,7 @@ class StubTest extends FunSuite with Matchers {
   }
 
   test("Forgiving client should not fail to publish if a handler returns an exception") {
-    withForgivingClient { client =>
+    runAmqpTestForgiving { client =>
       for {
         _          <- client.declare(declarations)
         consumer   <- IO.pure(StubHandlers.recordingHandler[IO, String](_ => IO.raiseError(exception)))
@@ -179,7 +152,7 @@ class StubTest extends FunSuite with Matchers {
   }
 
   test("An strict simulator client should not fail publish if a handler doesn't return an Ack") {
-    withStrictSimulator { client =>
+    runAmqpTestStrict { client =>
       for {
         _          <- client.declare(declarations)
         consumer   <- IO.pure(StubHandlers.deadLetterHandler[IO, String])
@@ -195,7 +168,7 @@ class StubTest extends FunSuite with Matchers {
   }
 
   test("A strict simulator client should fail to publish if a handler returns an exception") {
-    withStrictSimulator { client =>
+    runAmqpTestStrict { client =>
       for {
         _          <- client.declare(declarations)
         consumer   <- IO.pure(StubHandlers.recordingHandler[IO, String](_ => IO.raiseError(exception)))
