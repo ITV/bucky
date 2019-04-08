@@ -32,7 +32,10 @@ object UnmarshallingConsumer extends IOApp with StrictLogging {
     }
 
   implicit val personUnmarshaller: PayloadUnmarshaller[Person] =
-    StringPayloadUnmarshaller.flatMap[Person]((thing: String) => csvStringToPerson(thing))
+    StringPayloadUnmarshaller.flatMap[Person](new Unmarshaller[String, Person] {
+      override def unmarshal(thing: String): UnmarshalResult[Person] =
+        csvStringToPerson(thing)
+    })
   //end snippet 2
 
   //start snippet 3

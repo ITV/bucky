@@ -8,7 +8,10 @@ object ArgonautSupport {
 
   def unmarshallerFromDecodeJson[T](implicit decode: DecodeJson[T]): PayloadUnmarshaller[T] =
     StringPayloadUnmarshaller
-      .flatMap(Parse.decodeEither[T](_).leftMap(UnmarshalFailure(_)))
+      .flatMap(new Unmarshaller[String, T] {
+        override def unmarshal(thing: String): UnmarshalResult[T] =
+          Parse.decodeEither[T](thing).leftMap(UnmarshalFailure(_))
+      })
 
   def marshallerFromEncodeJson[T](implicit encode: EncodeJson[T]): PayloadMarshaller[T] =
     StringPayloadMarshaller contramap { value =>

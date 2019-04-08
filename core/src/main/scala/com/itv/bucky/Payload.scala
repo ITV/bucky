@@ -1,6 +1,7 @@
 package com.itv.bucky
 
 import scala.collection.mutable
+import cats.syntax.either._
 
 class Payload(val value: Array[Byte]) {
 
@@ -47,7 +48,7 @@ trait Unmarshaller[U, T] { self =>
 
   def map[V](f: T => V): Unmarshaller[U, V] =
     new Unmarshaller[U, V] {
-      override def unmarshal(thing: U): UnmarshalResult[V] = self.unmarshal(thing) map f
+      override def unmarshal(thing: U): UnmarshalResult[V] = self.unmarshal(thing).map(f)
     }
 
   def flatMap[V](f: Unmarshaller[T, V]): Unmarshaller[U, V] =

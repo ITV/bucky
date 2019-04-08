@@ -3,9 +3,8 @@ package com.itv.bucky
 import cats.effect._
 import cats.implicits._
 import com.itv.bucky.consume.{ConsumeAction, DeadLetter, Delivery, PublishCommand}
-import com.rabbitmq.client.{Channel => RabbitChannel, Connection => RabbitConnection}
+import com.rabbitmq.client.{ConnectionFactory, ShutdownListener, ShutdownSignalException, Channel => RabbitChannel, Connection => RabbitConnection}
 import com.itv.bucky.decl._
-import com.rabbitmq.client.{ConnectionFactory, ShutdownSignalException}
 import com.typesafe.scalalogging.StrictLogging
 
 import scala.language.higherKinds
@@ -27,7 +26,9 @@ object AmqpClient extends StrictLogging {
       F.delay {
         logger.info(s"Starting Channel")
         val channel = connection.createChannel()
-        channel.addShutdownListener((cause: ShutdownSignalException) => logger.warn(s"Channel shut down", cause))
+        channel.addShutdownListener(new ShutdownListener {
+          override def shutdownCompleted(cause: ShutdownSignalException): Unit = logger.warn(s"Channel shut down", cause)
+        })
         channel
       }
         .attempt
