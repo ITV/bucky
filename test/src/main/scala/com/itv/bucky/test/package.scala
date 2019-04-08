@@ -49,7 +49,16 @@ package object test {
       }
   }
 
-  trait IOAmqpTest {
+  object AmqpClientTest {
+    def apply: AmqpClientTest = new AmqpClientTest {}
+    def apply(implicit executionContext: ExecutionContext, t: Timer[IO], contextShift: ContextShift[IO]): AmqpClientTest = new AmqpClientTest {
+      override implicit val ec: ExecutionContext = executionContext
+      override implicit val cs: ContextShift[IO] = contextShift
+      override implicit val timer: Timer[IO] = t
+    }
+  }
+
+  trait AmqpClientTest {
 
     implicit val ec: ExecutionContext = ExecutionContext.global
     implicit val cs: ContextShift[IO] = IO.contextShift(ec)

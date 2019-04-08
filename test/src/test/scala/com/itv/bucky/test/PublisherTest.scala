@@ -10,7 +10,7 @@ import org.scalatest.{FunSuite, Matchers}
 import scala.concurrent.duration._
 import scala.concurrent.{Future, TimeoutException}
 
-class PublisherTest extends FunSuite with Matchers with IOAmqpTest {
+class PublisherTest extends FunSuite with Matchers with AmqpClientTest {
   val exchange = ExchangeName("anexchange")
   val queue    = QueueName("aqueue")
   val rk       = RoutingKey("ark")

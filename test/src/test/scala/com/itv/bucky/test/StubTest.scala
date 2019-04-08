@@ -8,7 +8,7 @@ import com.itv.bucky.decl.{Exchange, Queue}
 import com.itv.bucky.{ExchangeName, QueueName, RoutingKey, consume, _}
 import org.scalatest.{FunSuite, Matchers}
 
-class StubTest extends FunSuite with Matchers with IOAmqpTest {
+class StubTest extends FunSuite with Matchers with AmqpClientTest {
   val exchange     = ExchangeName("anexchange")
   val queue        = QueueName("aqueue")
   val rk           = RoutingKey("ark")
