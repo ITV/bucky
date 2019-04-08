@@ -55,14 +55,54 @@ package object test {
     implicit val cs: ContextShift[IO] = IO.contextShift(ec)
     implicit val timer: Timer[IO]     = IO.timer(ec)
 
-    def simulator(channel: StubChannel[IO] = StubChannels.strict, config: AmqpClientConfig = Config.empty()): Resource[IO, AmqpClient[IO]] =
+    def client(channel: StubChannel[IO], config: AmqpClientConfig): Resource[IO, AmqpClient[IO]] =
       AmqpClient[IO](
         config,
         Resource.pure[IO, Channel[IO]](channel)
       )
 
-    def runAmqpTest(simulatorResource: Resource[IO, AmqpClient[IO]])(test: AmqpClient[IO] => IO[Unit]): Unit =
-      simulatorResource.map(_.withLogging()).use(test).unsafeRunSync()
+    /**
+      * A publish will fail if any handler throws an exception
+      * @param config
+      * @return
+      */
+    def client(config: AmqpClientConfig = Config.empty()): Resource[IO, AmqpClient[IO]] =
+      clientStrict(config)
+
+    /**
+      * For a publish to succeed all handlers must respond with Ack
+      * @param config
+      * @return
+      */
+    def clientAllAck(config: AmqpClientConfig = Config.empty()): Resource[IO, AmqpClient[IO]] =
+      client(StubChannels.allShallAck[IO], config)
+
+    /**
+      * A publish will fail if any handler throws an exception
+      * @param config
+      * @return
+      */
+    def clientStrict(config: AmqpClientConfig = Config.empty()): Resource[IO, AmqpClient[IO]] =
+      client(StubChannels.strict[IO], config)
+
+    /**
+      * Publishes always succeed, even if a handler throws an exception or does not Ack
+      * @param config
+      * @return
+      */
+    def clientForgiving(config: AmqpClientConfig = Config.empty()): Resource[IO, AmqpClient[IO]] =
+      client(StubChannels.forgiving[IO], config)
+
+    /**
+      * Every attempt to publish will result in a timeout (after the time specified in config)
+      * @param config
+      * @return
+      */
+    def clientPublishTimeout(config: AmqpClientConfig = Config.empty()): Resource[IO, AmqpClient[IO]] =
+      client(StubChannels.publishTimeout[IO], config)
+
+    def runAmqpTest(clientResource: Resource[IO, AmqpClient[IO]])(test: AmqpClient[IO] => IO[Unit]): Unit =
+      clientResource.map(_.withLogging()).use(test).unsafeRunSync()
 
     /**
       * A publish will fail if any handler throws an exception
@@ -76,28 +116,28 @@ package object test {
       * @param test
       */
     def runAmqpTestAllAck(test: AmqpClient[IO] => IO[Unit]): Unit =
-      runAmqpTest(simulator(StubChannels.allShallAck))(test)
+      runAmqpTest(clientAllAck())(test)
 
     /**
       * A publish will fail if any handler throws an exception
       * @param test
       */
     def runAmqpTestStrict(test: AmqpClient[IO] => IO[Unit]): Unit =
-      runAmqpTest(simulator(StubChannels.strict))(test)
+      runAmqpTest(clientStrict())(test)
 
     /**
       * Publishes always succeed, even if a handler throws an exception or does not Ack
       * @param test
       */
     def runAmqpTestForgiving(test: AmqpClient[IO] => IO[Unit]): Unit =
-      runAmqpTest(simulator(StubChannels.forgiving))(test)
+      runAmqpTest(clientForgiving())(test)
 
     /**
       * Every attempt to publish will result in a timeout (after the time specified in config)
       * @param test
       */
     def runAmqpTestPublishTimeout(test: AmqpClient[IO] => IO[Unit]): Unit =
-      runAmqpTest(simulator(StubChannels.publishTimeout))(test)
+      runAmqpTest(clientPublishTimeout())(test)
 
   }
 

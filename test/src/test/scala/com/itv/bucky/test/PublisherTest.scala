@@ -23,7 +23,7 @@ class PublisherTest extends FunSuite with Matchers with IOAmqpTest {
 
   test("A message publishing should only complete when an ack is returned.") {
     val channel                               = StubChannels.publishTimeout[IO]
-    runAmqpTest(simulator(channel, Config.empty(10.seconds))) { client =>
+    runAmqpTest(client(channel, Config.empty(10.seconds))) { client =>
       for {
         pubSeq       <- IO(channel.publishSeq)
         future       <- IO(client.publisher()(commandBuilder).unsafeToFuture())
@@ -39,7 +39,7 @@ class PublisherTest extends FunSuite with Matchers with IOAmqpTest {
 
   test("A message publishing should timeout if no ack is ever received.") {
     val channel                               = StubChannels.publishTimeout[IO]
-    runAmqpTest(simulator(channel, Config.empty(1.second))) { client =>
+    runAmqpTest(client(channel, Config.empty(1.second))) { client =>
       for {
         future      <- IO(client.publisher()(commandBuilder).unsafeToFuture())
         result      <- IO.fromFuture(IO(future)).attempt
@@ -57,7 +57,7 @@ class PublisherTest extends FunSuite with Matchers with IOAmqpTest {
 
   test("Multiple messages can be ack when the channel acks multiple messages") {
     val channel                               = StubChannels.publishTimeout[IO]
-    runAmqpTest(simulator(channel, Config.empty(30.seconds))) { client =>
+    runAmqpTest(client(channel, Config.empty(30.seconds))) { client =>
       for {
         publish1      <- IO(client.publisher()(commandBuilder).unsafeToFuture())
         publish2      <- IO(client.publisher()(commandBuilder).unsafeToFuture())
@@ -77,7 +77,7 @@ class PublisherTest extends FunSuite with Matchers with IOAmqpTest {
 
   test("Multiple messages can be Nack when the channel Nacks multiple messages") {
     val channel                               = StubChannels.publishTimeout[IO]
-    runAmqpTest(simulator(channel, Config.empty(15.seconds))) { client =>
+    runAmqpTest(client(channel, Config.empty(15.seconds))) { client =>
       for {
         publish1      <- IO(client.publisher()(commandBuilder).unsafeToFuture())
         publish2      <- IO(client.publisher()(commandBuilder).unsafeToFuture())
@@ -106,7 +106,7 @@ class PublisherTest extends FunSuite with Matchers with IOAmqpTest {
 
   test("Multiple messages can be published and some can be acked and some can be Nacked.") {
     val channel                               = StubChannels.publishTimeout[IO]
-    runAmqpTest(simulator(channel, Config.empty(10.seconds))) { client =>
+    runAmqpTest(client(channel, Config.empty(10.seconds))) { client =>
       for {
         publish1      <- IO(client.publisher()(commandBuilder).unsafeToFuture())
         publish2      <- IO(client.publisher()(commandBuilder).unsafeToFuture())
