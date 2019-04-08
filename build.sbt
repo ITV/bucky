@@ -227,9 +227,12 @@ lazy val kamon = project
   )
   .settings(
     libraryDependencies ++= Seq(
-      "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
-      "org.scalatest"              %% "scalatest"     % scalaTestVersion % "test, it",
-      "io.kamon"                   %% "kamon-core"    % kamonVersion
+      "com.typesafe.scala-logging" %% "scala-logging"   % scalaLoggingVersion,
+      "org.scalatest"              %% "scalatest"       % scalaTestVersion % "test, it",
+      "io.kamon"                   %% "kamon-core"      % kamonVersion,
+      "io.kamon"                   %% "kamon-testkit"   % kamonVersion % "test, it",
+      "ch.qos.logback"             % "logback-classic"  % logbackVersion % "test, it",
+      "io.kamon"                   %% "kamon-executors" % "1.0.2" % "test, it"
     )
   )
 

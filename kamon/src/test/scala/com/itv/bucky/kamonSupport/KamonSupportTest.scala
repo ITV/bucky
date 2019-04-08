@@ -63,6 +63,7 @@ class KamonSupportTest extends FunSuite with Matchers with Eventually with SpanS
           "span.kind" -> "bucky.consume",
           "component" -> "bucky",
           "rk"        -> rk.value,
+          "exchange"  -> exchange.name.value,
           "result"    -> "deadletter"
         )
       }

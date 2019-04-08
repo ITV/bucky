@@ -106,6 +106,7 @@ object KamonSupport {
           .withFrom(start)
           .withMetricTag("span.kind", "bucky.consume")
           .withMetricTag("component", "bucky")
+          .withMetricTag("exchange", d.envelope.exchangeName.value)
         if (includeConsumehRK) {
           span.withMetricTag("rk", d.envelope.routingKey.value)
         } else {
