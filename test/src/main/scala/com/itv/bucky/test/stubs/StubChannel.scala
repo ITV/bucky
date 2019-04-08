@@ -35,7 +35,7 @@ abstract class StubChannel[F[_]](implicit F: ConcurrentEffect[F]) extends Channe
 
   def handlePublishHandlersResult(result: Either[Throwable, List[ConsumeAction]]): F[Unit]
 
-  override def publish(cmd: PublishCommand): F[Unit] = { //Notice that the client synchronizeson the channel so there should only be one of these running at each time
+  override def publish(cmd: PublishCommand): F[Unit] = {
     val queues = bindings.filter(binding => binding.exchangeName == cmd.exchange && binding.routingKey == cmd.routingKey).map(_.queueName)
     val subscribedHandlers = handlers
       .filterKeys(queues.contains)
@@ -49,8 +49,12 @@ abstract class StubChannel[F[_]](implicit F: ConcurrentEffect[F]) extends Channe
       _        <- F.delay(logger.debug("Publishing message with rk: {}, exchange: {} ,body: {} and pid {}", cmd.routingKey, cmd.exchange, cmd.body, id))
       _        <- F.delay(logger.debug("Found {} queues for pid {}.", queues.toList.map(_.value), id))
       _        <- F.delay(logger.debug("Found {} handlers for pid {}.", subscribedHandlers.size, id))
-      delivery <- deliveryFor(cmd)
-      _        <- F.delay(pubSeqLock.synchronized(publishSeq = publishSeq + 1))
+      sequenceNumber        <- F.delay(pubSeqLock.synchronized {
+        val current = publishSeq
+        publishSeq = publishSeq + 1
+        current
+      })
+      delivery <- deliveryFor(cmd, sequenceNumber)
       result   <- subscribedHandlers.traverse(_(delivery)).attempt
       _        <- F.delay(logger.debug("Message pid {} published with result {}.", id, result))
       _        <- handlePublishHandlersResult(result)
@@ -59,16 +63,15 @@ abstract class StubChannel[F[_]](implicit F: ConcurrentEffect[F]) extends Channe
       .rethrow
   }
 
-  private def deliveryFor(publishCommand: PublishCommand): F[Delivery] =
-    for {
-      publishSeq <- getNextPublishSeqNo
-    } yield
+  private def deliveryFor(publishCommand: PublishCommand, sequenceNumber: Long): F[Delivery] =
+    F.pure(
       Delivery(
         publishCommand.body,
         ConsumerTag("test"),
-        Envelope(publishSeq, redeliver = false, publishCommand.exchange, publishCommand.routingKey),
+        Envelope(sequenceNumber, redeliver = false, publishCommand.exchange, publishCommand.routingKey),
         publishCommand.basicProperties
       )
+    )
 
   override def sendAction(action: ConsumeAction)(envelope: bucky.Envelope): F[Unit] =
     F.unit
