@@ -55,7 +55,7 @@ package object test {
     implicit val cs: ContextShift[IO] = IO.contextShift(ec)
     implicit val timer: Timer[IO]     = IO.timer(ec)
 
-    def simulator(channel: StubChannel[IO], config: AmqpClientConfig = Config.empty()): Resource[IO, AmqpClient[IO]] =
+    def simulator(channel: StubChannel[IO] = StubChannels.strict, config: AmqpClientConfig = Config.empty()): Resource[IO, AmqpClient[IO]] =
       AmqpClient[IO](
         config,
         Resource.pure[IO, Channel[IO]](channel)
