@@ -59,11 +59,13 @@ object LoggingAmqpClient extends StrictLogging {
                 ))
                 .leftMap(t =>
                   logger.error(
-                    s"Failed to execute handler for message with rk '{}' on queue '{}' and exchange '{}'. Will return '{}'. message: '{}'",
+                    s"Failed to execute handler for message with rk '{}' on queue '{}' and exchange '{}'. Will return '{}'. message: '{}', headers:'{}'",
                     delivery.envelope.routingKey.value,
                     queueName.value,
                     delivery.envelope.exchangeName,
+                    exceptionalAction,
                     new String(delivery.body.value, charset),
+                    delivery.properties.headers,
                     t
                 ))
             }

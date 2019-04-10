@@ -95,7 +95,7 @@ object KamonSupport {
 
       private def contextMapFrom(delivery: Delivery) = {
         val contextMap = new context.TextMap.Default
-        delivery.properties.headers.foreach(t => contextMap.put(t._1, t._2.asInstanceOf[String]))
+        delivery.properties.headers.foreach(t => Try { contextMap.put(t._1, t._2.asInstanceOf[String]) })
         contextMap
       }
 
