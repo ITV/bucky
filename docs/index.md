@@ -89,6 +89,6 @@ clientResource.use { client =>
   }.unsafeRunAsync(println)
 ```
 
-For easiness of use, bucky supports the creation of [Wirings](../wiring). A [Wiring](../wiring) centralizes the definition
+For easiness of use, bucky supports the creation of [Wirings](./wiring). A [Wiring](./wiring) centralizes the definition
 of both ends of the communication (consumer/publisher) as well as the declarations of queues and exchanges
 in a single place. 
