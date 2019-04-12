@@ -89,3 +89,6 @@ clientResource.use { client =>
   }.unsafeRunAsync(println)
 ```
 
+For easiness of use, bucky supports the creation of [Wirings](/wiring). A [Wiring](/wiring) centralizes the definition
+of both ends of the communication using rabbit (consumer/publisher) as well as the declarations 
+in a single place. 
