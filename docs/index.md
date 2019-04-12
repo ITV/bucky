@@ -16,4 +16,4 @@ Current version of bucky is based on:
 - [Wiring](./wiring)
 - [Publisher](./publisher)
 - [Consumer](./consumer)
-- [Serialization](./serialization)
+- [Serialization](./serializing)
