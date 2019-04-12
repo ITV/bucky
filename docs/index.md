@@ -17,4 +17,3 @@ Current version of bucky is based on:
 - [Publisher](./publisher)
 - [Consumer](./consumer)
 - [Serialization](./serialization)
-

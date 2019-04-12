@@ -1,13 +1,13 @@
-## Serialisation
+## Serialization
 
-When publishing and consuming messages, Bucky needs to know how to serialise
+When publishing and consuming messages, Bucky needs to know how to serialize
 Scala data structures into something RabbitMQ understands. For this we use
 `Marshaller` and `Unmarshaller` classes.
 
 #### Automatic derivation
 
 Bucky offers automatic derivation of both marshallers and unmarshallers when
-using JSON and [Circe](https://circe.github.io/circe/) for the serialisation library.
+using JSON and [Circe](https://circe.github.io/circe/) for the serialization library.
 
 We strongly recommend using automatic derivation of marshallers and unmarshallers
 for all messages sent across RabbitMQ.
@@ -89,7 +89,7 @@ object CustomMarshaller {
 ```
 
 
-#### XML Serialisation
+#### XML serialization
 
 Bucky offers out-of-the-box support for serializing to and from XML.
 
