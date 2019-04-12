@@ -5,11 +5,11 @@ The library is built on top of the [java amqp client](https://github.com/rabbitm
 
 Current version of bucky is based on:
  
-    | Project     | Version  |
-    |:------------|:--------:|
-    | cats        | 1.6.0    |
-    | cats-effects| 1.2.0    |
-    | amqp-client | 5.6.0    |
+| Project     | Version  |
+|:------------|:--------:|
+| cats        | 1.6.0    |
+| cats-effects| 1.2.0    |
+| amqp-client | 5.6.0    |
 
 
 ### Getting Started
@@ -29,7 +29,7 @@ libraryDependencies ++= Seq(
 
 or for ammonite:
 ```scala
-import $ivy.`com.itv::bucky-core:2.0.0-M4` //ammonite only
+import $ivy.`com.itv::bucky-core:2.0.0-M4` 
 import $ivy.`com.itv::bucky-circe:2.0.0-M4`
 ```
 
@@ -80,7 +80,6 @@ clientResource.use { client =>
 Publishing a message:
 ```scala
 val clientResource = AmqpClient[IO](config)
-case class Message(foo: String)
 clientResource.use { client =>
    val publisher = client.publisherOf[Message](ExchangeName("exchange-name"), RoutingKey("rk"))
    for {
