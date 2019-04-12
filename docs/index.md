@@ -14,7 +14,7 @@ Current version of bucky is based on:
 #### Index
 - [Getting Started](./getting-started)
 - [Wiring](./wiring)
-- [Publisher](./publishers)
-- [Consumer](./publishers)
+- [Publisher](./publisher)
+- [Consumer](./consumer)
 - [Serialization](./serialization)
 
