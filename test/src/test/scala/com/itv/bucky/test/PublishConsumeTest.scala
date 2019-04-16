@@ -7,7 +7,7 @@ import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.consume._
 import com.itv.bucky.decl.{Exchange, Queue}
 import com.itv.bucky.publish._
-import com.itv.bucky.{ExchangeName, PayloadMarshaller, QueueName, RoutingKey}
+import com.itv.bucky.{ExchangeName, Handler, PayloadMarshaller, QueueName, RequeueHandler, RoutingKey}
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
@@ -137,6 +137,39 @@ class PublishConsumeTest extends FunSuite with IOAmqpClientTest with Eventually 
       } yield {
         handler.receivedMessages should have size 1
       }
+    }
+  }
+
+  test("should perform failure action when handler throws an exception") {
+    runAmqpTest { client =>
+      implicit val stringPayloadMarshaller: PayloadMarshaller[String] = StringPayloadMarshaller
+
+      val handler = new RequeueHandler[IO, String] {
+        override def apply(v1: String): IO[RequeueConsumeAction] =
+          IO {
+            throw new RuntimeException("Oh no! it happened again")
+          }
+      }
+      val exchange = ExchangeName("anexchange")
+
+      val queue = QueueName("aqueue")
+      val rk = RoutingKey("ark")
+
+      val declarations =
+        List(Queue(queue), Exchange(exchange).binding(rk -> queue)) ++ com.itv.bucky.pattern.requeue.requeueDeclarations(queue, rk)
+
+      val requeueHandler = StubHandlers.ackHandler[IO, String]
+
+      for {
+        _ <- client.declare(declarations)
+        _ <- client.registerRequeueConsumerOf(queue, handler)
+        publisher = client.publisherOf[String](exchange, rk)
+        _ <- client.registerConsumerOf(QueueName(queue.value + ".requeue"), requeueHandler)
+        _ <- publisher("hello")
+      }
+        yield {
+          requeueHandler.receivedMessages should have size 1
+        }
     }
   }
 

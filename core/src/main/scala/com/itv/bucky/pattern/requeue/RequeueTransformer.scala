@@ -57,11 +57,12 @@ case class RequeueTransformer[F[_]](
         case other: ConsumeAction => F.point(other)
       }
 
-    for {
-      wrapper       <- F.delay(handler(delivery))
-      handlerAction <- wrapper
-      channelAction <- perform(handlerAction)
-    } yield channelAction
+    val safePerform = F.flatMap(F.delay(handler(delivery)))(identity)
+    F.handleErrorWith(F.flatMap(safePerform)(perform)) {
+      case t: Throwable =>
+        logger.error(s"Unable to process ${delivery.body} due to handler failure, will $onFailure", t)
+        perform(onFailure)
+    }
   }
 
 }
