@@ -3,7 +3,7 @@
 In order to get started with bucky, add the following to you `build.sbt`:
  
 ```scala 
-val buckyVersion = "2.0.0-M4"
+val buckyVersion = "2.0.0-M5"
 libraryDependencies ++= Seq(
     "com.itv"                    %% "bucky-core"              % buckyVersion,
     "com.itv"                    %% "bucky-circe"             % buckyVersion,            //for circe based marshallers/unmarshallers
@@ -15,8 +15,8 @@ libraryDependencies ++= Seq(
 
 or for ammonite:
 ```scala
-import $ivy.`com.itv::bucky-core:2.0.0-M4` 
-import $ivy.`com.itv::bucky-circe:2.0.0-M4`
+import $ivy.`com.itv::bucky-core:2.0.0-M5` 
+import $ivy.`com.itv::bucky-circe:2.0.0-M5`
 ```
 
 Imports, implicits and config:
