@@ -7,9 +7,10 @@ import cats.implicits._
 import com.itv.bucky._
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
+import com.itv.bucky.consume.Ack
 import com.itv.bucky.decl.{Exchange, Queue}
 import com.itv.bucky.test.StubHandlers
-import com.itv.bucky.test.stubs.RecordingHandler
+import com.itv.bucky.test.stubs.{RecordingHandler}
 import com.typesafe.config.ConfigFactory
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
@@ -22,7 +23,7 @@ import scala.language.higherKinds
 
 class HammerTest extends FunSuite with Eventually with IntegrationPatience {
 
-  case class TestFixture(stubHandler: RecordingHandler[IO, String], publisher: Publisher[IO, String])
+  case class TestFixture(stubHandler: RecordingHandler[IO, String], publisher: Publisher[IO, String], client: AmqpClient[IO])
 
   implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(300))
   implicit val cs: ContextShift[IO] = IO.contextShift(ec)
@@ -54,7 +55,7 @@ class HammerTest extends FunSuite with Eventually with IntegrationPatience {
         _ <- client.declare(declarations)
         _ <- client.registerConsumerOf(queueName, handler)
         pub = client.publisherOf[String](exchangeName, routingKey)
-        fixture = TestFixture(handler, pub)
+        fixture = TestFixture(handler, pub, client)
         _ <- test(fixture)
       } yield ()
     }.unsafeRunSync()
@@ -67,17 +68,17 @@ class HammerTest extends FunSuite with Eventually with IntegrationPatience {
 
       val results =
         (1 to hammerStrength)
-        .grouped(parallelPublish)
-        .toList
-        .flatTraverse(group => {
-          group.toList.parTraverse { i =>
-            val deferred = Deferred[IO, Option[Throwable]].unsafeRunSync()
-            testFixture.publisher(s"hello$i").runAsync {
-              case Right(_) => deferred.complete(None)
-              case Left(error) => deferred.complete(Some(error))
-            }.toIO.flatMap(_ => deferred.get)
-          }.map(_.flatten)
-        })
+          .grouped(parallelPublish)
+          .toList
+          .flatTraverse(group => {
+            group.toList.parTraverse { i =>
+              val deferred = Deferred[IO, Option[Throwable]].unsafeRunSync()
+              testFixture.publisher(s"hello$i").runAsync {
+                case Right(_) => deferred.complete(None)
+                case Left(error) => deferred.complete(Some(error))
+              }.toIO.flatMap(_ => deferred.get)
+            }.map(_.flatten)
+          })
 
       for {
         errors <- results
@@ -91,4 +92,43 @@ class HammerTest extends FunSuite with Eventually with IntegrationPatience {
     }
   }
 
+  test("handlers should process messages in parallel") {
+    import scala.concurrent.duration._
+
+    withTestFixture { testFixture =>
+      implicit val stringPayloadMarshaller: PayloadMarshaller[String] = StringPayloadMarshaller
+
+      val exchange = ExchangeName("anexchange")
+      val slowQueue = QueueName("aqueue1")
+      val slowRk = RoutingKey("ark1")
+      val fastQueue = QueueName("aqueue2")
+      val fastRk = RoutingKey("ark2")
+
+      val fastPublisher = testFixture.client.publisherOf[String](exchange, fastRk)
+      val slowPublisher = testFixture.client.publisherOf[String](exchange, slowRk)
+
+      val fastHandler = new RecordingHandler[IO, String]((v1: String) => IO.pure(Ack))
+      val slowHandler = new RecordingHandler[IO, String]((v1: String) => IO.sleep(1.second).map(_ => Ack))
+
+      val declarations =
+        List(Queue(slowQueue), Queue(fastQueue), Exchange(exchange).binding(slowRk -> slowQueue).binding(fastRk -> fastQueue))
+
+      for {
+        _ <- testFixture.client.declare(declarations)
+        _ <- testFixture.client.registerConsumerOf(slowQueue, slowHandler)
+        _ <- testFixture.client.registerConsumerOf(fastQueue, fastHandler)
+        _ <- slowPublisher("slow one")
+        _ <- fastPublisher("fast one")
+        _ <- IO.sleep(50.milliseconds)
+      }
+        yield {
+          fastHandler.receivedMessages shouldBe List("fast one")
+          slowHandler.receivedMessages shouldBe List.empty
+        }
+    }
+  }
+
+
 }
+
+
