@@ -1,4 +1,5 @@
 package com.itv.bucky
+import java.nio.charset.StandardCharsets
 import java.util.concurrent.Executors
 
 import cats.effect.{ConcurrentEffect, ContextShift, IO, Sync}
@@ -114,6 +115,7 @@ object Channel {
       val deliveryCallback = new DefaultConsumer(channel) {
         override def handleDelivery(consumerTag: String, envelope: RabbitMQEnvelope, properties: BasicProperties, body: Array[Byte]): Unit = {
           (for {
+            _ <- cs.shift
             delivery <- F.delay(Consumer.deliveryFrom(consumerTag, envelope, properties, body))
             _ <- F.delay(logger.debug("Received delivery with rk:{} on exchange: {}", delivery.envelope.routingKey, delivery.envelope.exchangeName))
             action <- handler(delivery)
@@ -135,7 +137,11 @@ object Channel {
             .rethrow
             .flatMap(sendAction(_)(Envelope.fromEnvelope(envelope)))
             .toIO
-            .unsafeRunSync()
+            .unsafeRunAsync {
+              case Right(_) => ()
+              case Left(error) =>
+                logger.error(s"Exception from handler. Exchange = ${envelope.getExchange}, routing key = ${envelope.getRoutingKey}, body = ${new String(body, StandardCharsets.UTF_8)}", error)
+            }
         }
       }
       F.delay(channel.basicConsume(queue.value, false, consumerTag.value, deliveryCallback)).void

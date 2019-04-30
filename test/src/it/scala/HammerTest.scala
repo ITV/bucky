@@ -112,31 +112,16 @@ class HammerTest extends FunSuite with Eventually with IntegrationPatience with 
 
       val fastHandler = new RecordingHandler[IO, String]((v1: String) => {
         for {
-          _ <- IO.delay(logger.error("banana fast invoked"))
-          _ <- order.update { current =>
-            logger.error("banana fast updating, current: " + current)
-            current :+ "fast"
-          }
+          _ <- order.update(_ :+ "fast")
         }
-          yield {
-            logger.error("fast yielding")
-            Ack
-          }
+          yield Ack
       })
       val slowHandler = new RecordingHandler[IO, String]((v1: String) => {
         for {
-          _ <- IO.delay(logger.error("banana slow invoked"))
           _ <- IO.sleep(10.second)
-          _ <- IO.delay(logger.error("banana slow done sleeping"))
-          _ <- order.update { current =>
-            logger.error("banana slow updating, current: " + current)
-            current :+ "slow"
-          }
+          _ <- order.update(_ :+ "slow")
         }
-          yield {
-            logger.error("slow yielding")
-            Ack
-          }
+          yield Ack
       })
 
       val declarations =
@@ -146,18 +131,15 @@ class HammerTest extends FunSuite with Eventually with IntegrationPatience with 
         _ <- testFixture.client.declare(declarations)
         _ <- testFixture.client.registerConsumerOf(slowQueue, slowHandler)
         _ <- testFixture.client.registerConsumerOf(fastQueue, fastHandler)
-        _ <- IO.delay(logger.error("publishing slow"))
         _ <- slowPublisher("slow one")
-        _ <- IO.delay(logger.error("publishing sleep"))
         _ <- IO.sleep(1.second)
-        _ <- IO.delay(logger.error("publishing fast"))
         _ <- fastPublisher("fast one")
       }
         yield {
           eventually {
             val messages = order.get.unsafeRunSync()
             messages should have size 2
-            messages shouldBe List.empty
+            messages shouldBe List("fast", "slow")
           }
         }
     }
