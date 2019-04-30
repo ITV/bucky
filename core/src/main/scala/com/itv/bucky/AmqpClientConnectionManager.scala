@@ -1,5 +1,7 @@
 package com.itv.bucky
 
+import java.util.concurrent.Executors
+
 import cats.effect._
 import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.implicits._
@@ -59,14 +61,15 @@ private[bucky] case class AmqpClientConnectionManager[F[_]](
 
   def registerConsumer(queueName: QueueName, handler: Handler[F, Delivery], onFailure: ConsumeAction): F[Unit] =
     for {
-      _           <- cs.shift
+      _ <- cs.shift
       consumerTag <- F.delay(ConsumerTag.create(queueName))
-      _           <- F.delay(logger.debug("Registering consumer for queue: {} with tag {}.", queueName.value, consumerTag.value))
-      _           <- channel.basicQos(amqpConfig.prefetchCount)
-      _           <- channel.registerConsumer(handler, onFailure, queueName, consumerTag)
-      _           <- F.delay(logger.debug("Consumer for queue: {} with tag {} was successfully registered.", queueName.value, consumerTag.value))
-      _           <- F.delay(logger.debug("Successfully registered consumer for queue: {} with tag.", queueName.value), consumerTag.value)
+      _ <- F.delay(logger.debug("Registering consumer for queue: {} with tag {}.", queueName.value, consumerTag.value))
+      _ <- channel.basicQos(amqpConfig.prefetchCount)
+      _ <- channel.registerConsumer(handler, onFailure, queueName, consumerTag, cs)
+      _ <- F.delay(logger.debug("Consumer for queue: {} with tag {} was successfully registered.", queueName.value, consumerTag.value))
+      _ <- F.delay(logger.debug("Successfully registered consumer for queue: {} with tag.", queueName.value), consumerTag.value)
     } yield ()
+
   def declare(declarations: Iterable[Declaration]): F[Unit] = channel.runDeclarations(declarations)
 }
 

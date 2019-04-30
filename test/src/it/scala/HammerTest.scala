@@ -1,7 +1,7 @@
 import java.util.UUID
 import java.util.concurrent.Executors
 
-import cats.effect.concurrent.Deferred
+import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
 import com.itv.bucky._
@@ -10,8 +10,9 @@ import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
 import com.itv.bucky.consume.Ack
 import com.itv.bucky.decl.{Exchange, Queue}
 import com.itv.bucky.test.StubHandlers
-import com.itv.bucky.test.stubs.{RecordingHandler}
+import com.itv.bucky.test.stubs.RecordingHandler
 import com.typesafe.config.ConfigFactory
+import com.typesafe.scalalogging.StrictLogging
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
@@ -21,7 +22,7 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.higherKinds
 
-class HammerTest extends FunSuite with Eventually with IntegrationPatience {
+class HammerTest extends FunSuite with Eventually with IntegrationPatience with StrictLogging {
 
   case class TestFixture(stubHandler: RecordingHandler[IO, String], publisher: Publisher[IO, String], client: AmqpClient[IO])
 
@@ -99,16 +100,44 @@ class HammerTest extends FunSuite with Eventually with IntegrationPatience {
       implicit val stringPayloadMarshaller: PayloadMarshaller[String] = StringPayloadMarshaller
 
       val exchange = ExchangeName("anexchange")
-      val slowQueue = QueueName("aqueue1")
+      val slowQueue = QueueName("aqueue1" + UUID.randomUUID().toString)
       val slowRk = RoutingKey("ark1")
-      val fastQueue = QueueName("aqueue2")
+      val fastQueue = QueueName("aqueue2" + UUID.randomUUID().toString)
       val fastRk = RoutingKey("ark2")
+
+      val order: Ref[IO, List[String]] = Ref.of[IO, List[String]](List.empty).unsafeRunSync()
 
       val fastPublisher = testFixture.client.publisherOf[String](exchange, fastRk)
       val slowPublisher = testFixture.client.publisherOf[String](exchange, slowRk)
 
-      val fastHandler = new RecordingHandler[IO, String]((v1: String) => IO.pure(Ack))
-      val slowHandler = new RecordingHandler[IO, String]((v1: String) => IO.sleep(1.second).map(_ => Ack))
+      val fastHandler = new RecordingHandler[IO, String]((v1: String) => {
+        for {
+          _ <- IO.delay(logger.error("banana fast invoked"))
+          _ <- order.update { current =>
+            logger.error("banana fast updating, current: " + current)
+            current :+ "fast"
+          }
+        }
+          yield {
+            logger.error("fast yielding")
+            Ack
+          }
+      })
+      val slowHandler = new RecordingHandler[IO, String]((v1: String) => {
+        for {
+          _ <- IO.delay(logger.error("banana slow invoked"))
+          _ <- IO.sleep(10.second)
+          _ <- IO.delay(logger.error("banana slow done sleeping"))
+          _ <- order.update { current =>
+            logger.error("banana slow updating, current: " + current)
+            current :+ "slow"
+          }
+        }
+          yield {
+            logger.error("slow yielding")
+            Ack
+          }
+      })
 
       val declarations =
         List(Queue(slowQueue), Queue(fastQueue), Exchange(exchange).binding(slowRk -> slowQueue).binding(fastRk -> fastQueue))
@@ -117,13 +146,19 @@ class HammerTest extends FunSuite with Eventually with IntegrationPatience {
         _ <- testFixture.client.declare(declarations)
         _ <- testFixture.client.registerConsumerOf(slowQueue, slowHandler)
         _ <- testFixture.client.registerConsumerOf(fastQueue, fastHandler)
+        _ <- IO.delay(logger.error("publishing slow"))
         _ <- slowPublisher("slow one")
+        _ <- IO.delay(logger.error("publishing sleep"))
+        _ <- IO.sleep(1.second)
+        _ <- IO.delay(logger.error("publishing fast"))
         _ <- fastPublisher("fast one")
-        _ <- IO.sleep(50.milliseconds)
       }
         yield {
-          fastHandler.receivedMessages shouldBe List("fast one")
-          slowHandler.receivedMessages shouldBe List.empty
+          eventually {
+            val messages = order.get.unsafeRunSync()
+            messages should have size 2
+            messages shouldBe List.empty
+          }
         }
     }
   }

@@ -8,6 +8,8 @@ import com.itv.bucky.decl._
 import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.StrictLogging
 
+import scala.concurrent.ExecutionContext.Implicits.global
+
 object UnmarshallingConsumer extends IOApp with StrictLogging {
 
   //start snippet 1
