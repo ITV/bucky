@@ -1,7 +1,7 @@
 import java.util.UUID
 import java.util.concurrent.Executors
 
-import cats.effect.{ContextShift, IO, Sync, Timer}
+import cats.effect.{ContextShift, IO, Resource, Sync, Timer}
 import com.itv.bucky._
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
@@ -58,15 +58,18 @@ class RequeueIntegrationTest extends FunSuite with Eventually with IntegrationPa
       val handler = StubHandlers.requeueRequeueHandler[IO, Delivery]
       val dlqHandler = StubHandlers.ackHandler[IO, Delivery]
 
-      for {
-        _ <- client.declare(declarations)
-        _ <- client.registerRequeueConsumer(queueName, handler, requeuePolicy)
-        _ <- client.registerConsumer(deadletterQueueName, dlqHandler)
-        pub = client.publisher()
-        pcb = publishCommandBuilder[String](implicitly).using(exchangeName).using(routingKey)
-        fixture = TestFixture(handler, dlqHandler, pcb, pub)
-        _ <- test(fixture)
-      } yield ()
+      Resource.liftF(client.declare(declarations)).flatMap(_ =>
+        for {
+          _ <-  client.registerRequeueConsumer(queueName, handler, requeuePolicy)
+          _ <- client.registerConsumer(deadletterQueueName, dlqHandler)
+        }
+          yield ()
+      ).use { _ =>
+      val pub = client.publisher()
+        val pcb = publishCommandBuilder[String](implicitly).using(exchangeName).using(routingKey)
+        val fixture = TestFixture(handler, dlqHandler, pcb, pub)
+        test(fixture)
+      }
     }.unsafeRunSync()
   }
 

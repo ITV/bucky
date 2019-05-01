@@ -10,6 +10,8 @@ import com.typesafe.config.ConfigFactory
 import scala.concurrent._
 import scala.concurrent.duration._
 
+import scala.concurrent.ExecutionContext.Implicits.global
+
 
 object MarshallingPublisher extends IOApp {
   import com.itv.bucky._

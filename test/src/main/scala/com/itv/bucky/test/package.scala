@@ -62,18 +62,20 @@ package object test {
   }
 
   trait IOAmqpClientTest extends AmqpClientTest[IO] {
-    implicit val globalExecutionContext: ExecutionContext = ExecutionContext.Implicits.global
+    val globalExecutionContext: ExecutionContext = ExecutionContext.Implicits.global
+    override implicit val ec: ExecutionContext = globalExecutionContext
     override implicit val timer: Timer[IO] = IO.timer(globalExecutionContext)
     override implicit val contextShift: ContextShift[IO] = IO.contextShift(globalExecutionContext)
     override implicit val F: ConcurrentEffect[IO] = IO.ioConcurrentEffect(contextShift)
   }
 
   object AmqpClientTest {
-    def apply[F[_]](implicit concurrentEffect: ConcurrentEffect[F], t: Timer[F], cs: ContextShift[F]): AmqpClientTest[F] =
+    def apply[F[_]](implicit concurrentEffect: ConcurrentEffect[F], t: Timer[F], cs: ContextShift[F], executionContext: ExecutionContext): AmqpClientTest[F] =
       new AmqpClientTest[F]() {
         override implicit val F: ConcurrentEffect[F] = concurrentEffect
         override implicit val timer: Timer[F] = t
         override implicit val contextShift: ContextShift[F] = cs
+        override implicit val ec: ExecutionContext = executionContext
       }
   }
 
@@ -82,10 +84,12 @@ package object test {
     implicit val F: ConcurrentEffect[F]
     implicit val timer: Timer[F]
     implicit val contextShift: ContextShift[F]
+    implicit val ec: ExecutionContext
 
     def client(channel: StubChannel[F], config: AmqpClientConfig): Resource[F, AmqpClient[F]] =
       AmqpClient[F](
         config,
+        () => Resource.pure[F, Channel[F]](channel),
         Resource.pure[F, Channel[F]](channel)
       )
 

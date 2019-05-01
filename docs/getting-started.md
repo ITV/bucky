@@ -1,6 +1,7 @@
 ### Getting Started
 
 In order to get started with bucky, add the following to you `build.sbt`:
+
  
 ```scala 
 val buckyVersion = "2.0.0-M5"

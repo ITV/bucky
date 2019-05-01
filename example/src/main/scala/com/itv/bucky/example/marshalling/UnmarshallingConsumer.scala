@@ -1,12 +1,16 @@
 package com.itv.bucky.example.marshalling
 
-import cats.effect.{ExitCode, IO, IOApp}
+import cats.effect.{ExitCode, IO, IOApp, Resource}
 import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
 import com.itv.bucky._
 import com.itv.bucky.consume._
 import com.itv.bucky.decl._
 import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.StrictLogging
+import cats.effect._
+import cats.implicits._
+
+import scala.concurrent.ExecutionContext.Implicits.global
 
 object UnmarshallingConsumer extends IOApp with StrictLogging {
 
@@ -50,12 +54,11 @@ object UnmarshallingConsumer extends IOApp with StrictLogging {
 
   //start snippet 4
   override def run(args: List[String]): IO[ExitCode] =
-    AmqpClient[IO](amqpClientConfig).use { amqpClient =>
-      for {
-        _ <- amqpClient.declare(Declarations.all)
+      (for {
+        amqpClient <- AmqpClient[IO](amqpClientConfig)
+        _ <- Resource.liftF(amqpClient.declare(Declarations.all))
         _ <- amqpClient.registerConsumerOf(Declarations.queue.name, personHandler)
-      } yield ExitCode.Success
-    }
+      } yield ()).use(_ => IO.never *> IO.delay(ExitCode.Success))
   //end snippet 4
 
 }

@@ -1,6 +1,6 @@
 package com.itv.bucky.test
 
-import cats.effect.IO
+import cats.effect.{IO, Resource}
 import com.itv.bucky.AmqpClient
 import com.itv.bucky.consume.Ack
 import com.itv.bucky.test.stubs.RecordingHandler
@@ -27,27 +27,28 @@ class WiringPublishConsumeTest extends FunSuite with IOAmqpClientTest with Stric
   }
 
   case class Fixture(
-                      client: AmqpClient[IO],
-                      sink: RecordingHandler[IO, String]
-                    )
+      client: AmqpClient[IO],
+      sink: RecordingHandler[IO, String]
+  )
 
-  def withApp[A](fn: Fixture => IO[A]): Unit = {
+  def withApp[A](fn: Fixture => IO[A]): Unit =
     runAmqpTest { client =>
       val handler = StubHandlers.ackHandler[IO, String]
-
-      for {
-        sendOutgoingMessage <- outgoing.publisher(client)
+      (for {
+        sendOutgoingMessage <- Resource.liftF(outgoing.publisher(client))
         _ <- incoming.registerConsumer(client) { message =>
           logger.info(s"Forwarding received message to sink: message=$message")
           sendOutgoingMessage(s"Outgoing: $message").map(_ => Ack)
         }
         _ <- outgoing.registerConsumer(client)(handler)
-        fixture = Fixture(client, handler)
-        _ <- fn(fixture)
+
+      } yield ()).use { _ =>
+        for {
+          fixture <- IO(Fixture(client, handler))
+          _       <- fn(fixture)
+        } yield ()
       }
-        yield ()
+
     }
-  }
 
 }
-

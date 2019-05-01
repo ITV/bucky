@@ -1,6 +1,6 @@
 package com.itv.bucky.pattern
 
-import cats.effect.Sync
+import cats.effect.{Resource, Sync}
 import com.itv.bucky.{AmqpClient, DeliveryUnmarshalHandler, _}
 import com.itv.bucky.Unmarshaller._
 import com.itv.bucky.consume.{DeadLetter, Delivery, Requeue, RequeueConsumeAction}
@@ -52,7 +52,7 @@ package object requeue {
                                     unmarshaller: DeliveryUnmarshaller[T],
                                     onFailure: RequeueConsumeAction = Requeue,
                                     onFailureAction: T => F[Unit] = (_: T) => F.point(()),
-                                    unmarshalFailureAction: RequeueConsumeAction = DeadLetter): F[Unit] = {
+                                    unmarshalFailureAction: RequeueConsumeAction = DeadLetter): Resource[F, Unit] = {
 
       val deserializeHandler                              = new DeliveryUnmarshalHandler[F, T, RequeueConsumeAction](unmarshaller)(handler, unmarshalFailureAction)
       val deserializeOnFailureAction: Delivery => F[Unit] = new UnmarshalFailureAction[F, T](unmarshaller).apply(onFailureAction)
@@ -63,7 +63,7 @@ package object requeue {
                   handler: RequeueHandler[F, Delivery],
                   requeuePolicy: RequeuePolicy,
                   onFailure: RequeueConsumeAction = Requeue,
-                  onFailureAction: Delivery => F[Unit] = (_: Delivery) => F.point(())): F[Unit] = {
+                  onFailureAction: Delivery => F[Unit] = (_: Delivery) => F.point(())): Resource[F, Unit] = {
       val requeueExchange = ExchangeName(s"${queueName.value}.requeue")
       val requeuePublish  = amqpClient.publisher()
       amqpClient.registerConsumer(queueName,

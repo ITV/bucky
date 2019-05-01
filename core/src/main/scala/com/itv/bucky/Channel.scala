@@ -1,5 +1,8 @@
 package com.itv.bucky
-import cats.effect.{ConcurrentEffect, Sync}
+import java.nio.charset.StandardCharsets
+import java.util.concurrent.Executors
+
+import cats.effect.{ConcurrentEffect, ContextShift, IO, Sync}
 import cats.effect.implicits._
 import cats.implicits._
 import com.itv.bucky.consume.{Ack, ConsumeAction, Consumer, ConsumerTag, DeadLetter, Delivery, PublishCommand, RequeueImmediately}
@@ -9,11 +12,12 @@ import com.rabbitmq.client.impl.recovery.AutorecoveringConnection
 import com.rabbitmq.client.{ConfirmListener, DefaultConsumer, Channel => RabbitChannel, Envelope => RabbitMQEnvelope}
 import com.typesafe.scalalogging.StrictLogging
 
+import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 trait Channel[F[_]] {
   def isConnectionOpen: F[Boolean]
-  def synchroniseIfNeeded[T](f: =>T): T
+  def synchroniseIfNeeded[T](f: => T): T
   def close(): F[Unit]
   def purgeQueue(name: QueueName): F[Unit]
   def basicQos(prefetchCount: Int): F[Unit]
@@ -45,7 +49,11 @@ trait Channel[F[_]] {
       _ <- exchangeBindings.traverse(declareExchangeBinding)
     } yield ()
   }
-  def registerConsumer(handler: Handler[F, Delivery], onFailure: ConsumeAction, queue: QueueName, consumerTag: ConsumerTag): F[Unit]
+  def registerConsumer(handler: Handler[F, Delivery],
+                       onFailure: ConsumeAction,
+                       queue: QueueName,
+                       consumerTag: ConsumerTag,
+                       cs: ContextShift[F]): F[Unit]
 }
 
 object Channel {
@@ -106,10 +114,16 @@ object Channel {
           )
       }.void
 
-    override def registerConsumer(handler: Handler[F, Delivery], onFailure: ConsumeAction, queue: QueueName, consumerTag: ConsumerTag): F[Unit] = {
+    override def registerConsumer(handler: Handler[F, Delivery],
+                                  onFailure: ConsumeAction,
+                                  queue: QueueName,
+                                  consumerTag: ConsumerTag,
+                                  cs: ContextShift[F]): F[Unit] = {
+
       val deliveryCallback = new DefaultConsumer(channel) {
         override def handleDelivery(consumerTag: String, envelope: RabbitMQEnvelope, properties: BasicProperties, body: Array[Byte]): Unit =
           (for {
+            _        <- cs.shift
             delivery <- F.delay(Consumer.deliveryFrom(consumerTag, envelope, properties, body))
             _        <- F.delay(logger.debug("Received delivery with rk:{} on exchange: {}", delivery.envelope.routingKey, delivery.envelope.exchangeName))
             action   <- handler(delivery)
@@ -125,10 +139,10 @@ object Channel {
                   logger.debug("Processed message with dl {}", envelope.getDeliveryTag)
                 }
             }
-            .recoverWith {
-              case e => F.delay(logger.debug(s"Handler failure with {} will recover to: {}", e.getMessage, onFailure)) *> F.delay(Right(onFailure))
+            .flatMap {
+              case Right(r) => F.delay(r)
+              case Left(e)  => F.delay(logger.debug(s"Handler failure with {} will recover to: {}", e.getMessage, onFailure)) *> F.delay(onFailure)
             }
-            .rethrow
             .flatMap(sendAction(_)(Envelope.fromEnvelope(envelope)))
             .toIO
             .unsafeRunSync

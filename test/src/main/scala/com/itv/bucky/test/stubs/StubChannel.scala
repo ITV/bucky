@@ -76,7 +76,7 @@ abstract class StubChannel[F[_]](implicit F: ConcurrentEffect[F]) extends Channe
   override def sendAction(action: ConsumeAction)(envelope: bucky.Envelope): F[Unit] =
     F.unit
 
-  override def registerConsumer(handler: Handler[F, Delivery], onFailure: ConsumeAction, queue: QueueName, consumerTag: ConsumerTag): F[Unit] =
+  override def registerConsumer(handler: Handler[F, Delivery], onFailure: ConsumeAction, queue: QueueName, consumerTag: ConsumerTag, cs: ContextShift[F]): F[Unit] =
     F.delay(handlers.synchronized(handlers.put(queue, handler -> onFailure))).void
 
   override def addConfirmListener(listener: ConfirmListener): F[Unit] = F.delay(confirmListeners.synchronized(confirmListeners += listener))

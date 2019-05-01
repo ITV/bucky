@@ -1,5 +1,8 @@
 package com.itv.bucky
 
+import java.util.Collections
+import java.util.concurrent.{AbstractExecutorService, TimeUnit}
+
 import cats.effect._
 import cats.implicits._
 import com.itv.bucky.consume.{ConsumeAction, DeadLetter, Delivery, PublishCommand}
@@ -7,6 +10,7 @@ import com.rabbitmq.client.{ConnectionFactory, ShutdownListener, ShutdownSignalE
 import com.itv.bucky.decl._
 import com.typesafe.scalalogging.StrictLogging
 
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutorService}
 import scala.language.higherKinds
 
 trait AmqpClient[F[_]] {
@@ -15,7 +19,7 @@ trait AmqpClient[F[_]] {
   def publisher(): Publisher[F, PublishCommand]
   def registerConsumer(queueName: QueueName,
                        handler: Handler[F, Delivery],
-                       exceptionalAction: ConsumeAction = DeadLetter): F[Unit]
+                       exceptionalAction: ConsumeAction = DeadLetter): Resource[F, Unit]
   def isConnectionOpen: F[Boolean]
 }
 
@@ -43,7 +47,7 @@ object AmqpClient extends StrictLogging {
     Resource.make(cs.shift.flatMap(_ => make))(channel => F.delay(channel.close()))
   }
 
-  private def createConnection[F[_]](config: AmqpClientConfig)(implicit F: Sync[F], cs: ContextShift[F]): Resource[F, RabbitConnection] = {
+  private def createConnection[F[_]](config: AmqpClientConfig)(implicit F: Sync[F], cs: ContextShift[F], executionContext: ExecutionContext): Resource[F, RabbitConnection] = {
     val make =
       F.delay {
         logger.info(s"Starting AmqpClient")
@@ -53,6 +57,20 @@ object AmqpClient extends StrictLogging {
         connectionFactory.setUsername(config.username)
         connectionFactory.setPassword(config.password)
         connectionFactory.setAutomaticRecoveryEnabled(config.networkRecoveryInterval.isDefined)
+        connectionFactory.setSharedExecutor(executionContext match {
+          case null => throw null
+          case eces: ExecutionContextExecutorService => eces
+          case other => new AbstractExecutorService with ExecutionContextExecutorService {
+            override def prepare(): ExecutionContext = other
+            override def isShutdown = false
+            override def isTerminated = false
+            override def shutdown() = ()
+            override def shutdownNow() = Collections.emptyList[Runnable]
+            override def execute(runnable: Runnable): Unit = other execute runnable
+            override def reportFailure(t: Throwable): Unit = other reportFailure t
+            override def awaitTermination(length: Long,unit: TimeUnit): Boolean = false
+          }
+        })
         config.networkRecoveryInterval.map(_.toMillis.toInt).foreach(connectionFactory.setNetworkRecoveryInterval)
         config.virtualHost.foreach(connectionFactory.setVirtualHost)
         connectionFactory.newConnection()
@@ -69,27 +87,30 @@ object AmqpClient extends StrictLogging {
     Resource.make(cs.shift.flatMap(_ => make))(connection => F.delay(connection.close()))
   }
 
-  def apply[F[_]](config: AmqpClientConfig)(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F]): Resource[F, AmqpClient[F]] =
+  def apply[F[_]](config: AmqpClientConfig)(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F], executionContext: ExecutionContext): Resource[F, AmqpClient[F]] =
     for {
       connection <- createConnection(config)
-      rabbitChannel = createChannel(connection).map(Channel.apply[F])
-      client <- apply[F](config, rabbitChannel)
+      publishChannel = createChannel(connection).map(Channel.apply[F])
+      buildChannel = () => createChannel(connection).map(Channel.apply[F])
+      client <- apply[F](config, buildChannel, publishChannel)
     } yield client
 
   def apply[F[_]](config: AmqpClientConfig,
-                  channel: Resource[F, Channel[F]])(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F]): Resource[F, AmqpClient[F]] =
-    channel.flatMap { channel =>
+                  buildChannel: () => Resource[F, Channel[F]],
+                  publishChannel: Resource[F, Channel[F]])(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F], executionContext: ExecutionContext): Resource[F, AmqpClient[F]] =
+    publishChannel.flatMap { channel =>
       val make =
         for {
           _ <- cs.shift
           connectionManager <- AmqpClientConnectionManager(config, channel)
         }
-          yield mkClient(connectionManager)
+          yield mkClient(buildChannel, connectionManager)
       Resource.make(make)(_ => F.unit)
     }
 
   private def mkClient[F[_]](
-      connectionManager: AmqpClientConnectionManager[F])(implicit F: Concurrent[F], cs: ContextShift[F], t: Timer[F]): AmqpClient[F] =
+      buildChannel: () => Resource[F, Channel[F]],
+      connectionManager: AmqpClientConnectionManager[F])(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F]): AmqpClient[F] =
     new AmqpClient[F] {
       override def publisher(): Publisher[F, PublishCommand] = cmd => {
         for {
@@ -99,12 +120,14 @@ object AmqpClient extends StrictLogging {
       }
       override def registerConsumer(queueName: QueueName,
                                     handler: Handler[F, Delivery],
-                                    exceptionalAction: ConsumeAction): F[Unit] =
-        connectionManager.registerConsumer(queueName, handler, exceptionalAction)
+                                    exceptionalAction: ConsumeAction): Resource[F, Unit] =
+        buildChannel().evalMap {
+          connectionManager.registerConsumer(_, queueName, handler, exceptionalAction)
+        }
 
       override def declare(declarations: Declaration*): F[Unit]          = connectionManager.declare(declarations)
       override def declare(declarations: Iterable[Declaration]): F[Unit] = connectionManager.declare(declarations)
 
-      override def isConnectionOpen: F[Boolean] = connectionManager.channel.isConnectionOpen
+      override def isConnectionOpen: F[Boolean] = connectionManager.publishChannel.isConnectionOpen
     }
 }

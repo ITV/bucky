@@ -1,16 +1,19 @@
 package com.itv.bucky.example.requeue
 
-import cats.effect.{ExitCode, IO, IOApp}
+import cats.effect.{ExitCode, IO, IOApp, Resource}
 import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
 import com.itv.bucky.decl._
 import com.itv.bucky._
-import com.itv.bucky.consume.{_}
+import com.itv.bucky.consume._
 import com.itv.bucky.pattern.requeue._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.StrictLogging
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
+
+import cats.effect._
+import cats.implicits._
 
 object RequeueConsumer extends IOApp with StrictLogging {
 
@@ -36,11 +39,10 @@ object RequeueConsumer extends IOApp with StrictLogging {
     }
 
   override def run(args: List[String]): IO[ExitCode] =
-    AmqpClient[IO](amqpClientConfig).use { amqpClient =>
-      for {
-        _ <- amqpClient.declare(Declarations.all)
+    (for {
+        amqpClient <- AmqpClient[IO](amqpClientConfig)
+        _ <- Resource.liftF(amqpClient.declare(Declarations.all))
         _ <- amqpClient.registerRequeueConsumerOf(Declarations.queue.name,
           stringToLogRequeueHandler)
-      } yield ExitCode.Success
-    }
+      } yield ()).use(_ => IO.never *> IO(ExitCode.Success))
 }
