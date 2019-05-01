@@ -1,6 +1,6 @@
 package com.itv.bucky.wiring
 
-import cats.effect.Sync
+import cats.effect.{Resource, Sync}
 import com.itv.bucky.decl._
 import com.itv.bucky.pattern.requeue
 import com.itv.bucky.pattern.requeue.RequeuePolicy
@@ -86,35 +86,47 @@ class Wiring[T](
       yield client.publisherWithHeadersOf(publisherBuilder)
   }
 
-  def registerConsumer[F[_]](client: AmqpClient[F])(handleMessage: T => F[ConsumeAction])(implicit F: Sync[F]): F[Unit] = {
-    for {
-      _ <- F.delay {
-        logger.info(
-          s"Creating consumer: " +
-            s"exchange=${exchangeName.value} " +
-            s"routingKey=${routingKey.value} " +
-            s"queue=${queueName.value} " +
-            s"type=${exchangeType.value} " +
-            s"requeuePolicy=$requeuePolicy")
+  def registerConsumer[F[_]](client: AmqpClient[F])(handleMessage: T => F[ConsumeAction])(implicit F: Sync[F]): Resource[F, Unit] = {
+    val runDeclarations =
+      for {
+        _ <- F.delay {
+          logger.info(
+            s"Creating consumer: " +
+              s"exchange=${exchangeName.value} " +
+              s"routingKey=${routingKey.value} " +
+              s"queue=${queueName.value} " +
+              s"type=${exchangeType.value} " +
+              s"requeuePolicy=$requeuePolicy")
+        }
+        _ <- client.declare(consumerDeclarations)
       }
-      _ <- client.declare(consumerDeclarations)
+        yield ()
+
+    for {
+      _ <- Resource.make(runDeclarations)(_ => F.pure(()))
       _ <- client.registerConsumerOf(queueName, handleMessage)
     }
       yield ()
   }
 
-  def registerRequeueConsumer[F[_]](client: AmqpClient[F])(handleMessage: T => F[RequeueConsumeAction])(implicit F: Sync[F]): F[Unit] = {
-    for {
-      _ <- F.delay {
-        logger.info(
-          s"Creating consumer: " +
-            s"exchange=${exchangeName.value} " +
-            s"routingKey=${routingKey.value} " +
-            s"queue=${queueName.value} " +
-            s"type=${exchangeType.value} " +
-            s"requeuePolicy=$requeuePolicy")
+  def registerRequeueConsumer[F[_]](client: AmqpClient[F])(handleMessage: T => F[RequeueConsumeAction])(implicit F: Sync[F]): Resource[F, Unit] = {
+    val runDeclarations =
+      for {
+        _ <- F.delay {
+          logger.info(
+            s"Creating consumer: " +
+              s"exchange=${exchangeName.value} " +
+              s"routingKey=${routingKey.value} " +
+              s"queue=${queueName.value} " +
+              s"type=${exchangeType.value} " +
+              s"requeuePolicy=$requeuePolicy")
+        }
+        _ <- client.declare(consumerDeclarations)
       }
-      _ <- client.declare(consumerDeclarations)
+        yield ()
+
+    for {
+      _ <- Resource.make(runDeclarations)(_ => F.pure(()))
       _ <- client.registerRequeueConsumerOf(queueName, handleMessage, requeuePolicy)(unmarshaller, F)
     }
       yield ()

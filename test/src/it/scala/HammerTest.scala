@@ -2,7 +2,7 @@ import java.util.UUID
 import java.util.concurrent.Executors
 
 import cats.effect.concurrent.{Deferred, Ref}
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{ContextShift, IO, Resource, Timer}
 import cats.implicits._
 import com.itv.bucky._
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
@@ -52,13 +52,14 @@ class HammerTest extends FunSuite with Eventually with IntegrationPatience with 
 
     AmqpClient[IO](config).use { client =>
       val handler = StubHandlers.ackHandler[IO, String]
-      for {
-        _ <- client.declare(declarations)
-        _ <- client.registerConsumerOf(queueName, handler)
-        pub = client.publisherOf[String](exchangeName, routingKey)
-        fixture = TestFixture(handler, pub, client)
-        _ <- test(fixture)
-      } yield ()
+      val handlerResource =
+        Resource.liftF(client.declare(declarations)).flatMap(_ => client.registerConsumerOf(queueName, handler))
+
+      handlerResource.use { _ =>
+        val pub = client.publisherOf[String] (exchangeName, routingKey)
+        val fixture = TestFixture(handler, pub, client)
+        test(fixture)
+      }
     }.unsafeRunSync()
   }
 
@@ -127,21 +128,30 @@ class HammerTest extends FunSuite with Eventually with IntegrationPatience with 
       val declarations =
         List(Queue(slowQueue), Queue(fastQueue), Exchange(exchange).binding(slowRk -> slowQueue).binding(fastRk -> fastQueue))
 
-      for {
-        _ <- testFixture.client.declare(declarations)
-        _ <- testFixture.client.registerConsumerOf(slowQueue, slowHandler)
-        _ <- testFixture.client.registerConsumerOf(fastQueue, fastHandler)
-        _ <- slowPublisher("slow one")
-        _ <- IO.sleep(1.second)
-        _ <- fastPublisher("fast one")
-      }
-        yield {
-          eventually {
-            val messages = order.get.unsafeRunSync()
-            messages should have size 2
-            messages shouldBe List("fast", "slow")
-          }
+      val handlers =
+        for {
+          _ <- testFixture.client.registerConsumerOf(slowQueue, slowHandler)
+          _ <- testFixture.client.registerConsumerOf(fastQueue, fastHandler)
         }
+          yield ()
+
+      val handlersResource =
+        Resource.liftF(testFixture.client.declare(declarations)).flatMap(_ => handlers)
+
+      handlersResource.use { _ =>
+        for {
+          _ <- slowPublisher("slow one")
+          _ <- IO.sleep(1.second)
+          _ <- fastPublisher("fast one")
+        }
+          yield {
+            eventually {
+              val messages = order.get.unsafeRunSync()
+              messages should have size 2
+              messages shouldBe List("fast", "slow")
+            }
+          }
+      }
     }
   }
 

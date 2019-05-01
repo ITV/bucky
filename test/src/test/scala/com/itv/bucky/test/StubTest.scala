@@ -1,6 +1,6 @@
 package com.itv.bucky.test
 
-import cats.effect.IO
+import cats.effect.{IO, Resource}
 import cats.implicits._
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.consume.{Ack, DeadLetter}
@@ -18,15 +18,15 @@ class StubTest extends FunSuite with Matchers with IOAmqpClientTest {
 
   test("An ack Recording Handlers should accumulate publish results and ack") {
     runAmqpTestAllAck { client =>
-      for {
-        _         <- client.declare(declarations)
-        consumer  <- IO.pure(StubHandlers.ackHandler[IO, String])
-        _         <- client.registerConsumerOf(queue, consumer)
-        publisher <- IO(client.publisherOf[String](exchange, rk))
-        _         <- (1 to 10).toList.map(_ => publisher(message)).sequence
-      } yield {
-        all(consumer.receivedMessages) should be(message)
-        all(consumer.returnedResults) should be(Right(Ack))
+      val consumer = StubHandlers.ackHandler[IO, String]
+      Resource.liftF(client.declare(declarations)).flatMap(_ => client.registerConsumerOf(queue, consumer)).use { _ =>
+        for {
+          publisher <- IO(client.publisherOf[String](exchange, rk))
+          _ <- (1 to 10).toList.map(_ => publisher(message)).sequence
+        } yield {
+          all(consumer.receivedMessages) should be(message)
+          all(consumer.returnedResults) should be(Right(Ack))
+        }
       }
     }
   }
@@ -39,13 +39,10 @@ class StubTest extends FunSuite with Matchers with IOAmqpClientTest {
           publisher("publish from handler").map(_ => Ack)
       }
 
-      for {
-        _         <- client.declare(declarations)
-        consumer  = handler
-        _         <- client.registerConsumerOf(queue, consumer)
-        publisher = client.publisherOf[String](exchange, rk)
-        _         <- publisher(message)
-      } yield ()
+      Resource.liftF(client.declare(declarations)).flatMap { _ => client.registerConsumerOf(queue, handler) }.use { _ =>
+        val publisher = client.publisherOf[String] (exchange, rk)
+        publisher(message)
+      }
     }
   }
 

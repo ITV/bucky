@@ -19,7 +19,7 @@ trait AmqpClient[F[_]] {
   def publisher(): Publisher[F, PublishCommand]
   def registerConsumer(queueName: QueueName,
                        handler: Handler[F, Delivery],
-                       exceptionalAction: ConsumeAction = DeadLetter): F[Unit]
+                       exceptionalAction: ConsumeAction = DeadLetter): Resource[F, Unit]
   def isConnectionOpen: F[Boolean]
 }
 
@@ -90,24 +90,27 @@ object AmqpClient extends StrictLogging {
   def apply[F[_]](config: AmqpClientConfig)(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F], executionContext: ExecutionContext): Resource[F, AmqpClient[F]] =
     for {
       connection <- createConnection(config)
-      rabbitChannel = createChannel(connection).map(Channel.apply[F])
-      client <- apply[F](config, rabbitChannel)
+      publishChannel = createChannel(connection).map(Channel.apply[F])
+      buildChannel = () => createChannel(connection).map(Channel.apply[F])
+      client <- apply[F](config, buildChannel, publishChannel)
     } yield client
 
   def apply[F[_]](config: AmqpClientConfig,
-                  channel: Resource[F, Channel[F]])(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F], executionContext: ExecutionContext): Resource[F, AmqpClient[F]] =
-    channel.flatMap { channel =>
+                  buildChannel: () => Resource[F, Channel[F]],
+                  publishChannel: Resource[F, Channel[F]])(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F], executionContext: ExecutionContext): Resource[F, AmqpClient[F]] =
+    publishChannel.flatMap { channel =>
       val make =
         for {
           _ <- cs.shift
           connectionManager <- AmqpClientConnectionManager(config, channel)
         }
-          yield mkClient(connectionManager)
+          yield mkClient(buildChannel, connectionManager)
       Resource.make(make)(_ => F.unit)
     }
 
   private def mkClient[F[_]](
-      connectionManager: AmqpClientConnectionManager[F])(implicit F: Concurrent[F], cs: ContextShift[F], t: Timer[F]): AmqpClient[F] =
+      buildChannel: () => Resource[F, Channel[F]],
+      connectionManager: AmqpClientConnectionManager[F])(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F]): AmqpClient[F] =
     new AmqpClient[F] {
       override def publisher(): Publisher[F, PublishCommand] = cmd => {
         for {
@@ -117,12 +120,14 @@ object AmqpClient extends StrictLogging {
       }
       override def registerConsumer(queueName: QueueName,
                                     handler: Handler[F, Delivery],
-                                    exceptionalAction: ConsumeAction): F[Unit] =
-        connectionManager.registerConsumer(queueName, handler, exceptionalAction)
+                                    exceptionalAction: ConsumeAction): Resource[F, Unit] =
+        buildChannel().evalMap {
+          connectionManager.registerConsumer(_, queueName, handler, exceptionalAction)
+        }
 
       override def declare(declarations: Declaration*): F[Unit]          = connectionManager.declare(declarations)
       override def declare(declarations: Iterable[Declaration]): F[Unit] = connectionManager.declare(declarations)
 
-      override def isConnectionOpen: F[Boolean] = connectionManager.channel.isConnectionOpen
+      override def isConnectionOpen: F[Boolean] = connectionManager.publishChannel.isConnectionOpen
     }
 }

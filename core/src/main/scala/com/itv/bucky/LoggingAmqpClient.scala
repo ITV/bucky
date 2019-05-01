@@ -1,6 +1,6 @@
 package com.itv.bucky
 
-import cats.effect.ConcurrentEffect
+import cats.effect.{ConcurrentEffect, Resource}
 import com.typesafe.scalalogging.StrictLogging
 import cats._
 import cats.implicits._
@@ -42,7 +42,7 @@ object LoggingAmqpClient extends StrictLogging {
           }
       }
 
-      override def registerConsumer(queueName: QueueName, handler: Handler[F, Delivery], exceptionalAction: ConsumeAction): F[Unit] = {
+      override def registerConsumer(queueName: QueueName, handler: Handler[F, Delivery], exceptionalAction: ConsumeAction): Resource[F, Unit] = {
         val newHandler = (delivery: Delivery) => {
           (for {
             result <- handler(delivery).attempt
