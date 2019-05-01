@@ -25,7 +25,7 @@ import kamon.trace.Span.TagValue
 import kamon.trace.{IdentityProvider, Span}
 
 class KamonSupportTest extends FunSuite with Matchers with Eventually with SpanSupport {
-  /*val queue = Queue(QueueName("kamon-spec-test"))
+  val queue = Queue(QueueName("kamon-spec-test"))
   val rk    = RoutingKey("kamon-spec-rk")
   val exchange = Exchange(ExchangeName("kamon-spec-exchange"))
     .binding(rk -> queue.name)
@@ -111,12 +111,15 @@ class KamonSupportTest extends FunSuite with Matchers with Eventually with SpanS
           .clientForgiving()
           .map(_.withKamonSupport())
           .use(client => {
-            for {
-              _      <- cs.shift
-              _      <- client.declare(declarations)
-              _      <- client.registerConsumerOf(queue.name, handler)
-              result <- test(reporter, client.publisherOf[String](exchange.name, rk), handler).attempt
-            } yield result
+            (for {
+              _ <- Resource.liftF(client.declare(declarations))
+              _ <- client.registerConsumerOf(queue.name, handler)
+            } yield ()).use { _ =>
+              for {
+                _ <- cs.shift
+                result <- test(reporter, client.publisherOf[String](exchange.name, rk), handler).attempt
+              } yield result
+            }
           })
           .unsafeRunSync()
         IO.fromEither(result).unsafeRunSync()
@@ -134,18 +137,17 @@ class KamonSupportTest extends FunSuite with Matchers with Eventually with SpanS
         implicit val cs    = IO.contextShift(ec)
         val actualChannel  = StubChannels.forgiving[IO]
         val channel        = Resource.make(IO(actualChannel))(_.close())
-        val client         = AmqpClient.apply[IO](Config.empty(3.seconds), channel.map(_.asInstanceOf[Channel[IO]]))
+        val clientResource         = AmqpClient.apply[IO](Config.empty(3.seconds), () => channel.map(_.asInstanceOf[Channel[IO]]), channel.map(_.asInstanceOf[Channel[IO]]))
 
-        val result = client
-          .use(client => {
-            for {
-              _      <- cs.shift
-              _      <- client.declare(declarations)
-              _      <- client.withKamonSupport().registerConsumerOf(queue.name, handler)
-              result <- test(reporter, actualChannel).attempt
-            } yield result
-          })
-          .unsafeRunSync()
+        val result =
+        (for {
+          client <- clientResource
+          _ <- Resource.liftF(client.declare(declarations))
+          _ <- client.withKamonSupport().registerConsumerOf(queue.name, handler)
+        } yield ()).use { _ =>
+          test(reporter, actualChannel).attempt
+        }.unsafeRunSync()
+
         IO.fromEither(result).unsafeRunSync()
       }
     }
@@ -155,5 +157,5 @@ class KamonSupportTest extends FunSuite with Matchers with Eventually with SpanS
       case boolean: TagValue.Boolean => s"${boolean.text}"
       case TagValue.String(string)   => s"$string"
       case TagValue.Number(number)   => s"$number"
-    }*/
+    }
 }
