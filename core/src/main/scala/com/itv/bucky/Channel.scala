@@ -17,7 +17,7 @@ import scala.language.higherKinds
 
 trait Channel[F[_]] {
   def isConnectionOpen: F[Boolean]
-  def synchroniseIfNeeded[T](f: =>T): T
+  def synchroniseIfNeeded[T](f: => T): T
   def close(): F[Unit]
   def purgeQueue(name: QueueName): F[Unit]
   def basicQos(prefetchCount: Int): F[Unit]
@@ -49,7 +49,11 @@ trait Channel[F[_]] {
       _ <- exchangeBindings.traverse(declareExchangeBinding)
     } yield ()
   }
-  def registerConsumer(handler: Handler[F, Delivery], onFailure: ConsumeAction, queue: QueueName, consumerTag: ConsumerTag, cs: ContextShift[F]): F[Unit]
+  def registerConsumer(handler: Handler[F, Delivery],
+                       onFailure: ConsumeAction,
+                       queue: QueueName,
+                       consumerTag: ConsumerTag,
+                       cs: ContextShift[F]): F[Unit]
 }
 
 object Channel {
@@ -110,16 +114,20 @@ object Channel {
           )
       }.void
 
-    override def registerConsumer(handler: Handler[F, Delivery], onFailure: ConsumeAction, queue: QueueName, consumerTag: ConsumerTag, cs:  ContextShift[F]): F[Unit] = {
+    override def registerConsumer(handler: Handler[F, Delivery],
+                                  onFailure: ConsumeAction,
+                                  queue: QueueName,
+                                  consumerTag: ConsumerTag,
+                                  cs: ContextShift[F]): F[Unit] = {
 
       val deliveryCallback = new DefaultConsumer(channel) {
-        override def handleDelivery(consumerTag: String, envelope: RabbitMQEnvelope, properties: BasicProperties, body: Array[Byte]): Unit = {
+        override def handleDelivery(consumerTag: String, envelope: RabbitMQEnvelope, properties: BasicProperties, body: Array[Byte]): Unit =
           (for {
-            _ <- cs.shift
+            _        <- cs.shift
             delivery <- F.delay(Consumer.deliveryFrom(consumerTag, envelope, properties, body))
-            _ <- F.delay(logger.debug("Received delivery with rk:{} on exchange: {}", delivery.envelope.routingKey, delivery.envelope.exchangeName))
-            action <- handler(delivery)
-            _ <- F.delay(logger.debug("Responding with {} to {} on {}", action, delivery))
+            _        <- F.delay(logger.debug("Received delivery with rk:{} on exchange: {}", delivery.envelope.routingKey, delivery.envelope.exchangeName))
+            action   <- handler(delivery)
+            _        <- F.delay(logger.debug("Responding with {} to {} on {}", action, delivery))
           } yield action).attempt
             .flatTap {
               case Left(e) =>
@@ -131,18 +139,13 @@ object Channel {
                   logger.debug("Processed message with dl {}", envelope.getDeliveryTag)
                 }
             }
-            .recoverWith {
-              case e => F.delay(logger.debug(s"Handler failure with {} will recover to: {}", e.getMessage, onFailure)) *> F.delay(Right(onFailure))
+            .flatMap {
+              case Right(r) => F.delay(r)
+              case Left(e)  => F.delay(logger.debug(s"Handler failure with {} will recover to: {}", e.getMessage, onFailure)) *> F.delay(onFailure)
             }
-            .rethrow
             .flatMap(sendAction(_)(Envelope.fromEnvelope(envelope)))
             .toIO
-            .unsafeRunAsync {
-              case Right(_) => ()
-              case Left(error) =>
-                logger.error(s"Exception from handler. Exchange = ${envelope.getExchange}, routing key = ${envelope.getRoutingKey}, body = ${new String(body, StandardCharsets.UTF_8)}", error)
-            }
-        }
+            .unsafeRunSync
       }
       F.delay(channel.basicConsume(queue.value, false, consumerTag.value, deliveryCallback)).void
     }

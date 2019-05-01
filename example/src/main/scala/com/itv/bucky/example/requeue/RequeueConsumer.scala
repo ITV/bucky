@@ -12,7 +12,7 @@ import com.typesafe.scalalogging.StrictLogging
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
-object RequeueConsumer extends IOApp with StrictLogging {
+/*object RequeueConsumer extends IOApp with StrictLogging {
 
   object Declarations {
     val queue = Queue(QueueName(s"requeue_string-1"))
@@ -43,4 +43,4 @@ object RequeueConsumer extends IOApp with StrictLogging {
           stringToLogRequeueHandler)
       } yield ExitCode.Success
     }
-}
+}*/

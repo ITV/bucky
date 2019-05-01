@@ -1,7 +1,7 @@
 package com.itv.bucky.kamonSupport
 import java.time.Instant
 
-import cats.effect.{ConcurrentEffect, ContextShift, Timer}
+import cats.effect.{ConcurrentEffect, Resource}
 import com.itv.bucky.consume._
 import com.itv.bucky.{AmqpClient, Handler, Publisher, QueueName, decl}
 import cats.implicits._
@@ -73,7 +73,7 @@ object KamonSupport {
           .map { case (key, value) => (key, value) }
           .toMap[String, AnyRef]
 
-      override def registerConsumer(queueName: QueueName, handler: Handler[F, Delivery], exceptionalAction: ConsumeAction): F[Unit] = {
+      override def registerConsumer(queueName: QueueName, handler: Handler[F, Delivery], exceptionalAction: ConsumeAction): Resource[F, Unit] = {
         val newHandler = (delivery: Delivery) => {
           (for {
             start       <- F.delay(Kamon.clock().instant())

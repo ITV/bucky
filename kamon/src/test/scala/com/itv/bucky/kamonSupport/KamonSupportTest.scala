@@ -25,7 +25,7 @@ import kamon.trace.Span.TagValue
 import kamon.trace.{IdentityProvider, Span}
 
 class KamonSupportTest extends FunSuite with Matchers with Eventually with SpanSupport {
-  val queue = Queue(QueueName("kamon-spec-test"))
+  /*val queue = Queue(QueueName("kamon-spec-test"))
   val rk    = RoutingKey("kamon-spec-rk")
   val exchange = Exchange(ExchangeName("kamon-spec-exchange"))
     .binding(rk -> queue.name)
@@ -155,5 +155,5 @@ class KamonSupportTest extends FunSuite with Matchers with Eventually with SpanS
       case boolean: TagValue.Boolean => s"${boolean.text}"
       case TagValue.String(string)   => s"$string"
       case TagValue.Number(number)   => s"$number"
-    }
+    }*/
 }
