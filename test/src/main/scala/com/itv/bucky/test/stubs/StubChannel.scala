@@ -1,6 +1,7 @@
 package com.itv.bucky.test.stubs
 
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicLong
 
 import com.itv.bucky
 import com.itv.bucky.consume.{ConsumeAction, ConsumerTag, Delivery, PublishCommand}
@@ -31,11 +32,16 @@ abstract class StubChannel[F[_]](implicit F: ConcurrentEffect[F]) extends Channe
   override def purgeQueue(name: QueueName): F[Unit]    = F.unit
   override def basicQos(prefetchCount: Int): F[Unit]   = F.unit
   override def confirmSelect: F[Unit]                  = F.unit
-  override def getNextPublishSeqNo: F[Long]            = F.delay(publishSeq)
+
+  override def getNextPublishSeqNo: F[Long] =  F.delay(pubSeqLock.synchronized {
+    val current = publishSeq
+    publishSeq = publishSeq + 1
+    current
+  })
 
   def handlePublishHandlersResult(result: Either[Throwable, List[ConsumeAction]]): F[Unit]
 
-  override def publish(cmd: PublishCommand): F[Unit] = {
+  override def publish(sequenceNumber: Long, cmd: PublishCommand): F[Unit] = {
     val queues = bindings.filter(binding => binding.exchangeName == cmd.exchange && binding.routingKey == cmd.routingKey).map(_.queueName)
     val subscribedHandlers = handlers
       .filterKeys(queues.contains)
@@ -49,11 +55,6 @@ abstract class StubChannel[F[_]](implicit F: ConcurrentEffect[F]) extends Channe
       _        <- F.delay(logger.debug("Publishing message with rk: {}, exchange: {} ,body: {} and pid {}", cmd.routingKey, cmd.exchange, cmd.body, id))
       _        <- F.delay(logger.debug("Found {} queues for pid {}.", queues.toList.map(_.value), id))
       _        <- F.delay(logger.debug("Found {} handlers for pid {}.", subscribedHandlers.size, id))
-      sequenceNumber        <- F.delay(pubSeqLock.synchronized {
-        val current = publishSeq
-        publishSeq = publishSeq + 1
-        current
-      })
       delivery <- deliveryFor(cmd, sequenceNumber)
       result   <- subscribedHandlers.traverse(_(delivery)).attempt
       _        <- F.delay(logger.debug("Message pid {} published with result {}.", id, result))

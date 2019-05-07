@@ -24,7 +24,7 @@ trait Channel[F[_]] {
   def confirmSelect: F[Unit]
   def addConfirmListener(listener: ConfirmListener): F[Unit]
   def getNextPublishSeqNo: F[Long]
-  def publish(cmd: PublishCommand): F[Unit]
+  def publish(sequenceNumber: Long, cmd: PublishCommand): F[Unit]
   def sendAction(action: ConsumeAction)(envelope: Envelope): F[Unit]
   def declareExchange(exchange: Exchange): F[Unit]
   def declareQueue(queue: Queue): F[Unit]
@@ -67,7 +67,7 @@ object Channel {
     override def addConfirmListener(listener: ConfirmListener): F[Unit] = F.delay(channel.addConfirmListener(listener))
     override def getNextPublishSeqNo: F[Long]                           = F.delay(channel.getNextPublishSeqNo)
 
-    override def publish(cmd: PublishCommand): F[Unit] =
+    override def publish(sequenceNumber: Long, cmd: PublishCommand): F[Unit] =
       for {
         _ <- F.delay(logger.debug("Publishing command with exchange:{} rk: {}.", cmd.exchange, cmd.routingKey))
         _ <- F.delay(

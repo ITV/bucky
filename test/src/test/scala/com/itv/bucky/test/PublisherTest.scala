@@ -114,8 +114,8 @@ class PublisherTest extends FunSuite with Matchers with IOAmqpClientTest {
         publish4      <- IO(client.publisher()(commandBuilder).unsafeToFuture())
         _             <- IO.sleep(3.seconds)
         areCompleted1 <- IO(List(publish1.isCompleted, publish2.isCompleted, publish3.isCompleted, publish4.isCompleted))
-        _             <- IO(channel.confirmListeners.foreach(_.handleAck(0, false))) // confirm 1
-        _             <- IO(channel.confirmListeners.foreach(_.handleNack(2, true))) //nack 2,3
+        _             <- IO(channel.confirmListeners.foreach(_.handleAck(0, false))) // ack 0
+        _             <- IO(channel.confirmListeners.foreach(_.handleNack(2, true))) //nack 1, 2
         result <- IO.fromFuture(
           IO(Future.sequence[Either[Throwable, Unit], List](List(publish1.attempt, publish2.attempt, publish3.attempt, publish4.attempt))))
         areCompleted2 <- IO(List(publish1.isCompleted, publish2.isCompleted, publish3.isCompleted, publish4.isCompleted))

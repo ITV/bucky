@@ -38,7 +38,7 @@ private[bucky] case class AmqpClientConnectionManager[F[_]](
             nextPublishSeq <- publishChannel.getNextPublishSeqNo
             _              <- deliveryTag.set(Some(nextPublishSeq))
             _              <- pendingConfirmListener.pendingConfirmations.update(_ + (nextPublishSeq -> signal))
-            _              <- publishChannel.publish(cmd)
+            _              <- publishChannel.publish(nextPublishSeq, cmd)
           } yield ()
         }
         _ <- signal.get.ifM(F.unit, F.raiseError[Unit](new RuntimeException("Failed to publish msg.")))

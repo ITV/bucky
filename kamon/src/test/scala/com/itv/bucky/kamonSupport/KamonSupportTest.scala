@@ -87,7 +87,7 @@ class KamonSupportTest extends FunSuite with Matchers with Eventually with SpanS
     val commandWSpan = command.copy(basicProperties = command.basicProperties.copy(headers = command.basicProperties.headers ++ headers))
     withChannel { (reporter, channel) =>
       for {
-        _ <- channel.publish(commandWSpan)
+        _ <- channel.publish(1L, commandWSpan)
       } yield {
         eventually(reporter.spans should have size 1)
         val consumeSpan = reporter.spans.find(_.operationName == s"bucky.consume.${queue.name.value}").get
