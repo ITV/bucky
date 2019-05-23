@@ -44,12 +44,12 @@ case class RequeueTransformer[F[_]](
         case com.itv.bucky.consume.Requeue =>
           remainingAttempts(delivery) match {
             case Some(value) if value < 1 =>
-              onFailureAction(delivery).map(_ => DeadLetter)
+              onFailureAction(delivery)
             case Some(value) =>
               requeuePublisher(buildRequeuePublishCommand(delivery, value - 1, requeuePolicy.requeueAfter)).map(_ => Ack)
             case None =>
               if (requeuePolicy.maximumProcessAttempts <= 1)
-                onFailureAction(delivery).map(_ => DeadLetter)
+                onFailureAction(delivery)
               else {
                 val initialRemainingAttempts = requeuePolicy.maximumProcessAttempts - 2
                 requeuePublisher(buildRequeuePublishCommand(delivery, initialRemainingAttempts, requeuePolicy.requeueAfter)).map(_ => Ack)
