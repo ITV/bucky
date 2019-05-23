@@ -66,7 +66,7 @@ package object requeue {
                                              requeuePolicy: RequeuePolicy,
                                              unmarshaller: PayloadUnmarshaller[T],
                                              onFailure: RequeueConsumeAction = Requeue,
-                                             onFailureAction: T => F[Unit],
+                                             onFailureAction: T => F[ConsumeAction],
                                              unmarshalFailureAction: RequeueConsumeAction = DeadLetter,
                                              prefetchCount: Int = 0): B[C] = {
       requeueDeliveryHandlerOf(queueName,
@@ -85,14 +85,14 @@ package object requeue {
                                     requeuePolicy: RequeuePolicy,
                                     unmarshaller: DeliveryUnmarshaller[T],
                                     onFailure: RequeueConsumeAction = Requeue,
-                                    onFailureAction: T => F[Unit] = (_: T) => amqpClient.effectMonad.apply(()),
+                                    onFailureAction: T => F[ConsumeAction] = (_: T) => amqpClient.effectMonad.apply[ConsumeAction](DeadLetter),
                                     unmarshalFailureAction: RequeueConsumeAction = DeadLetter,
                                     prefetchCount: Int = 0): B[C] = {
       val deserializeHandler =
         new DeliveryUnmarshalHandler[F, T, RequeueConsumeAction](unmarshaller)(handler, unmarshalFailureAction)(
           amqpClient.effectMonad)
 
-      val deserializeOnFailureAction: Delivery => F[Unit] =
+      val deserializeOnFailureAction: Delivery => F[ConsumeAction] =
         new UnmarshalFailureAction[F, T](unmarshaller)(amqpClient.effectMonad)(onFailureAction)
 
       requeueOf(queueName, deserializeHandler, requeuePolicy, onFailure, deserializeOnFailureAction, prefetchCount = prefetchCount)
@@ -102,7 +102,7 @@ package object requeue {
                   handler: RequeueHandler[F, Delivery],
                   requeuePolicy: RequeuePolicy,
                   onFailure: RequeueConsumeAction = Requeue,
-                  onFailureAction: Delivery => F[Unit] = (_: Delivery) => amqpClient.effectMonad.apply(()),
+                  onFailureAction: Delivery => F[ConsumeAction] = (_: Delivery) => amqpClient.effectMonad.apply(DeadLetter),
                   prefetchCount: Int = 0): B[C] = {
       val requeueExchange = ExchangeName(s"${queueName.value}.requeue")
       amqpClient.monad.flatMap(amqpClient.publisher()) { requeuePublish =>

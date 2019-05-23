@@ -152,7 +152,12 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
 
     var testInt = 0
 
-    Lifecycle.using(testLifecycle(handler, requeuePolicy, intMessageDeserializer, (i: Int) => Future { testInt = i })) { app =>
+    val onFailureAction = (i: Int) => Future {
+      testInt = i
+      DeadLetter
+    }
+
+    Lifecycle.using(testLifecycle(handler, requeuePolicy, intMessageDeserializer, onFailureAction)) { app =>
       handler.nextResponse = Future.successful(Requeue)
       val payload = Payload.from(128)
       app.publish(payload).futureValue shouldBe published
@@ -216,7 +221,7 @@ class RequeueIntegrationTest extends FunSuite with ScalaFutures {
   def testLifecycle[T](handler: RequeueHandler[Future, T],
                        requeuePolicy: RequeuePolicy,
                        unmarshaller: PayloadUnmarshaller[T],
-                       onFailureAction: T => Future[Unit] = (_: T) => Future.successful(())
+                       onFailureAction: T => Future[ConsumeAction] = (_: T) => Future.successful(DeadLetter)
                       )(implicit M: Monad[Future]): Lifecycle[TestFixture] =
     for {
       testFixture <- baseTestLifecycle()

@@ -12,7 +12,7 @@ case class RequeueTransformer[F[_], E](
     requeueExchange: ExchangeName,
     requeuePolicy: RequeuePolicy,
     onFailure: RequeueConsumeAction,
-    onFailureAction: Delivery => F[Unit]
+    onFailureAction: Delivery => F[ConsumeAction]
                                       )(handler: RequeueHandler[F, Delivery])(implicit F: MonadError[F, E])
     extends Handler[F, Delivery]
     with StrictLogging {
@@ -40,19 +40,17 @@ case class RequeueTransformer[F[_], E](
       action match {
         case com.itv.bucky.Requeue =>
           remainingAttempts(delivery) match {
-            case Some(value) if value < 1 => F.map(onFailureAction(delivery))(_ => DeadLetter)
+            case Some(value) if value < 1 => onFailureAction(delivery)
             case Some(value) =>
-              F.map(requeuePublisher(buildRequeuePublishCommand(delivery, value - 1, requeuePolicy.requeueAfter)))(_ =>
-                Ack)
+              F.map(requeuePublisher(buildRequeuePublishCommand(delivery, value - 1, requeuePolicy.requeueAfter)))(_ => Ack)
             case None =>
               if (requeuePolicy.maximumProcessAttempts <= 1)
-                F.map(onFailureAction(delivery))(_ => DeadLetter)
+                onFailureAction(delivery)
               else {
                 val initialRemainingAttempts = requeuePolicy.maximumProcessAttempts - 2
                 F.map(
                   requeuePublisher(
-                    buildRequeuePublishCommand(delivery, initialRemainingAttempts, requeuePolicy.requeueAfter)))(_ =>
-                  Ack)
+                    buildRequeuePublishCommand(delivery, initialRemainingAttempts, requeuePolicy.requeueAfter)))(_ => Ack)
               }
           }
         case other: ConsumeAction => F.apply(other)

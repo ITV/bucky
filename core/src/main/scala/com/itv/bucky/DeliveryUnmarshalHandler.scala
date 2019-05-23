@@ -19,12 +19,12 @@ class DeliveryUnmarshalHandler[F[_], T, S](unmarshaller: DeliveryUnmarshaller[T]
 }
 
 class UnmarshalFailureAction[F[_], T](unmarshaller: DeliveryUnmarshaller[T])(implicit F: Monad[F]) extends StrictLogging {
-  def apply(f: T => F[Unit])(delivery: Delivery): F[Unit] = {
+  def apply(f: T => F[ConsumeAction])(delivery: Delivery): F[ConsumeAction] = {
     unmarshaller.unmarshal(delivery) match {
       case UnmarshalResult.Success(message) => f(message)
       case UnmarshalResult.Failure(reason, throwable) =>
-      logger.error(s"Cannot deserialize: ${delivery.body} because: '$reason'", throwable)
-      F.apply(())
+        logger.error(s"Cannot deserialize: ${delivery.body} because: '$reason'", throwable)
+        F.apply(DeadLetter)
     }
   }
 }
