@@ -17,7 +17,7 @@ case class RequeueTransformer[F[_]](
     requeueExchange: ExchangeName,
     requeuePolicy: RequeuePolicy,
     onFailure: RequeueConsumeAction,
-    onFailureAction: Delivery => F[Unit]
+    onFailureAction: Delivery => F[ConsumeAction]
 )(handler: RequeueHandler[F, Delivery])(implicit F: Sync[F])
     extends Handler[F, Delivery]
     with StrictLogging {

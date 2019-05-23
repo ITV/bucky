@@ -1,7 +1,7 @@
 package com.itv.bucky
 
 import cats.Applicative
-import com.itv.bucky.consume.Delivery
+import com.itv.bucky.consume.{ConsumeAction, DeadLetter, Delivery}
 import com.typesafe.scalalogging.StrictLogging
 
 import scala.language.higherKinds
@@ -21,13 +21,13 @@ class DeliveryUnmarshalHandler[F[_], T, S](unmarshaller: DeliveryUnmarshaller[T]
 }
 
 class UnmarshalFailureAction[F[_], T](unmarshaller: DeliveryUnmarshaller[T])(implicit F: Applicative[F]) extends StrictLogging {
-  def apply(f: T => F[Unit])(delivery: Delivery): F[Unit] =
+  def apply(f: T => F[ConsumeAction])(delivery: Delivery): F[ConsumeAction] =
     unmarshaller.unmarshal(delivery) match {
       case Right(message) => f(message)
       case Left(throwable) =>
         F.point {
           logger.error(s"Cannot deserialize: ${delivery.body}", throwable)
-          ()
+          DeadLetter
         }
     }
 }

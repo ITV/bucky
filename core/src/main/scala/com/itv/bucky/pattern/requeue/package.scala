@@ -3,11 +3,12 @@ package com.itv.bucky.pattern
 import cats.effect.{Resource, Sync}
 import com.itv.bucky.{AmqpClient, DeliveryUnmarshalHandler, _}
 import com.itv.bucky.Unmarshaller._
-import com.itv.bucky.consume.{DeadLetter, Delivery, Requeue, RequeueConsumeAction}
+import com.itv.bucky.consume.{ConsumeAction, DeadLetter, Delivery, Requeue, RequeueConsumeAction}
 import com.itv.bucky.decl._
 
 import scala.concurrent.duration.{FiniteDuration, _}
 import scala.language.higherKinds
+import com.itv.bucky.consume.{ConsumeAction, DeadLetter, Delivery, Requeue, RequeueConsumeAction}
 
 package object requeue {
 
@@ -51,12 +52,12 @@ package object requeue {
                                     requeuePolicy: RequeuePolicy,
                                     unmarshaller: DeliveryUnmarshaller[T],
                                     onFailure: RequeueConsumeAction = Requeue,
-                                    onFailureAction: T => F[Unit] = (_: T) => F.point(()),
+                                    onFailureAction: T => F[ConsumeAction] = (_: T) => F.point(DeadLetter),
                                     unmarshalFailureAction: RequeueConsumeAction = DeadLetter,
                                     prefetchCount: Int = defaultPreFetchCount): Resource[F, Unit] = {
 
       val deserializeHandler                              = new DeliveryUnmarshalHandler[F, T, RequeueConsumeAction](unmarshaller)(handler, unmarshalFailureAction)
-      val deserializeOnFailureAction: Delivery => F[Unit] = new UnmarshalFailureAction[F, T](unmarshaller).apply(onFailureAction)
+      val deserializeOnFailureAction: Delivery => F[ConsumeAction] = new UnmarshalFailureAction[F, T](unmarshaller).apply(onFailureAction)
       requeueOf(queueName, deserializeHandler, requeuePolicy, onFailure, deserializeOnFailureAction, prefetchCount)
     }
 
@@ -64,7 +65,7 @@ package object requeue {
                   handler: RequeueHandler[F, Delivery],
                   requeuePolicy: RequeuePolicy,
                   onFailure: RequeueConsumeAction = Requeue,
-                  onFailureAction: Delivery => F[Unit] = (_: Delivery) => F.point(()),
+                  onFailureAction: Delivery => F[ConsumeAction] = (_: Delivery) => F.point(DeadLetter),
                   prefetchCount: Int = defaultPreFetchCount): Resource[F, Unit] = {
       val requeueExchange = ExchangeName(s"${queueName.value}.requeue")
       val requeuePublish  = amqpClient.publisher()
