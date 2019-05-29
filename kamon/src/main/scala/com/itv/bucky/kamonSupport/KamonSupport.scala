@@ -79,7 +79,6 @@ object KamonSupport {
       override def registerConsumer(queueN: QueueName, handler: Handler[F, Delivery], exceptionalAction: ConsumeAction): Resource[F, Unit] = {
         val newHandler = (delivery: Delivery) => {
           (for {
-            start       <- F.delay(Kamon.clock().instant())
             ctxMap      <- F.delay(contextMapFrom(delivery))
             context     <- Kamon.contextCodec().HttpHeaders.decode(ctxMap).pure[F]
             spanBuilder <- consumerSpanFor(queueN, delivery, context).pure[F]
@@ -101,7 +100,7 @@ object KamonSupport {
 
       private def contextMapFrom(delivery: Delivery) = {
         val contextMap = new context.TextMap.Default
-        delivery.properties.headers.foreach(t => Try { contextMap.put(t._1, t._2.asInstanceOf[String]) })
+        delivery.properties.headers.foreach(t => Try { contextMap.put(t._1, t._2.toString) })
         contextMap
       }
 
