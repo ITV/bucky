@@ -109,14 +109,14 @@ class KamonSupportTest extends FunSuite with Matchers with Eventually with SpanS
         implicit val cs    = IO.contextShift(ec)
         val result = IOAmqpClientTest(ec, timer, cs)
           .clientForgiving()
-          .map(_.withKamonSupport())
+          .map(_.withKamonSupport(false))
           .use(client => {
             (for {
               _ <- Resource.liftF(client.declare(declarations))
               _ <- client.registerConsumerOf(queue.name, handler)
             } yield ()).use { _ =>
               for {
-                _ <- cs.shift
+                _      <- cs.shift
                 result <- test(reporter, client.publisherOf[String](exchange.name, rk), handler).attempt
               } yield result
             }
@@ -137,16 +137,19 @@ class KamonSupportTest extends FunSuite with Matchers with Eventually with SpanS
         implicit val cs    = IO.contextShift(ec)
         val actualChannel  = StubChannels.forgiving[IO]
         val channel        = Resource.make(IO(actualChannel))(_.close())
-        val clientResource         = AmqpClient.apply[IO](Config.empty(3.seconds), () => channel.map(_.asInstanceOf[Channel[IO]]), channel.map(_.asInstanceOf[Channel[IO]]))
+        val clientResource =
+          AmqpClient.apply[IO](Config.empty(3.seconds), () => channel.map(_.asInstanceOf[Channel[IO]]), channel.map(_.asInstanceOf[Channel[IO]]))
 
         val result =
-        (for {
-          client <- clientResource
-          _ <- Resource.liftF(client.declare(declarations))
-          _ <- client.withKamonSupport().registerConsumerOf(queue.name, handler)
-        } yield ()).use { _ =>
-          test(reporter, actualChannel).attempt
-        }.unsafeRunSync()
+          (for {
+            client <- clientResource
+            _      <- Resource.liftF(client.declare(declarations))
+            _      <- client.withKamonSupport(logging = false).registerConsumerOf(queue.name, handler)
+          } yield ())
+            .use { _ =>
+              test(reporter, actualChannel).attempt
+            }
+            .unsafeRunSync()
 
         IO.fromEither(result).unsafeRunSync()
       }
