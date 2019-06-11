@@ -31,7 +31,11 @@ object AmqpClient extends StrictLogging {
         logger.info(s"Starting Channel")
         val channel = connection.createChannel()
         channel.addShutdownListener(new ShutdownListener {
-          override def shutdownCompleted(cause: ShutdownSignalException): Unit = logger.warn(s"Channel shut down", cause)
+          override def shutdownCompleted(cause: ShutdownSignalException): Unit =
+            if (cause.isInitiatedByApplication)
+              logger.info(s"Channel shut down due to explicit application action: ${cause.getMessage}")
+            else
+              logger.error(s"Channel shut down by broker or because of detectable non-deliberate application failure", cause)
         })
         channel
       }
