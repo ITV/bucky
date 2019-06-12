@@ -57,12 +57,12 @@ private[bucky] case class AmqpClientConnectionManager[F[_]](
         }
     } yield ()
 
-  def registerConsumer(channel: Channel[F], queueName: QueueName, handler: Handler[F, Delivery], onFailure: ConsumeAction): F[Unit] =
+  def registerConsumer(channel: Channel[F], queueName: QueueName, handler: Handler[F, Delivery], onFailure: ConsumeAction, prefetchCount : Int): F[Unit] =
     for {
       _ <- cs.shift
       consumerTag <- F.delay(ConsumerTag.create(queueName))
       _ <- F.delay(logger.debug("Registering consumer for queue: {} with tag {}.", queueName.value, consumerTag.value))
-      _ <- channel.basicQos(amqpConfig.prefetchCount)
+      _ <- channel.basicQos(prefetchCount)
       _ <- channel.registerConsumer(handler, onFailure, queueName, consumerTag, cs)
       _ <- F.delay(logger.debug("Consumer for queue: {} with tag {} was successfully registered.", queueName.value, consumerTag.value))
       _ <- F.delay(logger.debug("Successfully registered consumer for queue: {} with tag.", queueName.value), consumerTag.value)

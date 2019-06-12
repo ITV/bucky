@@ -76,7 +76,7 @@ object KamonSupport {
           .map { case (key, value) => (key, value) }
           .toMap[String, AnyRef]
 
-      override def registerConsumer(queueN: QueueName, handler: Handler[F, Delivery], exceptionalAction: ConsumeAction): Resource[F, Unit] = {
+      override def registerConsumer(queueN: QueueName, handler: Handler[F, Delivery], exceptionalAction: ConsumeAction, prefetchCount: Int): Resource[F, Unit] = {
         val newHandler = (delivery: Delivery) => {
           (for {
             ctxMap      <- F.delay(contextMapFrom(delivery))
@@ -95,7 +95,7 @@ object KamonSupport {
             _ <- F.delay(span.finish(end))
           } yield result).rethrow
         }
-        amqpClient.registerConsumer(queueN, newHandler, exceptionalAction)
+        amqpClient.registerConsumer(queueN, newHandler, exceptionalAction, prefetchCount)
       }
 
       private def contextMapFrom(delivery: Delivery) = {

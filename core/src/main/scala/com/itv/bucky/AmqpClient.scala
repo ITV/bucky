@@ -19,7 +19,9 @@ trait AmqpClient[F[_]] {
   def publisher(): Publisher[F, PublishCommand]
   def registerConsumer(queueName: QueueName,
                        handler: Handler[F, Delivery],
-                       exceptionalAction: ConsumeAction = DeadLetter): Resource[F, Unit]
+                       exceptionalAction: ConsumeAction = DeadLetter,
+                       prefetchCount : Int = 1
+                      ): Resource[F, Unit]
   def isConnectionOpen: F[Boolean]
 }
 
@@ -124,9 +126,9 @@ object AmqpClient extends StrictLogging {
       }
       override def registerConsumer(queueName: QueueName,
                                     handler: Handler[F, Delivery],
-                                    exceptionalAction: ConsumeAction): Resource[F, Unit] =
+                                    exceptionalAction: ConsumeAction, prefetchCount : Int): Resource[F, Unit] =
         buildChannel().evalMap {
-          connectionManager.registerConsumer(_, queueName, handler, exceptionalAction)
+          connectionManager.registerConsumer(_, queueName, handler, exceptionalAction,prefetchCount)
         }
 
       override def declare(declarations: Declaration*): F[Unit]          = connectionManager.declare(declarations)

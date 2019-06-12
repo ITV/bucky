@@ -74,7 +74,7 @@ object LoggingAmqpClient extends StrictLogging {
           }
       }
 
-      override def registerConsumer(queueName: QueueName, handler: Handler[F, Delivery], exceptionalAction: ConsumeAction): Resource[F, Unit] = {
+      override def registerConsumer(queueName: QueueName, handler: Handler[F, Delivery], exceptionalAction: ConsumeAction, prefetchCount: Int): Resource[F, Unit] = {
         val newHandler = (delivery: Delivery) => {
           (for {
             result <- handler(delivery).attempt
@@ -82,7 +82,7 @@ object LoggingAmqpClient extends StrictLogging {
                              logSuccessfulHandler(charset, queueName, delivery, _))
           } yield result).rethrow
         }
-        amqpClient.registerConsumer(queueName, newHandler, exceptionalAction)
+        amqpClient.registerConsumer(queueName, newHandler, exceptionalAction, prefetchCount)
       }
 
       override def isConnectionOpen: F[Boolean] = amqpClient.isConnectionOpen

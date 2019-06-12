@@ -52,22 +52,25 @@ package object requeue {
                                     unmarshaller: DeliveryUnmarshaller[T],
                                     onFailure: RequeueConsumeAction = Requeue,
                                     onFailureAction: T => F[Unit] = (_: T) => F.point(()),
-                                    unmarshalFailureAction: RequeueConsumeAction = DeadLetter): Resource[F, Unit] = {
+                                    unmarshalFailureAction: RequeueConsumeAction = DeadLetter,
+                                    prefetchCount: Int = defaultPreFetchCount): Resource[F, Unit] = {
 
       val deserializeHandler                              = new DeliveryUnmarshalHandler[F, T, RequeueConsumeAction](unmarshaller)(handler, unmarshalFailureAction)
       val deserializeOnFailureAction: Delivery => F[Unit] = new UnmarshalFailureAction[F, T](unmarshaller).apply(onFailureAction)
-      requeueOf(queueName, deserializeHandler, requeuePolicy, onFailure, deserializeOnFailureAction)
+      requeueOf(queueName, deserializeHandler, requeuePolicy, onFailure, deserializeOnFailureAction, prefetchCount)
     }
 
     def requeueOf(queueName: QueueName,
                   handler: RequeueHandler[F, Delivery],
                   requeuePolicy: RequeuePolicy,
                   onFailure: RequeueConsumeAction = Requeue,
-                  onFailureAction: Delivery => F[Unit] = (_: Delivery) => F.point(())): Resource[F, Unit] = {
+                  onFailureAction: Delivery => F[Unit] = (_: Delivery) => F.point(()),
+                  prefetchCount: Int = defaultPreFetchCount): Resource[F, Unit] = {
       val requeueExchange = ExchangeName(s"${queueName.value}.requeue")
       val requeuePublish  = amqpClient.publisher()
       amqpClient.registerConsumer(queueName,
-                                  RequeueTransformer(requeuePublish, requeueExchange, requeuePolicy, onFailure, onFailureAction)(handler))
+                                  RequeueTransformer(requeuePublish, requeueExchange, requeuePolicy, onFailure, onFailureAction)(handler),
+                                  prefetchCount = prefetchCount)
     }
   }
 }

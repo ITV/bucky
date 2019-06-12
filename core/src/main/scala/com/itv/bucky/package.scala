@@ -10,14 +10,14 @@ import scala.language.higherKinds
 
 package object bucky {
 
-  type Publisher[F[_], -T]      = T => F[Unit]
+  type Publisher[F[_], -T]            = T => F[Unit]
   type PublisherWithHeaders[F[_], -T] = (T, Map[String, AnyRef]) => F[Unit]
-  type Handler[F[_], -T]        = T => F[ConsumeAction]
-  type RequeueHandler[F[_], -T] = T => F[RequeueConsumeAction]
-  type Bindings                 = PartialFunction[RoutingKey, QueueName]
-  type PayloadUnmarshaller[T]   = Unmarshaller[Payload, T]
-  type DeliveryUnmarshaller[T]  = Unmarshaller[Delivery, T]
-  type UnmarshalResult[T]       = Either[Throwable, T]
+  type Handler[F[_], -T]              = T => F[ConsumeAction]
+  type RequeueHandler[F[_], -T]       = T => F[RequeueConsumeAction]
+  type Bindings                       = PartialFunction[RoutingKey, QueueName]
+  type PayloadUnmarshaller[T]         = Unmarshaller[Payload, T]
+  type DeliveryUnmarshaller[T]        = Unmarshaller[Delivery, T]
+  type UnmarshalResult[T]             = Either[Throwable, T]
 
   case class RoutingKey(value: String)
   case class ExchangeName(value: String)
@@ -33,5 +33,7 @@ package object bucky {
   implicit class LoggingSyntax[F[_]](client: AmqpClient[F]) {
     def withLogging(charset: Charset = StandardCharsets.UTF_8)(implicit F: ConcurrentEffect[F]): AmqpClient[F] = LoggingAmqpClient(client, charset)
   }
+
+  val defaultPreFetchCount: Int = 1
 
 }

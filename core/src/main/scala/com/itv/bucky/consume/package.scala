@@ -45,7 +45,7 @@ package object consume {
 
   implicit class ConsumerSugar[F[_]](amqpClient: AmqpClient[F]) {
 
-    def registerConsumerOf[T](queueName: QueueName, handler: Handler[F, T], exceptionalAction: ConsumeAction = DeadLetter)(implicit payloadUnmarshaller: PayloadUnmarshaller[T], ae: ApplicativeError[F, Throwable]): Resource[F, Unit] = {
+    def registerConsumerOf[T](queueName: QueueName, handler: Handler[F, T],exceptionalAction: ConsumeAction = DeadLetter, prefetchCount : Int = defaultPreFetchCount )(implicit payloadUnmarshaller: PayloadUnmarshaller[T], ae: ApplicativeError[F, Throwable]): Resource[F, Unit] = {
       amqpClient.registerConsumer(queueName, (delivery: Delivery) => {
         payloadUnmarshaller.unmarshal(delivery.body) match {
           case Right(value) =>
@@ -53,7 +53,7 @@ package object consume {
           case Left(e) =>
             ae.raiseError(e)
         }
-      }, exceptionalAction)
+      }, exceptionalAction, prefetchCount)
     }
 
     def registerRequeueConsumerOf[T](
@@ -75,9 +75,10 @@ package object consume {
                                 queueName: QueueName,
                                 handler: RequeueHandler[F, Delivery],
                                 requeuePolicy: RequeuePolicy = RequeuePolicy(maximumProcessAttempts = 10, requeueAfter = 3.minutes),
-                                onFailure: RequeueConsumeAction = Requeue
+                                onFailure: RequeueConsumeAction = Requeue,
+                                prefetchCount: Int = defaultPreFetchCount
     )(implicit F: Sync[F]): Resource[F, Unit] =
-      new RequeueOps(amqpClient).requeueOf(queueName, handler, requeuePolicy, onFailure)
+      new RequeueOps(amqpClient).requeueOf(queueName, handler, requeuePolicy, onFailure, prefetchCount= prefetchCount)
 
 
   }
