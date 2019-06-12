@@ -145,7 +145,7 @@ object Channel {
             }
             .flatMap(sendAction(_)(Envelope.fromEnvelope(envelope)))
             .toIO
-            .unsafeRunSync
+            .unsafeRunAsyncAndForget
       }
       F.delay(channel.basicConsume(queue.value, false, consumerTag.value, deliveryCallback)).void
     }
