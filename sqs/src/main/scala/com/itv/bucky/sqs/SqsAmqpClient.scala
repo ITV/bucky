@@ -11,6 +11,10 @@ import com.itv.bucky
 import com.itv.bucky.consume.{Ack, ConsumeAction, ConsumerTag, Delivery, PublishCommand}
 import com.itv.bucky.publish.MessageProperties
 import com.itv.bucky.{AmqpClient, Envelope, ExchangeName, Handler, Payload, Publisher, QueueName, RoutingKey, consume, decl}
+import cats.syntax.traverse._
+import cats.instances.list._
+
+import com.itv.bucky.decl._
 
 import scala.collection.JavaConverters._
 import scala.language.higherKinds
@@ -19,12 +23,26 @@ object SqsAmqpClient {
 
   //https://sqs.eu-west-1.amazonaws.com/829282787238/bucky-sqs-test-queue
 
+
   def apply[F[_]](clientBuilder: AmazonSQSAsyncClientBuilder)(implicit F: ConcurrentEffect[F], contextShift: ContextShift[IO]): Resource[F, AmqpClient[F]] = {
+
+    val resources = F.toIO(Ref.of[F, List[(ExchangeName, QueueName, RoutingKey)]](List.empty)).unsafeRunSync()
+
     val client: Resource[F, AmazonSQSBufferedAsyncClient] = Resource.make(F.delay(clientBuilder.build()))(c => F.delay(c.shutdown()))
       .map(new AmazonSQSBufferedAsyncClient(_))
     client.map { sqs =>
       new AmqpClient[F] {
-        override def declare(declarations: decl.Declaration*): F[Unit] = ???
+        override def declare(declarations: decl.Declaration*): F[Unit] = {
+          declarations.toList.traverse {
+            case Binding(ex, q,rk, _ ) => resources.update(_ :+ (ex, q, rk))
+            case Exchange(_, _, _, _, _, _, bindings) => bindings.traverse { binding =>
+              resources.update(_ :+ (binding.exchangeName, binding.queueName, binding.routingKey))
+            }.void
+            case Queue(name, _, _, _, _) => F.delay(sqs.createQueue(name.value)).void
+            case _ => F.raiseError(new RuntimeException("Unimplemented declaration type"))
+
+          }
+        }
 
         override def declare(declarations: Iterable[decl.Declaration]): F[Unit] = ???
 
@@ -66,7 +84,6 @@ object SqsAmqpClient {
           while (!stopped) {
             lock.synchronized {
               stopped = isStopped.get.unsafeRunSync()
-
               if (!stopped) {
                 val messageRequest = new ReceiveMessageRequest()
                   .withMaxNumberOfMessages(1)
@@ -74,7 +91,11 @@ object SqsAmqpClient {
                 val result = sqs.receiveMessage(messageRequest)
                 result.getMessages.asScala.headOption.foreach { msg =>
                   val delivery = Delivery(Payload.from[String](msg.getBody), ConsumerTag("foo"), Envelope(0L, redeliver = false, ExchangeName(""), RoutingKey(queueName.value)), MessageProperties.basic)
-                  F.toIO[ConsumeAction](handler.apply(delivery)).unsafeRunSync()
+
+                  F.toIO[ConsumeAction](handler.apply(delivery)).map {
+                    case Ack => sqs.deleteMessage(queueName.value, msg.getReceiptHandle)
+                    case _ => ???
+                  }.unsafeRunSync()
                 }
               }
             }
