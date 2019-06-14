@@ -4,14 +4,13 @@ import cats.effect.{ExitCode, IO, IOApp}
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.decl._
 import com.itv.bucky.example.marshalling.Shared.Person
-import com.itv.bucky.publish.{PublishCommandBuilder, PublisherSugar}
+import com.itv.bucky.publish._
 import com.typesafe.config.ConfigFactory
 
 import scala.concurrent._
 import scala.concurrent.duration._
 
 import scala.concurrent.ExecutionContext.Implicits.global
-
 
 object MarshallingPublisher extends IOApp {
   import com.itv.bucky._
@@ -43,10 +42,8 @@ object MarshallingPublisher extends IOApp {
         _ <- client.declare(Seq(Declarations.exchange))
         publisher = client.publisherOf[Person]
         _ <- publisher(Person("Bob", 67))
-      }
-        yield ExitCode.Success
+      } yield ExitCode.Success
     }
   //end snippet 3
-
 
 }

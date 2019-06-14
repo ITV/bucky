@@ -3,7 +3,7 @@ package com.itv.bucky
 import java.util.Date
 
 import cats.effect.Sync
-import com.itv.bucky.consume.{DeliveryMode, PublishCommand}
+import com.itv.bucky.consume.DeliveryMode
 
 import scala.language.higherKinds
 
@@ -62,42 +62,7 @@ package object publish {
       priority = Some(0)
     )
   }
-
-  implicit class PublisherSugar[F[_]](amqpClient: AmqpClient[F]) {
-
-    def publisherOf[T](implicit publishCommandBuilder: PublishCommandBuilder[T]): Publisher[F, T] = {
-      val basePublisher = amqpClient.publisher()
-      value: T => {
-        val command = publishCommandBuilder.toPublishCommand(value)
-        basePublisher.apply(command)
-      }
-    }
-
-    def publisherOf[T](exchangeName: ExchangeName, routingKey: RoutingKey)(implicit marshaller: PayloadMarshaller[T]): Publisher[F, T] = {
-      val pcb =
-        PublishCommandBuilder.publishCommandBuilder(marshaller)
-            .using(exchangeName)
-            .using(routingKey)
-      publisherOf[T](pcb)
-    }
-
-    def publisherWithHeadersOf[T](exchangeName: ExchangeName, routingKey: RoutingKey)(implicit F: Sync[F], marshaller: PayloadMarshaller[T]): PublisherWithHeaders[F, T] ={
-      val pcb =
-        PublishCommandBuilder.publishCommandBuilder(marshaller)
-        .using(exchangeName)
-        .using(routingKey)
-      publisherWithHeadersOf[T](pcb)
-    }
-
-    def publisherWithHeadersOf[T](commandBuilder: PublishCommandBuilder[T])(implicit F: Sync[F]): PublisherWithHeaders[F, T] =
-      (message: T, headers: Map[String, AnyRef]) =>
-        F.flatMap(F.delay {
-          val command = commandBuilder.toPublishCommand(message)
-
-          command.copy(basicProperties = headers.foldLeft(command.basicProperties) {
-            case (props, (headerName, headerValue)) => props.withHeader(headerName -> headerValue)
-          })
-        })(amqpClient.publisher())
-
+  case class PublishCommand(exchange: ExchangeName, routingKey: RoutingKey, basicProperties: MessageProperties, body: Payload) {
+    def description = s"${exchange.value}:${routingKey.value} $body"
   }
 }

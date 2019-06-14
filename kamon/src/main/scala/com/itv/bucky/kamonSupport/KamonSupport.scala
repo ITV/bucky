@@ -13,6 +13,7 @@ import kamon.trace.{Span, SpanCustomizer}
 import java.nio.charset.Charset
 
 import com.itv.bucky.LoggingAmqpClient.{logFailedHandler, logFailedPublishMessage, logSuccessfulHandler, logSuccessfullPublishMessage}
+import com.itv.bucky.publish.PublishCommand
 
 import scala.language.higherKinds
 import scala.util.Try

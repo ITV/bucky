@@ -7,7 +7,7 @@ import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.consume._
 import com.itv.bucky.decl.{Exchange, Queue}
 import com.itv.bucky.publish._
-import com.itv.bucky.{ExchangeName, Handler, PayloadMarshaller, QueueName, RequeueHandler, RoutingKey}
+import com.itv.bucky.{ExchangeName, Handler, PayloadMarshaller, PublisherSugar, QueueName, RequeueHandler, RoutingKey}
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}

@@ -4,7 +4,8 @@ import java.util.UUID
 import java.util.concurrent.atomic.AtomicLong
 
 import com.itv.bucky
-import com.itv.bucky.consume.{ConsumeAction, ConsumerTag, Delivery, PublishCommand}
+import com.itv.bucky.consume._
+import com.itv.bucky.publish._
 import com.itv.bucky.{Channel, Envelope, Handler, QueueName}
 import com.itv.bucky.decl.{Binding, Exchange, ExchangeBinding, Queue}
 import com.rabbitmq.client.ConfirmListener

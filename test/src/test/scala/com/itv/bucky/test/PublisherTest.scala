@@ -3,7 +3,7 @@ package com.itv.bucky.test
 import cats.effect.IO
 import cats.implicits._
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
-import com.itv.bucky.publish.{PendingConfirmListener, PublishCommandBuilder}
+import com.itv.bucky.publish._
 import com.itv.bucky.{ExchangeName, QueueName, RoutingKey, consume}
 import org.scalatest.{FunSuite, Matchers}
 
@@ -15,7 +15,7 @@ class PublisherTest extends FunSuite with Matchers with IOAmqpClientTest {
   val queue    = QueueName("aqueue")
   val rk       = RoutingKey("ark")
   val message  = "Hello"
-  val commandBuilder: consume.PublishCommand = PublishCommandBuilder
+  val commandBuilder: PublishCommand = PublishCommandBuilder
     .publishCommandBuilder[String](StringPayloadMarshaller)
     .using(exchange)
     .using(rk)

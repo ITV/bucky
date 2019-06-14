@@ -6,7 +6,8 @@ import cats._
 import cats.implicits._
 import java.nio.charset.Charset
 
-import com.itv.bucky.consume.{ConsumeAction, Delivery, PublishCommand}
+import com.itv.bucky.consume._
+import com.itv.bucky.publish._
 
 import scala.language.higherKinds
 
