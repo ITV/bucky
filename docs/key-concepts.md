@@ -24,7 +24,7 @@ On creation, Bucky will allocate a single channel which will be used for:
 
 then, for each consumer that's registered, a new channel will be allocated.
 
-### Channel expections
+### Channel exceptions
 
 If an [exception](https://www.rabbitmq.com/channels.html#error-handling) occurs on a channel it will permanently closed and
 further calls that use that channel will result in failure. Given the current way, channels are allocated, this means that
