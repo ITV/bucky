@@ -43,16 +43,27 @@ object SqsAmqpClient {
             }
           }
 
-          Resource.make(await) { case (isStopped, fiber) => {
-            (isStopped.set(true) *> fiber.cancel).ma
-          } }.mapK[F](FunctionK.lift[IO, F](F.liftIO)).map(_ => ())
+          def cancel(refAndFiber: (Ref[IO, Boolean], Fiber[IO, Unit])): IO[Unit] =
+            refAndFiber match {
+              case (isStopped, fiber) =>
+                val setStopped = IO.delay {
+                  lock.synchronized {
+                    println("Stopped")
+                    isStopped.set(true).unsafeRunSync()
+                  }
+                }
+
+                setStopped *> fiber.cancel
+            }
+
+          Resource.make(await)(cancel).mapK[F](FunctionK.lift[IO, F](F.liftIO)).map(_ => ())
         }
 
         override def isConnectionOpen: F[Boolean] = ???
 
         private def awaitMessages(queueName: QueueName, handler: Handler[F, consume.Delivery], isStopped: Ref[IO, Boolean]) = {
           var stopped = false
-          while (true) {
+          while (!stopped) {
             lock.synchronized {
               stopped = isStopped.get.unsafeRunSync()
 
@@ -70,8 +81,6 @@ object SqsAmqpClient {
           }
         }
       }
-
-
     }
   }
 
@@ -100,8 +109,8 @@ object Main extends IOApp {
 
     clientResource.use { amqpClient =>
       val publisher = amqpClient.publisher()
-      publisher(PublishCommand(ExchangeName(""), RoutingKey(queueName), MessageProperties.basic, Payload.from[String]("hello, world!")))
-    } *> IO.never.as(ExitCode.Success)
+      publisher(PublishCommand(ExchangeName(""), RoutingKey(queueName), MessageProperties.basic, Payload.from[String]("hello, world!"))) *> IO.never
+    }.as(ExitCode.Success)
   }
 
 }
