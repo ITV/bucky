@@ -11,8 +11,6 @@ import com.itv.bucky
 import com.itv.bucky.consume.{Ack, ConsumeAction, ConsumerTag, Delivery, PublishCommand}
 import com.itv.bucky.publish.MessageProperties
 import com.itv.bucky.{AmqpClient, Envelope, ExchangeName, Handler, Payload, Publisher, QueueName, RoutingKey, consume, decl}
-import cats.syntax.traverse._
-import cats.instances.list._
 
 import com.itv.bucky.decl._
 
@@ -33,18 +31,25 @@ object SqsAmqpClient {
     client.map { sqs =>
       new AmqpClient[F] {
         override def declare(declarations: decl.Declaration*): F[Unit] = {
-          declarations.toList.traverse {
-            case Binding(ex, q,rk, _ ) => resources.update(_ :+ (ex, q, rk))
-            case Exchange(_, _, _, _, _, _, bindings) => bindings.traverse { binding =>
-              resources.update(_ :+ (binding.exchangeName, binding.queueName, binding.routingKey))
-            }.void
-            case Queue(name, _, _, _, _) => F.delay(sqs.createQueue(name.value)).void
-            case _ => F.raiseError(new RuntimeException("Unimplemented declaration type"))
-
-          }
+          declare(declarations.toIterable)
         }
 
-        override def declare(declarations: Iterable[decl.Declaration]): F[Unit] = ???
+        override def declare(declarations: Iterable[decl.Declaration]): F[Unit] = {
+          declarations.toList.traverse[F, Unit] {
+            case Binding(ex, q,rk, _ ) =>
+              resources.update(_ :+ (ex, q, rk))
+            case Exchange(_, _, _, _, _, _, bindings) =>
+              bindings.traverse[F, Unit] { binding =>
+                resources.update(_ :+ (binding.exchangeName, binding.queueName, binding.routingKey))
+              }.void
+            case Queue(name, _, _, _, _) =>
+              F.delay(sqs.createQueue(name.value)).void
+            case _ =>
+              F.raiseError(new RuntimeException("Unimplemented declaration type"))
+          }.void
+        }
+
+        def resolve(publishCommand: PublishCommand): F[QueueName] =
 
         override def publisher(): Publisher[F, consume.PublishCommand] = msg => F.delay {
           sqs.sendMessage(msg.routingKey.value, msg.body.unmarshal[String].right.get)
@@ -119,18 +124,28 @@ object Main extends IOApp {
     val builder = AmazonSQSAsyncClientBuilder.standard()
     builder.setRegion("eu-west-1")
 
-    val queueName = "bucky-sqs-test-queue"
+    val queueName = QueueName("bucky-sqs-test--queue-foobar")
+    val exchangeName = ExchangeName("bucky-sqs-exchange")
+    val routingKey = RoutingKey("rk")
+
+
+    val declarations = List(
+      Queue(queueName),
+      Exchange(exchangeName).binding(routingKey -> queueName)
+    )
 
     val clientResource =
       for {
         client <- SqsAmqpClient[IO](builder)
-        _ <- client.registerConsumer(QueueName(queueName), handler)
+        _ = println("woah")
+        _ <- Resource.liftF(client.declare(declarations))
+        _ <- client.registerConsumer(queueName, handler)
       }
         yield client
 
     clientResource.use { amqpClient =>
       val publisher = amqpClient.publisher()
-      publisher(PublishCommand(ExchangeName(""), RoutingKey(queueName), MessageProperties.basic, Payload.from[String]("hello, world!"))) *> IO.never
+      publisher(PublishCommand(exchangeName, routingKey, MessageProperties.basic, Payload.from[String]("hello, world!"))) *> IO.never
     }.as(ExitCode.Success)
   }
 
