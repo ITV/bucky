@@ -1,4 +1,4 @@
-##Key Concepts
+## Key Concepts
 
 Bucky is built on top of the RabbitMQ [Java client](https://www.rabbitmq.com/tutorials/tutorial-one-java.html).  
 Even though the complexity of dealing with the java library directly was greatly simplified,  there are still 
