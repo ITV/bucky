@@ -1,14 +1,17 @@
 ##Key Concepts
+
 Bucky is built on top of the RabbitMQ [Java client](https://www.rabbitmq.com/tutorials/tutorial-one-java.html).  
 Even though the complexity of dealing with the java library directly was greatly simplified,  there are still 
 some key concepts which are important in order to fully understand Bucky. 
 
 ### Connection
+
 A [connection](https://www.rabbitmq.com/connections.html) is a no more than a TCP connection to a Rabbit Broker.
 Connections are meant to be long lived and to be shared by multiple consumers in a single application. Unless explicitly
 specified otherwise (by creating multiple connections), bucky will only allocate one connection per application.
 
 ### Channel
+
 A [channel](https://www.rabbitmq.com/channels.html) can be seen as a lightweight connection that share a single TCP connection
 with other channels.
 

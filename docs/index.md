@@ -12,7 +12,7 @@ Current version of bucky is based on:
 | amqp-client | 5.6.0    |
 
 #### Index
-- [Introduction/Key Concepts](./key-concepts)
+- [Introduction](./key-concepts)
 - [Getting Started](./getting-started)
 - [Publisher](./publisher)
 - [Consumer](./consumer)
