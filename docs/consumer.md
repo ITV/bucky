@@ -1,36 +1,31 @@
 ## Consuming messages
 
-Consuming messages with Bucky is done by creating a consumer that executes 
-a handler function every time a message arrives. 
+
+### Simple Handler
+Consuming messages with Bucky is done in two stages. First  you create a handler that's going to be
+executed whenever you receive a message:
 
 ```scala 
-import cats.effect.IO
-import com.itv.bucky._
-import com.itv.bucky.circe._
-import com.itv.bucky.consume._
-import com.itv.bucky.decl.Queue
-import com.typesafe.scalalogging.StrictLogging
-import io.circe.generic.auto._
+case class Message(foo: String)
+class MyHandler extends Handler[IO, Message] {
+override def apply(m: Message): IO[ConsumeAction] =
+  IO(Ack)
+}
+```
 
-object ConsumeMessages extends StrictLogging {
-  case class Person(name: String, age: Int)
-
-  val queue = Queue(QueueName("people-messages"))
-
-  def handler: Handler[IO, Person] = { message =>
-    IO.delay {
-      logger.info(s"${message.name} is ${message.age} years old")
-      Ack
-    }
+and then you register it like so: 
+```scala
+object MyApp extends IOApp {
+  val config = AmqpClientConfig(host = "127.0.0.1", port = 5672, username = "guest", password = "guest")
+  override def run(args: List[String]): IO[ExitCode] = {
+    implicit val ec: ExecutionContext = ExecutionContext.global
+    (for {
+      client <- AmqpClient[IO](config)
+      handler = new MyHandler
+      _ <- client.declareR(declarations)
+      _ <- client.registerConsumerOf(QueueName("queue-name"), handler)
+    } yield ()).use(_ => IO.never)
   }
-
-  def consume(client: AmqpClient[IO]) = {
-    for {
-    _ <- client.declare(List(queue))
-    _ <- client.registerConsumerOf[Person](queue.name, handler)
-    } yield ()
-  }
-
 }
 ```
 
@@ -41,156 +36,43 @@ the message that you were processing. Bucky gives you tools to create the
 re-queueing behaviour out of the box. You can configure both how many times you 
 want a message to be re-queued as well as the delay between messages.
 
+In order to do so, you have to create a requeue handler first:
+
 ```scala
+case class Message(foo: String)
+class MyHandler extends RequeueHandler[IO, Message] {
+override def apply(m: Message): IO[RequeuConsumeAction] = IO(Ack)
+}
+```
 
-import cats.effect.IO
-import com.itv.bucky._
-import com.itv.bucky.consume._
-import com.itv.bucky.circe._
-import com.itv.bucky.decl.Queue
-import com.itv.bucky.pattern.requeue.RequeuePolicy
-import com.typesafe.scalalogging.StrictLogging
-import concurrent.duration._
-import io.circe.generic.auto._
+And then register it:
+```scala
+object MyApp extends IOApp {
+  case class Message(foo: String)
 
-object RequeueConsumeMessages extends StrictLogging {
-  case class Person(name: String, age: Int)
+  val config = AmqpClientConfig(host = "127.0.0.1", port = 5672, username = "guest", password = "guest")
+  val declarations = List(
+    Queue(QueueName("queue-name")),
+    Exchange(ExchangeName("exchange-name")).binding(RoutingKey("rk") -> QueueName("queue-name"))
+  )
 
-  val queue = Queue(QueueName("people-messages"))
-
-  def handler: RequeueHandler[IO, Person] = { message =>
-    for {
-      _ <- IO.raiseError(new RuntimeException("Throwing intentional error"))
-    } yield Ack
+  class MyHandler extends RequeueHandler[IO, Message] {
+    override def apply(m: Message): IO[RequeueConsumeAction] = IO(Ack)
   }
 
-  def consume(client: AmqpClient[IO]) = {
-    for {
-      _ <- client.declare(List(queue))
-      _ <- client.registerRequeueConsumerOf[Person](
-        queueName = queue.name,
-        handler = handler,
-        requeuePolicy = RequeuePolicy(maximumProcessAttempts = 10,requeueAfter = 5.minutes)
-      )
-    } yield ()
+  override def run(args: List[String]): IO[ExitCode] = {
+    implicit val ec: ExecutionContext = ExecutionContext.global
+    (for {
+      client <- AmqpClient[IO](config)
+      handler = new MyHandler
+      _ <- client.declareR(declarations)
+      _ <- client.registerRequeueConsumerOf(QueueName("queue-name"), handler, RequeuePolicy(10, 3.seconds))
+    } yield client).use{_ => IO.never}
   }
 }
-
 ```
 
 In the above example the `handler` function will error out every time it runs. 
 When this happens, the consumer is configured to requeue the message that lead 
-to the error up to 10 times in a 5 minute interval.
+to the error up to 10 times in a 3 seconds interval.
 
-#### Testing handlers
-
-##### Unit testing
-
-When testing handlers, they can be treated similar to pure functions. 
-They receive a message and produce an output in form of a consume action.
-
-```scala
-import cats.effect.IO
-import com.itv.bucky.consume.Ack
-import com.itv.bucky.{Handler, consume}
-import org.scalatest.{Matchers, WordSpec}
-
-class ConsumerSpec extends WordSpec with Matchers {
-
-  case class User(id: String)
-  case class EmailAddress(value: String)
-  case class Message(email: EmailAddress)
-
-  class SendPasswordReset(
-      fetchEmailAddress: User => IO[EmailAddress],
-      sendMail: Message => IO[Unit]
-  ) extends Handler[IO, User] {
-
-    def apply(recipient: User): IO[consume.ConsumeAction] =
-      for {
-        emailAddress <- fetchEmailAddress(recipient)
-        _            <- sendMail(Message(emailAddress))
-      } yield Ack
-  }
-
-  "SendPasswordReset" should {
-    "send emails to the user in question" in new Setup {
-      result shouldBe Right(Ack)
-    }
-    "error out if fetching the email fails" in new Setup {
-      override val emailResult = IO.raiseError(new RuntimeException("DB failed"))
-      result.left.map(_.getMessage) shouldBe Left("DB failed")
-    }
-    "error out if sending the email fails" in new Setup {
-      override val sendResult = IO.raiseError(new RuntimeException("Email failed"))
-      result.left.map(_.getMessage) shouldBe Left("Email failed")
-    }
-
-  }
-
-  trait Setup {
-    val emailResult = IO.pure(EmailAddress("test@example.com"))
-    val sendResult  = IO.unit
-
-    lazy val handler = new SendPasswordReset(
-      fetchEmailAddress = _ => emailResult,
-      sendMail = _ => sendResult
-    )
-
-    lazy val result = handler(User("1")).attempt.unsafeRunSync()
-  }
-}
-
-```  
-
-##### Integration testing 
-
-We can also test handlers by using an actual AMQP client and wiring up the handler 
-function with a consumer.
-
-```scala 
-
-import cats.effect.IO
-import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
-import com.itv.bucky.consume.Delivery
-import com.itv.bucky.decl.{Exchange, Queue}
-import com.itv.bucky.publish.PublishCommandBuilder
-import com.itv.bucky.test.{IOAmqpClientTest, StubHandlers}
-import com.itv.bucky.{ExchangeName, QueueName, RoutingKey}
-import org.scalatest.FunSuite
-import org.scalatest.Matchers._
-import org.scalatest.concurrent.ScalaFutures
-
-class ConsumerTest
-  extends FunSuite
-    with IOAmqpClientTest
-    with ScalaFutures {
-
-  test("Consuming messages should work") {
-    runAmqpTest { client =>
-      val exchange = ExchangeName("email")
-      val queue    = QueueName("email")
-      val rk       = RoutingKey("email")
-      val message  = "Hello"
-  
-      val commandBuilder = PublishCommandBuilder
-        .publishCommandBuilder[String](StringPayloadMarshaller)
-        .using(exchange)
-        .using(rk)
-
-      val handler      = StubHandlers.ackHandler[IO, Delivery]
-      val declarations = List(Queue(queue), Exchange(exchange).binding((rk, queue)))
-
-      for {
-      _ <- client.declare(declarations)
-      _ <- client.registerConsumer(queue, handler)
-      _ <- client.publisher()(commandBuilder.toPublishCommand("Test"))
-      } yield {
-        handler.receivedMessages should have size 1
-      }
-    }
-  }
-}
-
-
-```

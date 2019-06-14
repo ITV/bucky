@@ -119,6 +119,13 @@ lazy val kernelSettings = Seq(
           <organization>ITV</organization>
           <organizationUrl>http://www.itv.com</organizationUrl>
         </developer>
+        <developer>
+          <id>cmcmteixeira</id>
+          <name>Carlos Teixeira</name>
+          <url>http://cmcmteixeira.github.io</url>
+          <organization>ITV</organization>
+          <organizationUrl>http://www.itv.com</organizationUrl>
+        </developer>
       </developers>
     )
 )
@@ -260,18 +267,3 @@ lazy val root = (project in file("."))
   .aggregate(xml, circe, kamon,  argonaut, example, test, core)
   .settings(publishArtifact := false)
 
-lazy val readme = scalatex
-  .ScalatexReadme(
-    projectId = "readme",
-    wd = file(""),
-    url = "https://github.com/ITV/bucky/tree/master",
-    source = "readme"
-  )
-  .settings(
-    publishArtifact in (Compile, packageDoc) := false,
-    publishSigned := (),
-    publishLocalSigned := (),
-    publish := (),
-    publishLocal := (),
-    publishArtifact := false
-  )

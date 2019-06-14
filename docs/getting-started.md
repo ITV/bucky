@@ -4,7 +4,7 @@ In order to get started with bucky, add the following to you `build.sbt`:
 
  
 ```scala 
-val buckyVersion = "2.0.0-M5"
+val buckyVersion = "2.0.0-M10"
 libraryDependencies ++= Seq(
     "com.itv"                    %% "bucky-core"              % buckyVersion,
     "com.itv"                    %% "bucky-circe"             % buckyVersion,            //for circe based marshallers/unmarshallers
@@ -16,8 +16,8 @@ libraryDependencies ++= Seq(
 
 or for ammonite:
 ```scala
-import $ivy.`com.itv::bucky-core:2.0.0-M5` 
-import $ivy.`com.itv::bucky-circe:2.0.0-M5`
+import $ivy.`com.itv::bucky-core:2.0.0-M10` 
+import $ivy.`com.itv::bucky-circe:2.0.0-M10`
 ```
 
 Imports, implicits and config:
@@ -26,54 +26,66 @@ import cats._
 import cats.implicits._
 import cats.effect._
 import io.circe.generic.auto._
+import scala.concurrent.{ExecutionContext}
+
 
 import com.itv.bucky.decl.Exchange
 import com.itv.bucky.decl.Queue
 import com.itv.bucky._
 import com.itv.bucky.circe._
 import com.itv.bucky.consume._
-
-
-implicit val ec = scala.concurrent.ExecutionContext.fromExecutor(java.util.concurrent.Executors.newFixedThreadPool(10))
-implicit val cs : ContextShift[IO] = IO.contextShift(ec)
-implicit val timer: Timer[IO] = IO.timer(ec)
-
-val config = AmqpClientConfig(host = "127.0.0.1", port= 5672, username="guest", password="guest")
-case class Message(foo: String)
-
+import com.itv.bucky.publish._
 ```
-Registering a consumer:
+Registering a simple consumer:
 ```scala
-val clientResource = AmqpClient[IO](config)
-def handler(s: Message) : IO[ConsumeAction] = {
-  for {
-    _ <- IO.delay(println(s"Received: $s"))
-  } yield Ack
-}
-clientResource.use { client =>
-   val declarations = List(
+object MyApp extends IOApp {
+  case class Message(foo: String)
+
+  val config = AmqpClientConfig(host = "127.0.0.1", port = 5672, username = "guest", password = "guest")
+  val declarations = List(
     Queue(QueueName("queue-name")),
     Exchange(ExchangeName("exchange-name")).binding(RoutingKey("rk") -> QueueName("queue-name"))
-   )
-   
-   for {
-    _ <- client.declare(declarations)
-    _ <- client.registerConsumerOf[Message](QueueName("queue-name"), handler)
-    _ <- IO.never //keep running the consumer (for demo purposes only)
-   } yield ()
-  }.unsafeRunAsync(println)
+  )
+
+  class MyHandler extends Handler[IO, Message] {
+    override def apply(m: Message): IO[ConsumeAction] =
+      IO(Ack)
+  }
+
+  override def run(args: List[String]): IO[ExitCode] = {
+    implicit val ec: ExecutionContext = ExecutionContext.global
+    (for {
+      client <- AmqpClient[IO](config)
+      handler = new MyHandler
+      _ <- client.declareR(declarations)
+      _ <- client.registerConsumerOf(QueueName("queue-name"), handler)
+    } yield ()).use(_ => IO.never)
+  }
+}
 ```
 
 Publishing a message:
 ```scala
-val clientResource = AmqpClient[IO](config)
-clientResource.use { client =>
-   val publisher = client.publisherOf[Message](ExchangeName("exchange-name"), RoutingKey("rk"))
-   for {
-    _ <- client.declare(List(Exchange(ExchangeName("exchange-name"))))
-    _ <- publisher(Message("Hello"))
-   } yield "Message Published"
-  }.unsafeRunAsync(println)
+object MyApp extends IOApp {
+  case class Message(foo: String)
+
+  val config = AmqpClientConfig(host = "127.0.0.1", port = 5672, username = "guest", password = "guest")
+  val declarations = List(
+    Queue(QueueName("queue-name")),
+    Exchange(ExchangeName("exchange-name")).binding(RoutingKey("rk") -> QueueName("queue-name"))
+  )
+
+  override def run(args: List[String]): IO[ExitCode] = {
+    implicit val ec: ExecutionContext = ExecutionContext.global
+    (for {
+      client <- AmqpClient[IO](config)
+      _ <- client.declareR(declarations)
+    } yield client).use { client =>
+      val publisher = client.publisherOf[Message](ExchangeName("exchange-name"), RoutingKey("rk"))
+      publisher(Message("Hello"))
+    } *> IO(ExitCode.Success)
+  }
+}
 ```
 
 For easiness of use, bucky supports the creation of [Wirings](./wiring). A [Wiring](./wiring) centralizes the definition
