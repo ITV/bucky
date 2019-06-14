@@ -18,13 +18,10 @@ import scala.language.higherKinds
 
 object SqsAmqpClient {
 
-  //https://sqs.eu-west-1.amazonaws.com/829282787238/bucky-sqs-test-queue
-
 
   def apply[F[_]](clientBuilder: AmazonSQSAsyncClientBuilder)(implicit F: ConcurrentEffect[F], contextShift: ContextShift[IO]): Resource[F, AmqpClient[F]] = {
 
     val resources = F.toIO(Ref.of[F, List[(ExchangeName, QueueName, RoutingKey)]](List.empty)).unsafeRunSync()
-    val deadLetterMappings = F.toIO(Ref.of[F, Map[QueueName, ExchangeName]](Map.empty)).unsafeRunSync()
 
     val client: Resource[F, AmazonSQSBufferedAsyncClient] = Resource.make(F.delay(clientBuilder.build()))(c => F.delay(c.shutdown()))
       .map(new AmazonSQSBufferedAsyncClient(_))
@@ -42,11 +39,7 @@ object SqsAmqpClient {
               bindings.traverse[F, Unit] { binding =>
                 resources.update(_ :+ (binding.exchangeName, binding.queueName, binding.routingKey))
               }.void
-            case Queue(name, _, _, _, arguments) => for {
-              _  <- F.delay(sqs.createQueue(name.value)).void
-              _ <- arguments.get("x-dead-letter-exchange").fold(F.unit){exchange =>
-                deadLetterMappings.update(_ + (name -> ExchangeName(exchange.toString)))}
-            } yield ()
+            case Queue(name, _, _, _, arguments) => F.delay(sqs.createQueue(toSqsQueueName(name))).void
             case _ =>
               F.raiseError(new RuntimeException("Unimplemented declaration type"))
           }.void
@@ -58,17 +51,16 @@ object SqsAmqpClient {
 
         override def publisher(): Publisher[F, consume.PublishCommand] = publishCommand =>
           resolve(publishCommand).flatMap(_.traverse { queue =>
-            F.delay(sqs.sendMessage(queue.value, publishCommand.body.unmarshal[String].right.get)).void
+            F.delay(sqs.sendMessage(toSqsQueueName(queue), publishCommand.body.unmarshal[String].right.get)).void
           }.void)
 
-        val deadLetterPublisher: Publisher[F, consume.PublishCommand] = publisher()
 
         private val lock = new Object()
 
         override def registerConsumer(queueName: bucky.QueueName, handler: Handler[F, consume.Delivery], exceptionalAction: consume.ConsumeAction, prefetchCount: Int): Resource[F, Unit] = {
           val await: IO[(Ref[IO, Boolean], Fiber[IO, Unit])] = {
             Ref.of[IO, Boolean](false).flatMap { isStopped =>
-              IO.delay(awaitMessages(queueName, handler, isStopped)).start.map { fiber =>
+              awaitMessages(queueName, handler, isStopped).start.map { fiber =>
                 (isStopped, fiber)
               }
             }
@@ -92,31 +84,22 @@ object SqsAmqpClient {
 
         override def isConnectionOpen: F[Boolean] = ???
 
-        private def awaitMessages(queueName: QueueName, handler: Handler[F, consume.Delivery], isStopped: Ref[IO, Boolean]) = {
-          var stopped = false
-          while (!stopped) {
-            lock.synchronized {
-              stopped = isStopped.get.unsafeRunSync()
-              if (!stopped) {
+        private def awaitMessages(queueName: QueueName, handler: Handler[F, consume.Delivery], isStopped: Ref[IO, Boolean]): IO[Unit] = {
                 val messageRequest = new ReceiveMessageRequest()
                   .withMaxNumberOfMessages(1)
-                  .withQueueUrl(queueName.value)
+                  .withQueueUrl(toSqsQueueName(queueName))
                 val result = sqs.receiveMessage(messageRequest)
-                result.getMessages.asScala.headOption.foreach { msg =>
+                result.getMessages.asScala.headOption.fold(IO.unit) { msg =>
                   val delivery = Delivery(Payload.from[String](msg.getBody), ConsumerTag("foo"), Envelope(0L, redeliver = false, ExchangeName(""), RoutingKey(queueName.value)), MessageProperties.basic)
 
-                  F.toIO[ConsumeAction](handler.apply(delivery)).flatMap {
-                    case Ack => F.delay(sqs.deleteMessage(queueName.value, msg.getReceiptHandle))
-                    case DeadLetter => deadLetterMappings.get.flatMap{mappings =>
-                                          mappings.get(queueName).fold(F.unit)(dlx => deadLetterPublisher.apply(PublishCommand(dlx, ???, ???, ???)))
-                    }
+                  F.toIO[ConsumeAction](handler.apply(delivery)).map {
+                    case Ack => sqs.deleteMessage(toSqsQueueName(queueName), msg.getReceiptHandle)
                     case _ => ???
-                  }.unsafeRunSync()
-                }
-              }
-            }
-          }
+                  }
+                }.void.flatMap(_ => awaitMessages(queueName, handler, isStopped))
         }
+
+        private def toSqsQueueName (queueName: QueueName) = queueName.value.replace(".", "-")
       }
     }
   }
