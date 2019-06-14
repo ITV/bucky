@@ -2,6 +2,7 @@ package com.itv.bucky.sqs
 
 import cats.arrow.FunctionK
 import cats.effect._
+import cats.effect.concurrent.Ref
 import cats.implicits._
 import com.amazonaws.services.sqs.buffered.AmazonSQSBufferedAsyncClient
 import com.amazonaws.services.sqs.model.ReceiveMessageRequest
@@ -32,27 +33,43 @@ object SqsAmqpClient {
           ()
         }
 
+        private val lock = new Object()
         override def registerConsumer(queueName: bucky.QueueName, handler: Handler[F, consume.Delivery], exceptionalAction: consume.ConsumeAction, prefetchCount: Int): Resource[F, Unit] = {
-          Resource.make(F.toIO(F.delay(awaitMessages(queueName, handler))).start)(_.cancel).mapK[F](FunctionK.lift[IO, F](F.liftIO)).map(_ => ())
+          val await: IO[(Ref[IO, Boolean], Fiber[IO, Unit])] = {
+            Ref.of[IO, Boolean](false).flatMap { isStopped =>
+              IO.delay(awaitMessages(queueName, handler, isStopped)).start.map { fiber =>
+                (isStopped, fiber)
+              }
+            }
+          }
+
+          Resource.make(await) { case (isStopped, fiber) => {
+            (isStopped.set(true) *> fiber.cancel).ma
+          } }.mapK[F](FunctionK.lift[IO, F](F.liftIO)).map(_ => ())
         }
 
         override def isConnectionOpen: F[Boolean] = ???
 
-        private def awaitMessages(queueName: QueueName, handler: Handler[F, consume.Delivery]) = {
+        private def awaitMessages(queueName: QueueName, handler: Handler[F, consume.Delivery], isStopped: Ref[IO, Boolean]) = {
+          var stopped = false
           while (true) {
-            val messageRequest = new ReceiveMessageRequest()
-              .withMaxNumberOfMessages(1)
-              .withQueueUrl(queueName.value)
-            val result = sqs.receiveMessage(messageRequest)
-            result.getMessages.asScala.headOption.foreach{ msg =>
-              val delivery = Delivery(Payload.from[String](msg.getBody), ConsumerTag("foo"), Envelope(0L, redeliver = false, ExchangeName(""), RoutingKey(queueName.value)), MessageProperties.basic)
-              F.toIO[ConsumeAction](handler.apply(delivery)).unsafeRunSync()
+            lock.synchronized {
+              stopped = isStopped.get.unsafeRunSync()
+
+              if (!stopped) {
+                val messageRequest = new ReceiveMessageRequest()
+                  .withMaxNumberOfMessages(1)
+                  .withQueueUrl(queueName.value)
+                val result = sqs.receiveMessage(messageRequest)
+                result.getMessages.asScala.headOption.foreach { msg =>
+                  val delivery = Delivery(Payload.from[String](msg.getBody), ConsumerTag("foo"), Envelope(0L, redeliver = false, ExchangeName(""), RoutingKey(queueName.value)), MessageProperties.basic)
+                  F.toIO[ConsumeAction](handler.apply(delivery)).unsafeRunSync()
+                }
+              }
             }
           }
         }
       }
-
-
 
 
     }
