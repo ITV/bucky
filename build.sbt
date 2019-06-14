@@ -139,6 +139,18 @@ lazy val core = project
   )
   .configs(IntegrationTest)
 
+lazy val sqs = project
+  .settings(name := "com.itv")
+  .settings(moduleName := "bucky-sqs")
+  .settings(kernelSettings: _*)
+  .dependsOn(core)
+  .settings(
+    libraryDependencies ++= Seq(
+      "com.amazonaws" % "aws-java-sdk-sqs" % "1.11.571"
+    )
+  )
+  .configs(IntegrationTest)
+
 lazy val test = project
   .settings(name := "com.itv")
   .settings(moduleName := "bucky-test")
@@ -257,7 +269,7 @@ lazy val xml = project
   )
 
 lazy val root = (project in file("."))
-  .aggregate(xml, circe, kamon,  argonaut, example, test, core)
+  .aggregate(xml, circe, kamon,  argonaut, example, test, core, sqs)
   .settings(publishArtifact := false)
 
 lazy val readme = scalatex
