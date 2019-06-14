@@ -2,6 +2,7 @@ package com.itv.bucky
 
 import cats.effect.{ConcurrentEffect, ContextShift, Resource, Sync, Timer}
 import com.itv.bucky.consume._
+import com.itv.bucky.publish._
 import cats.implicits._
 import cats.effect._
 import com.itv.bucky.test.stubs.{RecordingHandler, RecordingRequeueHandler, StubChannel, StubPublisher}

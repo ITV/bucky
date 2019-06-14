@@ -1,6 +1,5 @@
 package com.itv.bucky.publish
 
-import com.itv.bucky.consume.PublishCommand
 import com.itv.bucky.{ExchangeName, PayloadMarshaller, RoutingKey}
 
 trait PublishCommandBuilder[T] {

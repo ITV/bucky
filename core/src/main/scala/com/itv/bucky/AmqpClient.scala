@@ -5,9 +5,10 @@ import java.util.concurrent.{AbstractExecutorService, TimeUnit}
 
 import cats.effect._
 import cats.implicits._
-import com.itv.bucky.consume.{ConsumeAction, DeadLetter, Delivery, PublishCommand}
+import com.itv.bucky.consume.{ConsumeAction, DeadLetter, Delivery}
 import com.rabbitmq.client.{ConnectionFactory, ShutdownListener, ShutdownSignalException, Channel => RabbitChannel, Connection => RabbitConnection}
 import com.itv.bucky.decl._
+import com.itv.bucky.publish.PublishCommand
 import com.typesafe.scalalogging.StrictLogging
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutorService}

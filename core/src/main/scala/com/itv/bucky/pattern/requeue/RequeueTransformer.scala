@@ -9,7 +9,8 @@ import scala.util.Try
 import cats.implicits._
 import cats.effect.implicits._
 import com.itv.bucky.{ExchangeName, Handler, Publisher, RequeueHandler}
-import com.itv.bucky.consume.{Ack, ConsumeAction, DeadLetter, Delivery, PublishCommand, RequeueConsumeAction}
+import com.itv.bucky.consume.{Ack, ConsumeAction, DeadLetter, Delivery, RequeueConsumeAction}
+import com.itv.bucky.publish.PublishCommand
 
 case class RequeueTransformer[F[_]](
     requeuePublisher: Publisher[F, PublishCommand],

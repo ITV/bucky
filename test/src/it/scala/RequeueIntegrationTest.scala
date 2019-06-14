@@ -5,11 +5,11 @@ import cats.effect.{ContextShift, IO, Resource, Sync, Timer}
 import com.itv.bucky._
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
-import com.itv.bucky.consume.{Ack, Delivery, PublishCommand, Requeue}
+import com.itv.bucky.consume._
+import com.itv.bucky.publish._
 import com.itv.bucky.decl.{Exchange, Queue}
 import com.itv.bucky.pattern.requeue
 import com.itv.bucky.pattern.requeue.RequeuePolicy
-import com.itv.bucky.publish.{MessageProperties, PublishCommandBuilder}
 import com.itv.bucky.test.StubHandlers
 import com.itv.bucky.test.stubs.{RecordingHandler, RecordingRequeueHandler}
 import com.typesafe.config.ConfigFactory

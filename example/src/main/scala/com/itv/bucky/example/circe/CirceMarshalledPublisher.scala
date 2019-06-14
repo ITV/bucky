@@ -5,7 +5,7 @@ import com.itv.bucky._
 import com.itv.bucky.circe._
 import com.itv.bucky.decl._
 import com.itv.bucky.example.circe.Shared.Person
-import com.itv.bucky.publish.PublisherSugar
+import com.itv.bucky.publish._
 import com.typesafe.config.ConfigFactory
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -33,9 +33,7 @@ object CirceMarshalledPublisher extends IOApp {
         _ <- client.declare(Declarations.all)
         publisher = client.publisherOf[Person](Declarations.exchange.name, Declarations.routingKey)
         _ <- publisher(Person("bob", 22))
-      }
-        yield ExitCode.Success
+      } yield ExitCode.Success
     }
-
 
 }
