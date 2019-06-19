@@ -13,11 +13,11 @@ import com.itv.bucky.consume.{Ack, ConsumeAction, DeadLetter, Delivery, RequeueC
 import com.itv.bucky.publish.PublishCommand
 
 case class RequeueTransformer[F[_]](
-    requeuePublisher: Publisher[F, PublishCommand],
-    requeueExchange: ExchangeName,
-    requeuePolicy: RequeuePolicy,
-    onFailure: RequeueConsumeAction,
-    onFailureAction: Delivery => F[Unit]
+                                     requeuePublisher: Publisher[F, PublishCommand],
+                                     requeueExchange: ExchangeName,
+                                     requeuePolicy: RequeuePolicy,
+                                     onHandlerException: RequeueConsumeAction,
+                                     onRequeueExpiryAction: Delivery => F[ConsumeAction]
 )(handler: RequeueHandler[F, Delivery])(implicit F: Sync[F])
     extends Handler[F, Delivery]
     with StrictLogging {
@@ -44,12 +44,12 @@ case class RequeueTransformer[F[_]](
         case com.itv.bucky.consume.Requeue =>
           remainingAttempts(delivery) match {
             case Some(value) if value < 1 =>
-              onFailureAction(delivery).map(_ => DeadLetter)
+              onRequeueExpiryAction(delivery)
             case Some(value) =>
               requeuePublisher(buildRequeuePublishCommand(delivery, value - 1, requeuePolicy.requeueAfter)).map(_ => Ack)
             case None =>
               if (requeuePolicy.maximumProcessAttempts <= 1)
-                onFailureAction(delivery).map(_ => DeadLetter)
+                onRequeueExpiryAction(delivery)
               else {
                 val initialRemainingAttempts = requeuePolicy.maximumProcessAttempts - 2
                 requeuePublisher(buildRequeuePublishCommand(delivery, initialRemainingAttempts, requeuePolicy.requeueAfter)).map(_ => Ack)
@@ -61,8 +61,8 @@ case class RequeueTransformer[F[_]](
     val safePerform = F.flatMap(F.delay(handler(delivery)))(identity)
     F.handleErrorWith(F.flatMap(safePerform)(perform)) {
       case t: Throwable =>
-        logger.error(s"Unable to process ${delivery.body} due to handler failure, will $onFailure", t)
-        perform(onFailure)
+        logger.error(s"Unable to process ${delivery.body} due to handler failure, will $onHandlerException", t)
+        perform(onHandlerException)
     }
   }
 

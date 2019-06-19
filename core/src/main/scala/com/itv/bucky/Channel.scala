@@ -51,7 +51,7 @@ trait Channel[F[_]] {
     } yield ()
   }
   def registerConsumer(handler: Handler[F, Delivery],
-                       onFailure: ConsumeAction,
+                       onHandlerException: ConsumeAction,
                        queue: QueueName,
                        consumerTag: ConsumerTag,
                        cs: ContextShift[F]): F[Unit]
@@ -116,7 +116,7 @@ object Channel {
       }.void
 
     override def registerConsumer(handler: Handler[F, Delivery],
-                                  onFailure: ConsumeAction,
+                                  onHandlerException: ConsumeAction,
                                   queue: QueueName,
                                   consumerTag: ConsumerTag,
                                   cs: ContextShift[F]): F[Unit] = {
@@ -142,7 +142,7 @@ object Channel {
             }
             .flatMap {
               case Right(r) => F.delay(r)
-              case Left(e)  => F.delay(logger.debug(s"Handler failure with {} will recover to: {}", e.getMessage, onFailure)) *> F.delay(onFailure)
+              case Left(e)  => F.delay(logger.debug(s"Handler failure with {} will recover to: {}", e.getMessage, onHandlerException)) *> F.delay(onHandlerException)
             }
             .flatMap(sendAction(_)(Envelope.fromEnvelope(envelope)))
             .toIO
