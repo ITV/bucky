@@ -51,26 +51,26 @@ package object requeue {
                                     handler: RequeueHandler[F, T],
                                     requeuePolicy: RequeuePolicy,
                                     unmarshaller: DeliveryUnmarshaller[T],
-                                    onFailure: RequeueConsumeAction = Requeue,
-                                    onFailureAction: T => F[ConsumeAction] = (_: T) => F.point(DeadLetter),
+                                    onHandlerException: RequeueConsumeAction = Requeue,
+                                    onRequeueExpiryAction: T => F[ConsumeAction] = (_: T) => F.point[ConsumeAction](DeadLetter),
                                     unmarshalFailureAction: RequeueConsumeAction = DeadLetter,
                                     prefetchCount: Int = defaultPreFetchCount): Resource[F, Unit] = {
 
       val deserializeHandler                              = new DeliveryUnmarshalHandler[F, T, RequeueConsumeAction](unmarshaller)(handler, unmarshalFailureAction)
-      val deserializeOnFailureAction: Delivery => F[ConsumeAction] = new UnmarshalFailureAction[F, T](unmarshaller).apply(onFailureAction)
-      requeueOf(queueName, deserializeHandler, requeuePolicy, onFailure, deserializeOnFailureAction, prefetchCount)
+      val deserializeOnRequeueExpiryAction: Delivery => F[ConsumeAction] = new UnmarshalFailureAction[F, T](unmarshaller).apply(onRequeueExpiryAction)
+      requeueOf(queueName, deserializeHandler, requeuePolicy, onHandlerException, deserializeOnRequeueExpiryAction, prefetchCount)
     }
 
     def requeueOf(queueName: QueueName,
                   handler: RequeueHandler[F, Delivery],
                   requeuePolicy: RequeuePolicy,
-                  onFailure: RequeueConsumeAction = Requeue,
-                  onFailureAction: Delivery => F[ConsumeAction] = (_: Delivery) => F.point(DeadLetter),
+                  onHandlerException: RequeueConsumeAction = Requeue,
+                  onRequeueExpiryAction: Delivery => F[ConsumeAction] = (_: Delivery) => F.point[ConsumeAction](DeadLetter),
                   prefetchCount: Int = defaultPreFetchCount): Resource[F, Unit] = {
       val requeueExchange = ExchangeName(s"${queueName.value}.requeue")
       val requeuePublish  = amqpClient.publisher()
       amqpClient.registerConsumer(queueName,
-                                  RequeueTransformer(requeuePublish, requeueExchange, requeuePolicy, onFailure, onFailureAction)(handler),
+                                  RequeueTransformer(requeuePublish, requeueExchange, requeuePolicy, onHandlerException, onRequeueExpiryAction)(handler),
                                   prefetchCount = prefetchCount)
     }
   }

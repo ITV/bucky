@@ -56,14 +56,14 @@ package object bucky {
         queueName: QueueName,
         handler: RequeueHandler[F, T],
         requeuePolicy: RequeuePolicy = RequeuePolicy(maximumProcessAttempts = 10, requeueAfter = 3.minutes),
-        onFailure: RequeueConsumeAction = Requeue,
+        onHandlerException: RequeueConsumeAction = Requeue,
         unmarshalFailureAction: RequeueConsumeAction = DeadLetter)(implicit unmarshaller: PayloadUnmarshaller[T], F: Sync[F]): Resource[F, Unit] =
-      new RequeueOps(amqpClient).requeueDeliveryHandlerOf(
+      new RequeueOps(amqpClient).requeueDeliveryHandlerOf[T](
         queueName,
         handler,
         requeuePolicy,
         toDeliveryUnmarshaller(unmarshaller),
-        onFailure,
+        onHandlerException,
         unmarshalFailureAction = unmarshalFailureAction
       )
 
@@ -71,10 +71,10 @@ package object bucky {
         queueName: QueueName,
         handler: RequeueHandler[F, Delivery],
         requeuePolicy: RequeuePolicy = RequeuePolicy(maximumProcessAttempts = 10, requeueAfter = 3.minutes),
-        onFailure: RequeueConsumeAction = Requeue,
+        onHandlerException: RequeueConsumeAction = Requeue,
         prefetchCount: Int = defaultPreFetchCount
     )(implicit F: Sync[F]): Resource[F, Unit] =
-      new RequeueOps(amqpClient).requeueOf(queueName, handler, requeuePolicy, onFailure, prefetchCount = prefetchCount)
+      new RequeueOps(amqpClient).requeueOf(queueName, handler, requeuePolicy, onHandlerException, prefetchCount = prefetchCount)
 
   }
 
