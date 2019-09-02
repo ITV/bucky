@@ -152,7 +152,7 @@ object AmqpClient extends StrictLogging {
         for {
           channel <- buildChannel()
           handling <- Resource.make(Ref.of[F, Set[UUID]](Set.empty))(set =>
-            repeatUntil(F.delay(logger.debug("Verifying running handlers.")) *> set.get)(_.isEmpty)(shutdownRetry).timeout(shutdownTimeout))
+            repeatUntil(F.delay(logger.error(s"Verifying running handlers, current count: ${}")) *> set.get)(_.isEmpty)(shutdownRetry).timeout(shutdownTimeout))
           newHandler = (delivery: Delivery) =>
             for {
               id            <- F.delay(UUID.randomUUID())
