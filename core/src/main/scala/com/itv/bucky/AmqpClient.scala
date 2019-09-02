@@ -125,6 +125,7 @@ object AmqpClient extends StrictLogging {
       Resource.make(make)(_ => F.unit)
     }
 
+  
   private def mkClient[F[_]](
       buildChannel: () => Resource[F, Channel[F]],
       connectionManager: AmqpClientConnectionManager[F])(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F]): AmqpClient[F] =
