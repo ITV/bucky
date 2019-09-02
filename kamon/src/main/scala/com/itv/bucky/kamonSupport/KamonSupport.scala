@@ -15,6 +15,7 @@ import java.nio.charset.Charset
 import com.itv.bucky.LoggingAmqpClient.{logFailedHandler, logFailedPublishMessage, logSuccessfulHandler, logSuccessfullPublishMessage}
 import com.itv.bucky.publish.PublishCommand
 
+import scala.concurrent.duration._
 import scala.language.higherKinds
 import scala.util.Try
 
@@ -77,7 +78,8 @@ object KamonSupport {
           .map { case (key, value) => (key, value) }
           .toMap[String, AnyRef]
 
-      override def registerConsumer(queueN: QueueName, handler: Handler[F, Delivery], exceptionalAction: ConsumeAction, prefetchCount: Int): Resource[F, Unit] = {
+      override def registerConsumer(queueN: QueueName, handler: Handler[F, Delivery], exceptionalAction: ConsumeAction, prefetchCount: Int, shutdownTimeout: FiniteDuration = 1.minutes,
+                                    shutdownRetry: FiniteDuration = 500.millis): Resource[F, Unit] = {
         val newHandler = (delivery: Delivery) => {
           (for {
             ctxMap      <- F.delay(contextMapFrom(delivery))

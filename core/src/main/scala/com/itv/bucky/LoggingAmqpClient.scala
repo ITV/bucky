@@ -8,7 +8,8 @@ import java.nio.charset.Charset
 
 import com.itv.bucky.consume._
 import com.itv.bucky.publish._
-
+import scala.concurrent.duration._
+import scala.concurrent.duration.FiniteDuration
 import scala.language.higherKinds
 
 object LoggingAmqpClient extends StrictLogging {
@@ -75,7 +76,12 @@ object LoggingAmqpClient extends StrictLogging {
           }
       }
 
-      override def registerConsumer(queueName: QueueName, handler: Handler[F, Delivery], exceptionalAction: ConsumeAction, prefetchCount: Int): Resource[F, Unit] = {
+      override def registerConsumer(queueName: QueueName,
+                                    handler: Handler[F, Delivery],
+                                    exceptionalAction: ConsumeAction,
+                                    prefetchCount: Int,
+                                    shutdownTimeout: FiniteDuration = 1.minutes,
+                                    shutdownRetry: FiniteDuration = 500.millis): Resource[F, Unit] = {
         val newHandler = (delivery: Delivery) => {
           (for {
             result <- handler(delivery).attempt
