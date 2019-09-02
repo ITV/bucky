@@ -53,5 +53,5 @@ object MessagePropertiesConverters {
   private def toJInt(value: Option[Int]): Integer                  = value.fold[Integer](null)(value => value)
   private def toJString(value: Option[String]): String             = value.fold[String](null)(identity)
   private def toJDate(value: Option[Date]): Date                   = value.fold[Date](null)(identity)
-  private def priorityOf(properties: BasicProperties): Option[Int] = Option(properties.getPriority)
+  private def priorityOf(properties: BasicProperties): Option[Int] = Option[Integer](properties.getPriority).map(_.toInt)
 }
