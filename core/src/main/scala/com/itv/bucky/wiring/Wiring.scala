@@ -11,7 +11,7 @@ import com.itv.bucky._
 import scala.concurrent.duration._
 import cats.implicits._
 import cats.effect.implicits._
-import com.itv.bucky.consume.{ConsumeAction, RequeueConsumeAction}
+import com.itv.bucky.consume.{ConsumeAction, DeadLetter, RequeueConsumeAction}
 import com.itv.bucky.publish.PublishCommandBuilder
 
 import scala.language.higherKinds
@@ -131,6 +131,35 @@ class Wiring[T](
     }
       yield ()
   }
+
+  def registerRequeueConsumer[F[_]](client: AmqpClient[F],
+                                    onRequeueExpiryAction: T => F[ConsumeAction])
+                                    (handleMessage: T => F[RequeueConsumeAction])(implicit F: Sync[F]): Resource[F, Unit] = {
+    val runDeclarations =
+      for {
+        _ <- F.delay {
+          logger.info(
+            s"Creating consumer: " +
+              s"exchange=${exchangeName.value} " +
+              s"routingKey=${routingKey.value} " +
+              s"queue=${queueName.value} " +
+              s"type=${exchangeType.value} " +
+              s"requeuePolicy=$requeuePolicy")
+        }
+        _ <- client.declare(consumerDeclarations)
+      }
+        yield ()
+
+    for {
+      _ <- Resource.make(runDeclarations)(_ => F.pure(()))
+      _ <- client.registerRequeueConsumerOf(
+        queueName = queueName,
+        handler = handleMessage,
+        requeuePolicy = requeuePolicy,
+        onRequeueExpiryAction = onRequeueExpiryAction)(unmarshaller, F)
+    } yield ()
+  }
+
 
   def publisherBuilder: PublishCommandBuilder.Builder[T] =
     publishCommandBuilder(marshaller)
