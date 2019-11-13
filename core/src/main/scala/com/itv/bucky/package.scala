@@ -2,10 +2,10 @@ package com.itv
 
 import java.nio.charset.{Charset, StandardCharsets}
 
+import cats.effect.{ConcurrentEffect, Resource, Sync}
 import cats.{Applicative, ApplicativeError}
-import cats.effect.{ConcurrentEffect, IO, Resource, Sync}
 import com.itv.bucky.Unmarshaller.toDeliveryUnmarshaller
-import com.itv.bucky.consume.{ConsumeAction, DeadLetter, Delivery, Requeue, RequeueConsumeAction}
+import com.itv.bucky.consume._
 import com.itv.bucky.decl.Declaration
 import com.itv.bucky.pattern.requeue.{RequeueOps, RequeuePolicy}
 import com.itv.bucky.publish.PublishCommandBuilder
@@ -31,7 +31,7 @@ package object bucky {
   def publishCommandBuilder[T](marshaller: PayloadMarshaller[T]): PublishCommandBuilder.NothingSet[T] =
     PublishCommandBuilder.publishCommandBuilder[T](marshaller)
 
-  implicit class ConsumerSugar[F[_]](amqpClient: AmqpClient[F]) {
+  implicit class ConsumerSugar[F[_]](amqpClient: AmqpClient[F])(implicit val F: Sync[F]) {
 
     def registerConsumerOf[T](queueName: QueueName,
                               handler: Handler[F, T],
@@ -57,14 +57,16 @@ package object bucky {
         handler: RequeueHandler[F, T],
         requeuePolicy: RequeuePolicy = RequeuePolicy(maximumProcessAttempts = 10, requeueAfter = 3.minutes),
         onHandlerException: RequeueConsumeAction = Requeue,
-        unmarshalFailureAction: RequeueConsumeAction = DeadLetter)(implicit unmarshaller: PayloadUnmarshaller[T], F: Sync[F]): Resource[F, Unit] =
+        unmarshalFailureAction: RequeueConsumeAction = DeadLetter,
+        onRequeueExpiryAction: T => F[ConsumeAction] = (_: T) => F.point[ConsumeAction](DeadLetter))(implicit unmarshaller: PayloadUnmarshaller[T], F: Sync[F]): Resource[F, Unit] =
       new RequeueOps(amqpClient).requeueDeliveryHandlerOf[T](
-        queueName,
-        handler,
-        requeuePolicy,
-        toDeliveryUnmarshaller(unmarshaller),
-        onHandlerException,
-        unmarshalFailureAction = unmarshalFailureAction
+        queueName = queueName,
+        handler = handler,
+        requeuePolicy = requeuePolicy,
+        unmarshaller = toDeliveryUnmarshaller(unmarshaller),
+        onHandlerException = onHandlerException,
+        unmarshalFailureAction = unmarshalFailureAction,
+        onRequeueExpiryAction = onRequeueExpiryAction
       )
 
     def registerRequeueConsumer(
