@@ -19,18 +19,17 @@ import scala.language.higherKinds
 final case class WiringName(value: String) extends AnyVal
 
 class Wiring[T](
-                 name: WiringName,
-                 setExchangeName: Option[ExchangeName] = None,
-                 setRoutingKey: Option[RoutingKey] = None,
-                 setQueueName: Option[QueueName] = None,
-                 setExchangeType: Option[ExchangeType] = None,
-                 setRequeuePolicy: Option[RequeuePolicy] = None,
-                 setPrefetchCount: Option[Int] = None
-               )(implicit
-                 val marshaller: PayloadMarshaller[T],
-                 val unmarshaller: PayloadUnmarshaller[T]
-               )
-  extends StrictLogging {
+    name: WiringName,
+    setExchangeName: Option[ExchangeName] = None,
+    setRoutingKey: Option[RoutingKey] = None,
+    setQueueName: Option[QueueName] = None,
+    setExchangeType: Option[ExchangeType] = None,
+    setRequeuePolicy: Option[RequeuePolicy] = None,
+    setPrefetchCount: Option[Int] = None
+)(implicit
+  val marshaller: PayloadMarshaller[T],
+  val unmarshaller: PayloadUnmarshaller[T])
+    extends StrictLogging {
 
   def exchangeName: ExchangeName =
     setExchangeName.getOrElse(ExchangeName(s"bucky.exchange.${name.value}"))
@@ -56,35 +55,32 @@ class Wiring[T](
   def allDeclarations: List[Declaration] =
     (publisherDeclarations ++ consumerDeclarations).distinct
 
-  def publisher[F[_]](client: AmqpClient[F], timeout: FiniteDuration = 10.seconds)(implicit F: Sync[F]): F[Publisher[F, T]] = {
+  def publisher[F[_]](client: AmqpClient[F], timeout: FiniteDuration = 10.seconds)(implicit F: Sync[F]): F[Publisher[F, T]] =
     for {
-      _ <- F.delay(logger.info(
-        s"Creating publisher: " +
-          s"exchange=${ exchangeName.value} " +
-          s"routingKey=${ routingKey.value} " +
-          s"queue=${ queueName.value} " +
-          s"type=${ exchangeType.value} " +
-          s"requeuePolicy=$requeuePolicy"))
+      _ <- F.delay(
+        logger.info(
+          s"Creating publisher: " +
+            s"exchange=${exchangeName.value} " +
+            s"routingKey=${routingKey.value} " +
+            s"queue=${queueName.value} " +
+            s"type=${exchangeType.value} " +
+            s"requeuePolicy=$requeuePolicy"))
       _ <- client.declare(publisherDeclarations)
-    }
-      yield client.publisherOf(publisherBuilder)
-  }
+    } yield client.publisherOf(publisherBuilder)
 
-  def publisherWithHeaders[F[_]](client: AmqpClient[F])(implicit F: Sync[F]): F[PublisherWithHeaders[F, T]] = {
+  def publisherWithHeaders[F[_]](client: AmqpClient[F])(implicit F: Sync[F]): F[PublisherWithHeaders[F, T]] =
     for {
       _ <- F.delay {
         logger.info(
           s"Creating publisher with headers: " +
-            s"exchange=${ exchangeName.value} " +
-            s"routingKey=${ routingKey.value} " +
-            s"queue=${ queueName.value} " +
-            s"type=${ exchangeType.value} " +
+            s"exchange=${exchangeName.value} " +
+            s"routingKey=${routingKey.value} " +
+            s"queue=${queueName.value} " +
+            s"type=${exchangeType.value} " +
             s"requeuePolicy=$requeuePolicy")
       }
       _ <- client.declare(publisherDeclarations)
-    }
-      yield client.publisherWithHeadersOf(publisherBuilder)
-  }
+    } yield client.publisherWithHeadersOf(publisherBuilder)
 
   def registerConsumer[F[_]](client: AmqpClient[F])(handleMessage: T => F[ConsumeAction])(implicit F: Sync[F]): Resource[F, Unit] = {
     val runDeclarations =
@@ -99,14 +95,12 @@ class Wiring[T](
               s"requeuePolicy=$requeuePolicy")
         }
         _ <- client.declare(consumerDeclarations)
-      }
-        yield ()
+      } yield ()
 
     for {
       _ <- Resource.make(runDeclarations)(_ => F.pure(()))
       _ <- client.registerConsumerOf(queueName, handleMessage)
-    }
-      yield ()
+    } yield ()
   }
 
   def registerRequeueConsumer[F[_]](client: AmqpClient[F])(handleMessage: T => F[RequeueConsumeAction])(implicit F: Sync[F]): Resource[F, Unit] = {
@@ -122,19 +116,16 @@ class Wiring[T](
               s"requeuePolicy=$requeuePolicy")
         }
         _ <- client.declare(consumerDeclarations)
-      }
-        yield ()
+      } yield ()
 
     for {
       _ <- Resource.make(runDeclarations)(_ => F.pure(()))
       _ <- client.registerRequeueConsumerOf(queueName, handleMessage, requeuePolicy)(unmarshaller, F)
-    }
-      yield ()
+    } yield ()
   }
 
-  def registerRequeueConsumer[F[_]](client: AmqpClient[F],
-                                    onRequeueExpiryAction: T => F[ConsumeAction])
-                                    (handleMessage: T => F[RequeueConsumeAction])(implicit F: Sync[F]): Resource[F, Unit] = {
+  def registerRequeueConsumer[F[_]](client: AmqpClient[F], onRequeueExpiryAction: T => F[ConsumeAction])(handleMessage: T => F[RequeueConsumeAction])(
+      implicit F: Sync[F]): Resource[F, Unit] = {
     val runDeclarations =
       for {
         _ <- F.delay {
@@ -147,24 +138,21 @@ class Wiring[T](
               s"requeuePolicy=$requeuePolicy")
         }
         _ <- client.declare(consumerDeclarations)
-      }
-        yield ()
+      } yield ()
 
     for {
       _ <- Resource.make(runDeclarations)(_ => F.pure(()))
-      _ <- client.registerRequeueConsumerOf(
-        queueName = queueName,
-        handler = handleMessage,
-        requeuePolicy = requeuePolicy,
-        onRequeueExpiryAction = onRequeueExpiryAction)(unmarshaller, F)
+      _ <- client.registerRequeueConsumerOf(queueName = queueName,
+                                            handler = handleMessage,
+                                            requeuePolicy = requeuePolicy,
+                                            onRequeueExpiryAction = onRequeueExpiryAction)(unmarshaller, F)
     } yield ()
   }
-
 
   def publisherBuilder: PublishCommandBuilder.Builder[T] =
     publishCommandBuilder(marshaller)
       .using(exchangeName)
       .using(routingKey)
 
-  private [wiring] def getLogger = logger
+  private[wiring] def getLogger = logger
 }
