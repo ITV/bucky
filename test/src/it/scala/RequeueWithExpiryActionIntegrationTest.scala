@@ -2,6 +2,7 @@ import java.util.UUID
 import java.util.concurrent.Executors
 
 import cats.effect.{ContextShift, IO, Resource, Timer}
+import cats.implicits._
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
 import com.itv.bucky._
@@ -17,6 +18,7 @@ import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 
+import scala.collection.mutable.ListBuffer
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.higherKinds
@@ -33,7 +35,8 @@ class RequeueWithExpiryActionIntegrationTest extends FunSuite with Eventually wi
   implicit val timer: Timer[IO]     = IO.timer(ec)
   val requeuePolicy = RequeuePolicy(maximumProcessAttempts = 5, requeueAfter = 2.seconds)
 
-  def withTestFixture[F[_]](onRequeueExpiryAction: String => IO[ConsumeAction])
+  def withTestFixture[F[_]](onRequeueExpiryAction: String => IO[ConsumeAction],
+                            handlerAction: String => IO[Unit] = _ => IO.unit)
                               (test: TestFixture => IO[Unit]): Unit = {
 
     implicit val payloadMarshaller: PayloadMarshaller[String] = StringPayloadMarshaller
@@ -57,7 +60,7 @@ class RequeueWithExpiryActionIntegrationTest extends FunSuite with Eventually wi
     ) ++ requeue.requeueDeclarations(queueName, routingKey)
 
     AmqpClient[IO](config).use { client =>
-      val handler = StubHandlers.requeueRequeueHandler[IO, String]
+      val handler = new RecordingRequeueHandler[IO, String](handlerAction(_).map(_ => DeadLetter))
       val dlqHandler = StubHandlers.ackHandler[IO, String]
 
       Resource.liftF(client.declare(declarations)).flatMap(_ =>
@@ -81,16 +84,13 @@ class RequeueWithExpiryActionIntegrationTest extends FunSuite with Eventually wi
   }
 
 
-  test("Should DeadLetter after setting onRequeueExpiryAction to DeadLetter on expiry") {
+  test("Should record an invocation as true and DeadLetter after exhausting maximum requeue attempts") {
 
-    var wasHit = false
+    val invocationRecorder = ListBuffer.empty[Boolean]
+    val expiryAction = (_: String) => IO.delay(invocationRecorder += true).as(DeadLetter)
+    val handlerAction = (_: String) => IO.delay(invocationRecorder += false) >> IO.unit
 
-    val expiryAction = (_: String) => IO {
-      wasHit = true
-      DeadLetter
-    }
-
-    withTestFixture(expiryAction) { testFixture =>
+    withTestFixture(expiryAction, handlerAction) { testFixture =>
       val publishCommand =
         testFixture.publishCommandBuilder.toPublishCommand("hello, world!")
 
@@ -100,10 +100,9 @@ class RequeueWithExpiryActionIntegrationTest extends FunSuite with Eventually wi
         yield eventually {
           testFixture.stubHandler.receivedMessages.size should be (requeuePolicy.maximumProcessAttempts)
           testFixture.dlqHandler.receivedMessages.size shouldBe 1
-          wasHit shouldBe true
+          invocationRecorder should contain theSameElementsAs List(false, false, false, false, false, true)
         }
     }
-
   }
 
 }
