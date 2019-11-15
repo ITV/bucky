@@ -1,6 +1,7 @@
 import java.util.UUID
 import java.util.concurrent.Executors
 
+import cats.data.Kleisli
 import cats.effect.{ContextShift, IO, Resource, Timer}
 import cats.implicits._
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
@@ -60,7 +61,7 @@ class RequeueWithExpiryActionIntegrationTest extends FunSuite with Eventually wi
     ) ++ requeue.requeueDeclarations(queueName, routingKey)
 
     AmqpClient[IO](config).use { client =>
-      val handler = new RecordingRequeueHandler[IO, String](handlerAction(_).map(_ => DeadLetter))
+      val handler = new RecordingRequeueHandler[IO, String](Kleisli(handlerAction).andThen(_ => IO(Requeue)).run)
       val dlqHandler = StubHandlers.ackHandler[IO, String]
 
       Resource.liftF(client.declare(declarations)).flatMap(_ =>
