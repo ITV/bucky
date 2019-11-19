@@ -44,7 +44,7 @@ package object decl {
   case class ExchangeBinding(destinationExchangeName: ExchangeName,
                              sourceExchangeName: ExchangeName,
                              routingKey: RoutingKey,
-                             arguments: Map[String, AnyRef])
+                             arguments: Map[String, AnyRef] = Map.empty)
       extends Declaration
   case class Queue(name: QueueName,
                    isDurable: Boolean = true,

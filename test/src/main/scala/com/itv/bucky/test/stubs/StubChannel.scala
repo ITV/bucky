@@ -29,21 +29,40 @@ abstract class StubChannel[F[_]](implicit F: ConcurrentEffect[F]) extends Channe
   val handlers: mutable.Map[QueueName, (Handler[F, Delivery], ConsumeAction)] = mutable.Map.empty
   val confirmListeners: ListBuffer[ConfirmListener]                           = ListBuffer.empty
 
-  override def close(): F[Unit]                        = F.unit
-  override def purgeQueue(name: QueueName): F[Unit]    = F.unit
-  override def basicQos(prefetchCount: Int): F[Unit]   = F.unit
-  override def confirmSelect: F[Unit]                  = F.unit
+  override def close(): F[Unit]                      = F.unit
+  override def purgeQueue(name: QueueName): F[Unit]  = F.unit
+  override def basicQos(prefetchCount: Int): F[Unit] = F.unit
+  override def confirmSelect: F[Unit]                = F.unit
 
-  override def getNextPublishSeqNo: F[Long] =  F.delay(pubSeqLock.synchronized {
-    val current = publishSeq
-    publishSeq = publishSeq + 1
-    current
-  })
+  override def getNextPublishSeqNo: F[Long] =
+    F.delay(pubSeqLock.synchronized {
+      val current = publishSeq
+      publishSeq = publishSeq + 1
+      current
+    })
 
   def handlePublishHandlersResult(result: Either[Throwable, List[ConsumeAction]]): F[Unit]
 
+  private def lookupQueues(publishCommand: PublishCommand): List[QueueName] = {
+    val exchangeBindingExchanges =
+      exchangeBindings
+        .filter(b => b.sourceExchangeName == publishCommand.exchange && b.routingKey == publishCommand.routingKey)
+        .map(_.destinationExchangeName)
+        .toSet
+
+    ((bindings
+      .filter(binding => binding.exchangeName == publishCommand.exchange && binding.routingKey == publishCommand.routingKey)
+      .map(_.queueName)
+      .toList)
+    ++
+    (bindings
+      .filter(binding => exchangeBindingExchanges(binding.exchangeName) && binding.routingKey == publishCommand.routingKey)
+      .map(_.queueName)
+      .toList))
+  }
+
   override def publish(sequenceNumber: Long, cmd: PublishCommand): F[Unit] = {
-    val queues = bindings.filter(binding => binding.exchangeName == cmd.exchange && binding.routingKey == cmd.routingKey).map(_.queueName)
+    val queues = lookupQueues(cmd)
     val subscribedHandlers = handlers
       .filterKeys(queues.contains)
       .mapValues {
@@ -61,8 +80,7 @@ abstract class StubChannel[F[_]](implicit F: ConcurrentEffect[F]) extends Channe
       _        <- F.delay(logger.debug("Message pid {} published with result {}.", id, result))
       _        <- handlePublishHandlersResult(result)
       _        <- confirmListeners.toList.traverse(cl => F.delay(cl.handleAck(delivery.envelope.deliveryTag, false)))
-    } yield ()).attempt
-      .rethrow
+    } yield ()).attempt.rethrow
   }
 
   private def deliveryFor(publishCommand: PublishCommand, sequenceNumber: Long): F[Delivery] =
@@ -78,7 +96,11 @@ abstract class StubChannel[F[_]](implicit F: ConcurrentEffect[F]) extends Channe
   override def sendAction(action: ConsumeAction)(envelope: bucky.Envelope): F[Unit] =
     F.unit
 
-  override def registerConsumer(handler: Handler[F, Delivery], onHandlerException: ConsumeAction, queue: QueueName, consumerTag: ConsumerTag, cs: ContextShift[F]): F[Unit] =
+  override def registerConsumer(handler: Handler[F, Delivery],
+                                onHandlerException: ConsumeAction,
+                                queue: QueueName,
+                                consumerTag: ConsumerTag,
+                                cs: ContextShift[F]): F[Unit] =
     F.delay(handlers.synchronized(handlers.put(queue, handler -> onHandlerException))).void
 
   override def addConfirmListener(listener: ConfirmListener): F[Unit] = F.delay(confirmListeners.synchronized(confirmListeners += listener))

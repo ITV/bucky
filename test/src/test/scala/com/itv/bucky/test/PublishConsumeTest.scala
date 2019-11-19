@@ -5,7 +5,7 @@ import java.util.concurrent.TimeoutException
 import cats.effect.{IO, Resource}
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.consume._
-import com.itv.bucky.decl.{Exchange, Queue}
+import com.itv.bucky.decl.{Exchange, ExchangeBinding, Queue}
 import com.itv.bucky.publish._
 import com.itv.bucky.{ExchangeName, Handler, PayloadMarshaller, PublisherSugar, QueueName, RequeueHandler, RoutingKey}
 import org.scalatest.FunSuite
@@ -29,6 +29,38 @@ class PublishConsumeTest extends FunSuite with IOAmqpClientTest with Eventually 
         .toPublishCommand(message)
       val handler      = StubHandlers.ackHandler[IO, Delivery]
       val declarations = List(Queue(queue), Exchange(exchange).binding((rk, queue)))
+
+      Resource.liftF(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
+        for {
+          _ <- client.publisher()(commandBuilder)
+        } yield {
+          handler.receivedMessages should have size 1
+        }
+      }
+    }
+  }
+
+  test("Can simulate exchange bindings") {
+    runAmqpTest { client =>
+      val exchangeA = ExchangeName("a")
+      val exchangeB = ExchangeName("b")
+      val queue     = QueueName("aqueue")
+      val rk        = RoutingKey("ark")
+      val message   = "Hello"
+
+      val declarations = List(
+        Queue(queue),
+        Exchange(exchangeA),
+        Exchange(exchangeB).binding(rk -> queue),
+        ExchangeBinding(exchangeB, exchangeA, rk)
+      )
+
+      val commandBuilder = PublishCommandBuilder
+        .publishCommandBuilder[String](StringPayloadMarshaller)
+        .using(exchangeA)
+        .using(rk)
+        .toPublishCommand(message)
+      val handler      = StubHandlers.ackHandler[IO, Delivery]
 
       Resource.liftF(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
         for {
@@ -97,17 +129,16 @@ class PublishConsumeTest extends FunSuite with IOAmqpClientTest with Eventually 
   test("should have a publisherOf method that takes an implicit PublishCommandBuilder") {
     runAmqpTest { client =>
       val exchange = ExchangeName("anexchange")
-      val queue = QueueName("aqueue")
-      val rk = RoutingKey("ark")
-      val message = "Hello"
+      val queue    = QueueName("aqueue")
+      val rk       = RoutingKey("ark")
+      val message  = "Hello"
       implicit val commandBuilder: PublishCommandBuilder.Builder[String] =
         PublishCommandBuilder
           .publishCommandBuilder[String](StringPayloadMarshaller)
           .using(exchange)
           .using(rk)
-      val handler = StubHandlers.ackHandler[IO, Delivery]
+      val handler      = StubHandlers.ackHandler[IO, Delivery]
       val declarations = List(Queue(queue), Exchange(exchange).binding((rk, queue)))
-
 
       Resource.liftF(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
         val publisher = client.publisherOf[String]
@@ -122,15 +153,14 @@ class PublishConsumeTest extends FunSuite with IOAmqpClientTest with Eventually 
 
   test("should have a publisherOf method that takes an implicit PayloadMarshaller") {
     runAmqpTest { client =>
-      val exchange = ExchangeName("anexchange")
-      val queue = QueueName("aqueue")
-      val rk = RoutingKey("ark")
-      val message = "Hello"
+      val exchange                                                    = ExchangeName("anexchange")
+      val queue                                                       = QueueName("aqueue")
+      val rk                                                          = RoutingKey("ark")
+      val message                                                     = "Hello"
       implicit val stringPayloadMarshaller: PayloadMarshaller[String] = StringPayloadMarshaller
 
-      val handler = StubHandlers.ackHandler[IO, Delivery]
+      val handler      = StubHandlers.ackHandler[IO, Delivery]
       val declarations = List(Queue(queue), Exchange(exchange).binding((rk, queue)))
-
 
       Resource.liftF(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
         val publisher = client.publisherOf[String](exchange, rk)
@@ -156,28 +186,28 @@ class PublishConsumeTest extends FunSuite with IOAmqpClientTest with Eventually 
       val exchange = ExchangeName("anexchange")
 
       val queue = QueueName("aqueue")
-      val rk = RoutingKey("ark")
+      val rk    = RoutingKey("ark")
 
       val declarations =
         List(Queue(queue), Exchange(exchange).binding(rk -> queue)) ++ com.itv.bucky.pattern.requeue.requeueDeclarations(queue, rk)
 
       val requeueHandler = StubHandlers.ackHandler[IO, String]
 
-
-      Resource.liftF(client.declare(declarations)).flatMap(_ =>
-        for {
-          _ <- client.registerRequeueConsumerOf(queue, handler)
-          _ <- client.registerConsumerOf(QueueName(queue.value + ".requeue"), requeueHandler)
-        }
-          yield ()).use { _ =>
-        val publisher = client.publisherOf[String](exchange, rk)
-        for {
-          _ <- publisher("hello")
-        }
-          yield {
+      Resource
+        .liftF(client.declare(declarations))
+        .flatMap(_ =>
+          for {
+            _ <- client.registerRequeueConsumerOf(queue, handler)
+            _ <- client.registerConsumerOf(QueueName(queue.value + ".requeue"), requeueHandler)
+          } yield ())
+        .use { _ =>
+          val publisher = client.publisherOf[String](exchange, rk)
+          for {
+            _ <- publisher("hello")
+          } yield {
             requeueHandler.receivedMessages should have size 1
           }
-      }
+        }
     }
   }
 
