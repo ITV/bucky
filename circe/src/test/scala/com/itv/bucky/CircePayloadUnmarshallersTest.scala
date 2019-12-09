@@ -1,19 +1,17 @@
 package com.itv.bucky
 
+import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
+import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
+import com.itv.bucky.circe.auto._
 import io.circe._
 import io.circe.generic.auto._
 import io.circe.syntax._
-import PayloadMarshaller.StringPayloadMarshaller
-import Unmarshaller.StringPayloadUnmarshaller
 import org.scalatest.FunSuite
 import org.scalatest.Matchers._
 
 import scala.util.Random
 
 class CircePayloadUnmarshallersTest extends FunSuite {
-
-  import com.itv.bucky.test._
-  import com.itv.bucky.circe._
 
   case class Entity(foo: String)
 

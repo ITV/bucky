@@ -1,28 +1,18 @@
-package com.itv.bucky
+package com.itv.bucky.circe
 
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
-import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
+import com.itv.bucky.{Payload, PayloadMarshaller, PayloadUnmarshaller}
 import io.circe.{Decoder, Encoder, Json}
-import cats.implicits._
-import io.circe._
-import io.circe.parser.decode
 
-package object circe {
+package object auto {
 
   implicit object JsonPayloadMarshaller extends PayloadMarshaller[Json] {
     override def apply(json: Json): Payload = Payload.from(json.noSpaces)
   }
 
   implicit def unmarshallerFromDecodeJson[T](implicit decoder: Decoder[T]): PayloadUnmarshaller[T] =
-    StringPayloadUnmarshaller
-      .flatMap[T](new Unmarshaller[String, T] {
-      override def unmarshal(thing: String): UnmarshalResult[T] =
-        decode[T](thing)
-    })
+    semiauto.unmarshallerFromDecodeJson
 
   implicit def marshallerFromEncodeJson[T](implicit encoder: Encoder[T]): PayloadMarshaller[T] =
-    StringPayloadMarshaller.contramap { value =>
-      encoder(value).noSpaces
-    }
-
+    semiauto.marshallerFromEncodeJson
 }

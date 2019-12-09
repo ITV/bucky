@@ -2,7 +2,7 @@ package com.itv.bucky.example.circe
 
 import cats.effect.{ExitCode, IO, IOApp}
 import com.itv.bucky._
-import com.itv.bucky.circe._
+import com.itv.bucky.circe.auto._
 import com.itv.bucky.decl._
 import com.itv.bucky.example.circe.Shared.Person
 import com.itv.bucky.publish._
