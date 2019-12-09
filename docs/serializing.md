@@ -15,7 +15,7 @@ for all messages sent across RabbitMQ.
 To make use of automatic derivation, you need to import all Circe dependencies:
 
 ```scala
-import com.itv.bucky.circe._
+import com.itv.bucky.circe.auto._
 import io.circe.generic.auto._
 ```
 
@@ -40,6 +40,30 @@ object AutomaticDerivation {
       // Send a message
       _ <- publisher(Person("Alice", 22))
     } yield ()
+}
+
+
+```
+
+#### Semiautomatic Derivation
+
+Bucky also offers semiautomatic derivation of both marshallers and unmarshallers when using JSON and Circe for the serialization library.
+
+```scala
+import com.itv.bucky.circe.semiauto._
+import io.circe.generic.semiauto._
+```
+
+```scala
+case class Person(name: String, age: Int)
+
+object Person {
+
+  implicit val encoder: Encoder.AsObject[Person] = deriveEncoder[Person]
+  implicit val decoder: Decoder.AsObject[Person] = deriveDecoder[Person]
+
+  implicit val marshaller: PayloadMarshaller[Person] = marshallerFromEncodeJson[Person]
+  implicit val unmarshaller: PayloadUnmarshaller[Person] = unmarshallerFromDecodeJson[Person]
 }
 
 
