@@ -58,7 +58,8 @@ package object bucky {
         requeuePolicy: RequeuePolicy = RequeuePolicy(maximumProcessAttempts = 10, requeueAfter = 3.minutes),
         onHandlerException: RequeueConsumeAction = Requeue,
         unmarshalFailureAction: RequeueConsumeAction = DeadLetter,
-        onRequeueExpiryAction: T => F[ConsumeAction] = (_: T) => F.point[ConsumeAction](DeadLetter))(implicit unmarshaller: PayloadUnmarshaller[T], F: Sync[F]): Resource[F, Unit] =
+        onRequeueExpiryAction: T => F[ConsumeAction] = (_: T) => F.point[ConsumeAction](DeadLetter),
+        prefetchCount: Int = defaultPreFetchCount)(implicit unmarshaller: PayloadUnmarshaller[T], F: Sync[F]): Resource[F, Unit] =
       new RequeueOps(amqpClient).requeueDeliveryHandlerOf[T](
         queueName = queueName,
         handler = handler,
@@ -66,7 +67,8 @@ package object bucky {
         unmarshaller = toDeliveryUnmarshaller(unmarshaller),
         onHandlerException = onHandlerException,
         unmarshalFailureAction = unmarshalFailureAction,
-        onRequeueExpiryAction = onRequeueExpiryAction
+        onRequeueExpiryAction = onRequeueExpiryAction,
+        prefetchCount = prefetchCount
       )
 
     def registerRequeueConsumer(
