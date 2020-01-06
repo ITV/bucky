@@ -5,7 +5,7 @@ import java.util.concurrent.TimeoutException
 import cats.effect.{IO, Resource}
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.consume._
-import com.itv.bucky.decl.{Exchange, ExchangeBinding, Queue}
+import com.itv.bucky.decl.{Direct, Exchange, ExchangeBinding, Headers, Queue, Topic}
 import com.itv.bucky.publish._
 import com.itv.bucky.{ExchangeName, Handler, PayloadMarshaller, PublisherSugar, QueueName, RequeueHandler, RoutingKey}
 import org.scalatest.FunSuite
@@ -40,6 +40,30 @@ class PublishConsumeTest extends FunSuite with IOAmqpClientTest with Eventually 
     }
   }
 
+  test("A message can be published to a Topic exchange and consumed from a queue bound with wildcard routing key") {
+    runAmqpTest { client =>
+      val exchange = ExchangeName("anexchange")
+      val queue    = QueueName("aqueue")
+      val rk       = RoutingKey("ark")
+      val message  = "Hello"
+      val commandBuilder = PublishCommandBuilder
+        .publishCommandBuilder[String](StringPayloadMarshaller)
+        .using(exchange)
+        .using(rk)
+        .toPublishCommand(message)
+      val handler      = StubHandlers.ackHandler[IO, Delivery]
+      val declarations = List(Queue(queue), Exchange(exchange, exchangeType = Topic).binding((RoutingKey("#"), queue)))
+
+      Resource.liftF(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
+        for {
+          _ <- client.publisher()(commandBuilder)
+        } yield {
+          handler.receivedMessages should have size 1
+        }
+      }
+    }
+  }
+
   test("Can simulate exchange bindings") {
     runAmqpTest { client =>
       val exchangeA = ExchangeName("a")
@@ -60,7 +84,120 @@ class PublishConsumeTest extends FunSuite with IOAmqpClientTest with Eventually 
         .using(exchangeA)
         .using(rk)
         .toPublishCommand(message)
-      val handler      = StubHandlers.ackHandler[IO, Delivery]
+      val handler = StubHandlers.ackHandler[IO, Delivery]
+
+      Resource.liftF(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
+        for {
+          _ <- client.publisher()(commandBuilder)
+        } yield {
+          handler.receivedMessages should have size 1
+        }
+      }
+    }
+  }
+
+  test("Can simulate headers bindings (match any headers)") {
+    runAmqpTest { client =>
+      val exchange = ExchangeName("ex")
+      val queue    = QueueName("aqueue")
+      val rk       = RoutingKey("ark")
+      val otherRk  = RoutingKey("anrk")
+      val message  = "Hello"
+      val header   = "key" -> "val"
+
+      val declarations = List(
+        Queue(queue),
+        Exchange(exchange, Headers).binding(rk -> queue, Map("x-match" -> "any", header))
+      )
+
+      val commandBuilder = PublishCommandBuilder
+        .publishCommandBuilder[String](StringPayloadMarshaller)
+        .using(exchange)
+        .using(otherRk)
+        .using(MessageProperties.minimalBasic.withHeader(header))
+        .toPublishCommand(message)
+
+      val handler = StubHandlers.ackHandler[IO, Delivery]
+
+      Resource.liftF(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
+        for {
+          _ <- client.publisher()(commandBuilder)
+        } yield {
+          handler.receivedMessages should have size 1
+        }
+      }
+    }
+  }
+
+  test("Can simulate headers bindings (match ALL headers)") {
+    runAmqpTest { client =>
+      val exchange = ExchangeName("ex")
+      val queue    = QueueName("aqueue")
+      val rk       = RoutingKey("ark")
+      val otherRk  = RoutingKey("anrk")
+      val message  = "Hello"
+      val header   = "key" -> "val"
+      val header2  = "key2" -> "val2"
+
+      val declarations = List(
+        Queue(queue),
+        Exchange(exchange, Headers).binding(rk -> queue, Map("x-match" -> "all", header, header2))
+      )
+
+      val commandBuilder = PublishCommandBuilder
+        .publishCommandBuilder[String](StringPayloadMarshaller)
+        .using(exchange)
+        .using(otherRk)
+
+      val message1 = commandBuilder
+        .using(MessageProperties.minimalBasic.withHeader(header))
+        .toPublishCommand(message)
+
+      val message2 = commandBuilder
+        .using(MessageProperties.minimalBasic.withHeader(header).withHeader(header2))
+        .toPublishCommand(message)
+
+      val handler = StubHandlers.ackHandler[IO, Delivery]
+
+      Resource.liftF(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
+        for {
+          _ <- client.publisher()(message1)
+          firstCount = handler.receivedMessages.size
+          _ <- client.publisher()(message2)
+          secondCount = handler.receivedMessages.size
+        } yield {
+          firstCount shouldBe 0
+          secondCount shouldBe 1
+        }
+      }
+    }
+  }
+
+  test("Can simulate exchange binding with a Headers destination exchange") {
+    runAmqpTest { client =>
+      val exchangeA = ExchangeName("a")
+      val exchangeB = ExchangeName("b")
+      val queue     = QueueName("aqueue")
+      val rk        = RoutingKey("ark")
+      val otherRk   = RoutingKey("anrk")
+      val message   = "Hello"
+      val header    = "key" -> "val"
+
+      val declarations = List(
+        Queue(queue),
+        Exchange(exchangeA),
+        Exchange(exchangeB, Headers).binding(rk -> queue, Map("x-match" -> "any", header)),
+        ExchangeBinding(exchangeB, exchangeA, otherRk)
+      )
+
+      val commandBuilder = PublishCommandBuilder
+        .publishCommandBuilder[String](StringPayloadMarshaller)
+        .using(exchangeA)
+        .using(otherRk)
+        .using(MessageProperties.minimalBasic.withHeader(header))
+        .toPublishCommand(message)
+
+      val handler = StubHandlers.ackHandler[IO, Delivery]
 
       Resource.liftF(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
         for {

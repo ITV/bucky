@@ -6,8 +6,8 @@ import java.util.concurrent.atomic.AtomicLong
 import com.itv.bucky
 import com.itv.bucky.consume._
 import com.itv.bucky.publish._
-import com.itv.bucky.{Channel, Envelope, Handler, QueueName}
-import com.itv.bucky.decl.{Binding, Exchange, ExchangeBinding, Queue}
+import com.itv.bucky.{Channel, Envelope, ExchangeName, Handler, QueueName, RoutingKey}
+import com.itv.bucky.decl.{Binding, Direct, Exchange, ExchangeBinding, ExchangeType, Headers, Queue, Topic}
 import com.rabbitmq.client.ConfirmListener
 import cats._
 import cats.effect._
@@ -44,21 +44,84 @@ abstract class StubChannel[F[_]](implicit F: ConcurrentEffect[F]) extends Channe
   def handlePublishHandlersResult(result: Either[Throwable, List[ConsumeAction]]): F[Unit]
 
   private def lookupQueues(publishCommand: PublishCommand): List[QueueName] = {
-    val exchangeBindingExchanges =
+    val matchingExchanges = exchanges.filter(ex => ex.name == publishCommand.exchange)
+
+    matchingExchanges.flatMap { ex =>
+      if (ex.exchangeType == Headers) lookupQueuesForHeadersExchange(publishCommand)
+      else lookupQueuesForRoutingKeyExchange(publishCommand)
+    }.toList
+  }
+
+  private def lookupExchangeType(exchangeName: ExchangeName): Option[ExchangeType] =
+    exchanges.find(_.name == exchangeName).map(ex => ex.exchangeType)
+
+  private def routingKeysMatch(decRk: RoutingKey, publishedRk: RoutingKey, exchangeType: Option[ExchangeType]): Boolean =
+    exchangeType match {
+      case Some(Topic) if decRk == publishedRk || decRk == RoutingKey("#") => true
+      case Some(Topic) if decRk.value.contains("#")                        => throw new RuntimeException("Partial routing key matching not supported by bucky-test")
+      case Some(_)                                                         => decRk == publishedRk
+      case None                                                            => false
+    }
+
+  private def lookupQueuesForRoutingKeyExchange(publishCommand: PublishCommand): List[QueueName] = {
+    val boundExchangesRkRouting =
       exchangeBindings
-        .filter(b => b.sourceExchangeName == publishCommand.exchange && b.routingKey == publishCommand.routingKey)
+        .filter(
+          b =>
+            b.sourceExchangeName == publishCommand.exchange && routingKeysMatch(b.routingKey,
+                                                                                publishCommand.routingKey,
+                                                                                lookupExchangeType(b.sourceExchangeName)) && !lookupExchangeType(
+              b.destinationExchangeName).contains(Headers))
+        .map(_.destinationExchangeName)
+        .toSet
+
+    val boundExchangesHeaderRouting =
+      exchangeBindings
+        .filter(
+          b =>
+            b.sourceExchangeName == publishCommand.exchange && routingKeysMatch(b.routingKey,
+                                                                                publishCommand.routingKey,
+                                                                                lookupExchangeType(b.sourceExchangeName)) && lookupExchangeType(
+              b.destinationExchangeName).contains(Headers))
         .map(_.destinationExchangeName)
         .toSet
 
     ((bindings
-      .filter(binding => binding.exchangeName == publishCommand.exchange && binding.routingKey == publishCommand.routingKey)
+      .filter(
+        binding =>
+          binding.exchangeName == publishCommand.exchange && routingKeysMatch(binding.routingKey,
+                                                                              publishCommand.routingKey,
+                                                                              lookupExchangeType(binding.exchangeName)))
       .map(_.queueName)
       .toList)
-    ++
+      ++
+        (bindings
+          .filter(
+            binding =>
+              boundExchangesRkRouting(binding.exchangeName) && routingKeysMatch(binding.routingKey,
+                                                                                publishCommand.routingKey,
+                                                                                lookupExchangeType(binding.exchangeName)))
+          .map(_.queueName)
+          .toList)
+
+      ++ boundExchangesHeaderRouting.flatMap(ex => lookupQueuesForHeadersExchange(publishCommand.copy(exchange = ex))))
+  }
+
+  private def lookupQueuesForHeadersExchange(publishCommand: PublishCommand): List[QueueName] = {
+    def headersMatch(bindingArgs: Map[String, AnyRef]): Boolean = {
+      val matchType = bindingArgs.getOrElse("x-match", "all")
+
+      if (matchType == "any") {
+        bindingArgs.filterKeys(_ != "x-match").exists(arg => publishCommand.basicProperties.headers.toSet.contains(arg))
+      } else if (matchType == "all") {
+        bindingArgs.filterKeys(_ != "x-match").forall(arg => publishCommand.basicProperties.headers.toSet.contains(arg))
+      } else throw new RuntimeException(s"Binding declared with x-match argument not equal to 'any' or 'all'. Exchange: ${publishCommand.exchange}")
+    }
+
     (bindings
-      .filter(binding => exchangeBindingExchanges(binding.exchangeName) && binding.routingKey == publishCommand.routingKey)
+      .filter(binding => binding.exchangeName == publishCommand.exchange && headersMatch(binding.arguments))
       .map(_.queueName)
-      .toList))
+      .toList)
   }
 
   override def publish(sequenceNumber: Long, cmd: PublishCommand): F[Unit] = {
