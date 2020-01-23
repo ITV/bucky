@@ -1,23 +1,23 @@
 import sbt.Attributed
 import sbt.Keys.{publishArtifact, _}
-import ReleaseTransformations._
-import com.typesafe.sbt.pgp.PgpKeys.{publishSigned, publishLocalSigned}
+import sbtrelease.ReleasePlugin.autoImport.ReleaseTransformations._
 
 name := "bucky"
 
-crossScalaVersions := Seq("2.11.8", "2.12.7")
+crossScalaVersions := Seq("2.11.8", "2.12.10")
+scalaVersion := "2.12.10"
 scalacOptions += "-Ypartial-unification"
 
-val amqpClientVersion   = "5.6.0"
-val scalaLoggingVersion = "3.9.0"
-val scalaTestVersion    = "3.0.5"
-val argonautVersion     = "6.2.2"
-val circeVersion        = "0.11.1"
-val typeSafeVersion     = "1.3.3"
-val catsEffectVersion  = "1.2.0"
-val scalaXmlVersion     = "1.1.1"
-val scalaz = "7.2.22"
-val logbackVersion = "1.2.3"
+val amqpClientVersion   = "5.8.0"
+val scalaLoggingVersion = "3.9.2"
+val scalaTestVersion    = "3.0.8"
+val argonautVersion     = "6.2.3"
+val circeVersion        = "0.12.3"
+val typeSafeVersion     = "1.4.0"
+val catsEffectVersion   = "2.0.0"
+val scalaXmlVersion     = "1.2.0"
+val scalaz              = "7.2.22"
+val logbackVersion      = "1.2.3"
 val kamonVersion        = "1.1.0"
 
 releaseProcess := Seq[ReleaseStep](
@@ -50,7 +50,7 @@ pgpPassphrase := Option(System.getenv("GPG_KEY_PASSPHRASE")).map(_.toArray)
 
 lazy val kernelSettings = Seq(
   organization := "com.itv",
-  scalaVersion := "2.12.1",
+  scalaVersion := "2.12.10",
   scalacOptions ++= Seq("-feature", "-deprecation", "-Xfatal-warnings"),
   publishTo := {
     val nexus = "https://oss.sonatype.org/"
@@ -127,7 +127,7 @@ lazy val kernelSettings = Seq(
           <organizationUrl>http://www.itv.com</organizationUrl>
         </developer>
       </developers>
-    )
+  )
 )
 
 lazy val core = project
@@ -136,12 +136,11 @@ lazy val core = project
   .settings(kernelSettings: _*)
   .settings(
     libraryDependencies ++= Seq(
-      "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
-      "org.scalatest"              %% "scalatest"     % scalaTestVersion % "test",
-      "org.typelevel" %% "cats-core" % "1.6.0",
-      "org.typelevel" %% "cats-effect" % "1.2.0",
-      "com.rabbitmq"               % "amqp-client"    % amqpClientVersion,
-      "ch.qos.logback"             % "logback-classic"            % logbackVersion % "test,it"
+      "com.typesafe.scala-logging" %% "scala-logging"  % scalaLoggingVersion,
+      "org.scalatest"              %% "scalatest"      % scalaTestVersion % "test",
+      "org.typelevel"              %% "cats-effect"    % catsEffectVersion,
+      "com.rabbitmq"               % "amqp-client"     % amqpClientVersion,
+      "ch.qos.logback"             % "logback-classic" % logbackVersion % "test,it"
     )
   )
   .configs(IntegrationTest)
@@ -155,12 +154,12 @@ lazy val test = project
   .settings(Defaults.itSettings)
   .settings(
     libraryDependencies ++= Seq(
-      "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
-      "org.scalatest"              %% "scalatest"     % scalaTestVersion % "test,it",
-      "org.typelevel"              %% "cats-effect"   % catsEffectVersion,
-      "com.rabbitmq"               % "amqp-client"    % amqpClientVersion,
-      "com.typesafe"               % "config"         % typeSafeVersion % "it",
-      "ch.qos.logback"             % "logback-classic"            % logbackVersion % "it"
+      "com.typesafe.scala-logging" %% "scala-logging"  % scalaLoggingVersion,
+      "org.scalatest"              %% "scalatest"      % scalaTestVersion % "test,it",
+      "org.typelevel"              %% "cats-effect"    % catsEffectVersion,
+      "com.rabbitmq"               % "amqp-client"     % amqpClientVersion,
+      "com.typesafe"               % "config"          % typeSafeVersion % "it",
+      "ch.qos.logback"             % "logback-classic" % logbackVersion % "it"
     )
   )
 
@@ -264,6 +263,5 @@ lazy val xml = project
   )
 
 lazy val root = (project in file("."))
-  .aggregate(xml, circe, kamon,  argonaut, example, test, core)
+  .aggregate(xml, circe, kamon, argonaut, example, test, core)
   .settings(publishArtifact := false)
-
