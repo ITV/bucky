@@ -4,7 +4,7 @@ import sbtrelease.ReleasePlugin.autoImport.ReleaseTransformations._
 
 name := "bucky"
 
-crossScalaVersions := Seq("2.11.8", "2.12.10")
+crossScalaVersions := Seq("2.12.10")
 scalaVersion := "2.12.10"
 scalacOptions += "-Ypartial-unification"
 
