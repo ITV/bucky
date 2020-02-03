@@ -58,8 +58,8 @@ abstract class StubChannel[F[_]](implicit F: ConcurrentEffect[F]) extends Channe
   private def routingKeysMatch(decRk: RoutingKey, publishedRk: RoutingKey, exchangeType: Option[ExchangeType]): Boolean =
     exchangeType match {
       case Some(Topic) if decRk == publishedRk || decRk == RoutingKey("#") => true
-      case Some(Topic) if decRk.value.count(_ == '#') == 1 && decRk.value.endsWith("#") =>
-        publishedRk.value.startsWith(decRk.value.replace("#", ""))
+      case Some(Topic) if decRk.value.count(_ == '#') == 1 && decRk.value.endsWith(".#") =>
+        publishedRk.value.startsWith(decRk.value.replace(".#", ""))
       case Some(Topic) if decRk.value.contains("#")                        => throw new RuntimeException("Partial routing key matching not supported by bucky-test")
       case Some(_)                                                         => decRk == publishedRk
       case None                                                            => false
