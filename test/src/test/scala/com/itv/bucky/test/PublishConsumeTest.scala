@@ -64,11 +64,12 @@ class PublishConsumeTest extends FunSuite with IOAmqpClientTest with Eventually 
     }
   }
 
-  test("A message can be published to a Topic exchange and consumed from a queue bound with wildcard suffix routing key") {
+  test("A message can be published to a Topic exchange and consumed from a queue bound with wildcard suffix routing key" +
+    "which matches more than 0 words") {
     runAmqpTest { client =>
       val exchange = ExchangeName("anexchange")
       val queue    = QueueName("aqueue")
-      val rkRouted       = RoutingKey("ark")
+      val rkRouted       = RoutingKey("ar.k")
       val rkUnrouted       = RoutingKey("ask")
       val message  = "Hello"
       val commandBuilder = PublishCommandBuilder
@@ -76,7 +77,33 @@ class PublishConsumeTest extends FunSuite with IOAmqpClientTest with Eventually 
         .using(exchange)
 
       val handler      = StubHandlers.ackHandler[IO, Delivery]
-      val declarations = List(Queue(queue), Exchange(exchange, exchangeType = Topic).binding((RoutingKey("ar#"), queue)))
+      val declarations = List(Queue(queue), Exchange(exchange, exchangeType = Topic).binding((RoutingKey("ar.#"), queue)))
+
+      Resource.liftF(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
+        for {
+          _ <- client.publisher()(commandBuilder.using(rkRouted).toPublishCommand(message))
+          _ <- client.publisher()(commandBuilder.using(rkUnrouted).toPublishCommand(message))
+        } yield {
+          handler.receivedMessages should have size 1
+        }
+      }
+    }
+  }
+
+  test("A message can be published to a Topic exchange and consumed from a queue bound with wildcard suffix routing key" +
+    "which matches 0 words") {
+    runAmqpTest { client =>
+      val exchange = ExchangeName("anexchange")
+      val queue    = QueueName("aqueue")
+      val rkRouted       = RoutingKey("ar")
+      val rkUnrouted       = RoutingKey("ask")
+      val message  = "Hello"
+      val commandBuilder = PublishCommandBuilder
+        .publishCommandBuilder[String](StringPayloadMarshaller)
+        .using(exchange)
+
+      val handler      = StubHandlers.ackHandler[IO, Delivery]
+      val declarations = List(Queue(queue), Exchange(exchange, exchangeType = Topic).binding((RoutingKey("ar.#"), queue)))
 
       Resource.liftF(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
         for {
