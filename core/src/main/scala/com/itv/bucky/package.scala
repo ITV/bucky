@@ -71,6 +71,25 @@ package object bucky {
         prefetchCount = prefetchCount
       )
 
+    def registerDeliveryRequeueConsumerOf[T](
+        queueName: QueueName,
+        handler: RequeueHandler[F, T],
+        requeuePolicy: RequeuePolicy = RequeuePolicy(maximumProcessAttempts = 10, requeueAfter = 3.minutes),
+        onHandlerException: RequeueConsumeAction = Requeue,
+        unmarshalFailureAction: RequeueConsumeAction = DeadLetter,
+        onRequeueExpiryAction: T => F[ConsumeAction] = (_: T) => F.point[ConsumeAction](DeadLetter),
+        prefetchCount: Int = defaultPreFetchCount)(implicit unmarshaller: DeliveryUnmarshaller[T], F: Sync[F]): Resource[F, Unit] =
+      new RequeueOps(amqpClient).requeueDeliveryHandlerOf[T](
+        queueName = queueName,
+        handler = handler,
+        requeuePolicy = requeuePolicy,
+        unmarshaller = unmarshaller,
+        onHandlerException = onHandlerException,
+        unmarshalFailureAction = unmarshalFailureAction,
+        onRequeueExpiryAction = onRequeueExpiryAction,
+        prefetchCount = prefetchCount
+      )
+
     def registerRequeueConsumer(
         queueName: QueueName,
         handler: RequeueHandler[F, Delivery],
