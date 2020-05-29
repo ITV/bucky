@@ -77,7 +77,7 @@ class WiringTest extends AnyFunSuite with StrictLogging {
         Exchange(ExchangeName("exchange"), Direct)
           .binding(RoutingKey("route") -> QueueName("queue"))
       ) ++
-        requeueDeclarations(QueueName("queue"), RoutingKey("route"))
+        requeueDeclarations(QueueName("queue"))
   }
 
 }

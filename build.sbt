@@ -170,7 +170,7 @@ lazy val test = project
       "org.typelevel"              %% "cats-effect"    % catsEffectVersion,
       "com.rabbitmq"               % "amqp-client"     % amqpClientVersion,
       "com.typesafe"               % "config"          % typeSafeVersion % "it",
-      "ch.qos.logback"             % "logback-classic" % logbackVersion % "it"
+      "ch.qos.logback"             % "logback-classic" % logbackVersion % "test,it"
     )
   )
 

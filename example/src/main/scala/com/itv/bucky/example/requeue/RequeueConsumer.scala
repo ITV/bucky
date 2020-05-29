@@ -19,7 +19,7 @@ object RequeueConsumer extends IOApp with StrictLogging {
 
   object Declarations {
     val queue = Queue(QueueName(s"requeue_string-1"))
-    val all: Iterable[Declaration] = basicRequeueDeclarations(queue.name, retryAfter = 1.second)
+    val all: Iterable[Declaration] = requeueDeclarations(queue.name, retryAfter = 1.second)
   }
 
   val config: Config = ConfigFactory.load("bucky")
