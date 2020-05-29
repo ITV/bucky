@@ -14,34 +14,21 @@ package object requeue {
 
   case class RequeuePolicy(maximumProcessAttempts: Int, requeueAfter: FiniteDuration)
 
-  def basicRequeueDeclarations(queueName: QueueName, retryAfter: FiniteDuration = 5.minutes): Iterable[Declaration] = {
-    val deadLetterQueueName: QueueName = QueueName(s"${queueName.value}.dlq")
-    val dlxExchangeName: ExchangeName  = ExchangeName(s"${queueName.value}.dlx")
-    requeueDeclarations(queueName,
-                        RoutingKey(queueName.value),
-                        Exchange(dlxExchangeName).binding(RoutingKey(queueName.value) -> deadLetterQueueName),
-                        retryAfter)
-  }
-
-  def requeueDeclarations(queueName: QueueName, routingKey: RoutingKey): Iterable[Declaration] =
-    requeueDeclarations(queueName, routingKey, Exchange(ExchangeName(s"${queueName.value}.dlx")))
-
   def requeueDeclarations(queueName: QueueName,
-                          routingKey: RoutingKey,
-                          deadletterExchange: Exchange,
                           retryAfter: FiniteDuration = 5.minutes): Iterable[Declaration] = {
+    val dlxExchangeName: ExchangeName  = ExchangeName(s"${queueName.value}.dlx")
     val deadLetterQueueName: QueueName      = QueueName(s"${queueName.value}.dlq")
     val requeueQueueName: QueueName         = QueueName(s"${queueName.value}.requeue")
     val redeliverExchangeName: ExchangeName = ExchangeName(s"${queueName.value}.redeliver")
     val requeueExchangeName: ExchangeName   = ExchangeName(s"${queueName.value}.requeue")
 
     List(
-      Queue(queueName).deadLetterExchange(deadletterExchange.name),
+      Queue(queueName).deadLetterExchange(dlxExchangeName),
       Queue(deadLetterQueueName),
       Queue(requeueQueueName).deadLetterExchange(redeliverExchangeName).messageTTL(retryAfter),
-      deadletterExchange.binding(routingKey              -> deadLetterQueueName),
-      Exchange(requeueExchangeName).binding(routingKey   -> requeueQueueName),
-      Exchange(redeliverExchangeName).binding(routingKey -> queueName)
+      Exchange(dlxExchangeName, exchangeType = Fanout).binding(RoutingKey("-") -> deadLetterQueueName),
+      Exchange(requeueExchangeName, exchangeType = Fanout).binding(RoutingKey("-") -> requeueQueueName),
+      Exchange(redeliverExchangeName, exchangeType = Fanout).binding(RoutingKey("-") -> queueName)
     )
   }
 

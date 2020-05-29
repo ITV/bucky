@@ -46,7 +46,7 @@ class ShutdownTimeoutTest extends FunSuite with Eventually with IntegrationPatie
     val exchangeName                                              = ExchangeName(UUID.randomUUID().toString)
     val routingKey                                                = RoutingKey(UUID.randomUUID().toString)
     val queueName                                                 = QueueName(UUID.randomUUID().toString)
-    val declarations                                              = List(Exchange(exchangeName).binding(routingKey -> queueName)) ++ requeue.requeueDeclarations(queueName, routingKey)
+    val declarations                                              = List(Exchange(exchangeName).binding(routingKey -> queueName)) ++ requeue.requeueDeclarations(queueName)
 
     AmqpClient[IO](config)
       .use { client =>

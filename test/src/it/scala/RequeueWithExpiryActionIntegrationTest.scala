@@ -58,7 +58,7 @@ class RequeueWithExpiryActionIntegrationTest extends FunSuite with Eventually wi
 
     val declarations = List(
       Exchange(exchangeName).binding(routingKey -> queueName)
-    ) ++ requeue.requeueDeclarations(queueName, routingKey)
+    ) ++ requeue.requeueDeclarations(queueName)
 
     AmqpClient[IO](config).use { client =>
       val handler = new RecordingRequeueHandler[IO, String](Kleisli(handlerAction).andThen(_ => IO(Requeue)).run)

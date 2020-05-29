@@ -52,7 +52,7 @@ class RequeueIntegrationTest extends FunSuite with Eventually with IntegrationPa
 
     val declarations = List(
       Exchange(exchangeName).binding(routingKey -> queueName)
-    ) ++ requeue.requeueDeclarations(queueName, routingKey)
+    ) ++ requeue.requeueDeclarations(queueName)
 
     AmqpClient[IO](config).use { client =>
       val handler = StubHandlers.requeueRequeueHandler[IO, Delivery]
