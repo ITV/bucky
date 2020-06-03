@@ -16,11 +16,11 @@ package object requeue {
 
   def requeueDeclarations(queueName: QueueName,
                           retryAfter: FiniteDuration = 5.minutes): Iterable[Declaration] = {
-    val dlxExchangeName: ExchangeName  = ExchangeName(s"${queueName.value}.dlx")
+    val dlxExchangeName: ExchangeName       = ExchangeName(s"${queueName.value}.dlx.v2")
     val deadLetterQueueName: QueueName      = QueueName(s"${queueName.value}.dlq")
     val requeueQueueName: QueueName         = QueueName(s"${queueName.value}.requeue")
-    val redeliverExchangeName: ExchangeName = ExchangeName(s"${queueName.value}.redeliver")
-    val requeueExchangeName: ExchangeName   = ExchangeName(s"${queueName.value}.requeue")
+    val redeliverExchangeName: ExchangeName = ExchangeName(s"${queueName.value}.redeliver.v2")
+    val requeueExchangeName: ExchangeName   = ExchangeName(s"${queueName.value}.requeue.v2")
 
     List(
       Queue(queueName).deadLetterExchange(dlxExchangeName),
@@ -54,7 +54,7 @@ package object requeue {
                   onHandlerException: RequeueConsumeAction = Requeue,
                   onRequeueExpiryAction: Delivery => F[ConsumeAction] = (_: Delivery) => F.point[ConsumeAction](DeadLetter),
                   prefetchCount: Int = defaultPreFetchCount): Resource[F, Unit] = {
-      val requeueExchange = ExchangeName(s"${queueName.value}.requeue")
+      val requeueExchange = ExchangeName(s"${queueName.value}.requeue.v2")
       val requeuePublish  = amqpClient.publisher()
       amqpClient.registerConsumer(queueName,
                                   RequeueTransformer(requeuePublish, requeueExchange, requeuePolicy, onHandlerException, onRequeueExpiryAction)(handler),
