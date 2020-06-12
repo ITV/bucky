@@ -48,6 +48,8 @@ pgpSigningKey := Some("4D815C603762F73A473009792DD6E012562E4F64")
 
 pgpPassphrase := Option(System.getenv("GPG_KEY_PASSPHRASE")).map(_.toArray)
 
+useGpg := false
+
 lazy val kernelSettings = Seq(
   organization := "com.itv",
   scalaVersion := "2.12.10",
