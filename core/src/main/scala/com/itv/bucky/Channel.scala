@@ -59,7 +59,7 @@ trait Channel[F[_]] {
 
 object Channel {
   def apply[F[_]](channel: RabbitChannel)(implicit F: ConcurrentEffect[F]): Channel[F] = new Channel[F] with StrictLogging {
-    import scala.collection.JavaConverters._
+    import scala.jdk.CollectionConverters._
 
     override def close(): F[Unit]                                       = F.delay(channel.close())
     override def purgeQueue(name: QueueName): F[Unit]                   = F.delay { channel.queuePurge(name.value) }

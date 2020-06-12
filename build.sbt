@@ -4,13 +4,15 @@ import sbtrelease.ReleasePlugin.autoImport.ReleaseTransformations._
 
 name := "bucky"
 
-crossScalaVersions := Seq("2.12.10")
-scalaVersion := "2.12.10"
+lazy val scala212 = "2.12.10"
+lazy val scala213 = "2.13.2"
+
+scalaVersion := scala212
 scalacOptions += "-Ypartial-unification"
 
 val amqpClientVersion   = "5.8.0"
 val scalaLoggingVersion = "3.9.2"
-val scalaTestVersion    = "3.0.8"
+val scalaTestVersion    = "3.1.2"
 val argonautVersion     = "6.2.3"
 val circeVersion        = "0.13.0"
 val typeSafeVersion     = "1.4.0"
@@ -49,8 +51,9 @@ pgpSigningKey := Some("4D815C603762F73A473009792DD6E012562E4F64")
 pgpPassphrase := Option(System.getenv("GPG_KEY_PASSPHRASE")).map(_.toArray)
 
 lazy val kernelSettings = Seq(
+  crossScalaVersions := Seq(scala212, scala213),
+  scalaVersion := scala212,
   organization := "com.itv",
-  scalaVersion := "2.12.10",
   scalacOptions ++= Seq("-feature", "-deprecation", "-Xfatal-warnings"),
   publishTo := {
     val nexus = "https://oss.sonatype.org/"
@@ -140,7 +143,8 @@ lazy val core = project
       "org.scalatest"              %% "scalatest"      % scalaTestVersion % "test",
       "org.typelevel"              %% "cats-effect"    % catsEffectVersion,
       "com.rabbitmq"               % "amqp-client"     % amqpClientVersion,
-      "ch.qos.logback"             % "logback-classic" % logbackVersion % "test,it"
+      "ch.qos.logback"             % "logback-classic" % logbackVersion % "test,it",
+      "org.scala-lang.modules" %% "scala-collection-compat" % "2.1.6"
     )
   )
   .configs(IntegrationTest)
@@ -150,6 +154,7 @@ lazy val test = project
   .settings(moduleName := "bucky-test")
   .settings(kernelSettings: _*)
   .dependsOn(core)
+  .aggregate(core)
   .configs(IntegrationTest)
   .settings(Defaults.itSettings)
   .settings(
@@ -167,8 +172,8 @@ lazy val example = project
   .settings(name := "com.itv")
   .settings(moduleName := "bucky-example")
   .settings(kernelSettings: _*)
-  .aggregate(core, argonaut, circe)
-  .dependsOn(core, argonaut, circe)
+  .aggregate(core, argonaut, circe, test)
+  .dependsOn(core, argonaut, circe, test)
   .settings(
     libraryDependencies ++= Seq(
       "io.argonaut"                %% "argonaut"      % argonautVersion,
@@ -229,7 +234,8 @@ lazy val kamon = project
   .settings(Defaults.itSettings)
   .settings(
     internalDependencyClasspath in IntegrationTest += Attributed.blank((classDirectory in Test).value),
-    parallelExecution in IntegrationTest := false
+    parallelExecution in IntegrationTest := false,
+    crossScalaVersions := Seq(scala212)
   )
   .settings(
     libraryDependencies ++= Seq(

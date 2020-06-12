@@ -8,13 +8,15 @@ import com.itv.bucky.consume._
 import com.itv.bucky.decl.{Direct, Exchange, ExchangeBinding, Headers, Queue, Topic}
 import com.itv.bucky.publish._
 import com.itv.bucky.{ExchangeName, Handler, PayloadMarshaller, PublisherSugar, QueueName, RequeueHandler, RoutingKey}
-import org.scalatest.FunSuite
+import org.scalatest.{EitherValues, FunSuite}
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers._
 
 import scala.language.reflectiveCalls
 
-class PublishConsumeTest extends FunSuite with IOAmqpClientTest with Eventually with IntegrationPatience with ScalaFutures {
+class PublishConsumeTest extends AnyFunSuite with IOAmqpClientTest with Eventually with IntegrationPatience with ScalaFutures with EitherValues {
 
   test("A message can be published and consumed") {
     runAmqpTest { client =>
@@ -307,8 +309,7 @@ class PublishConsumeTest extends FunSuite with IOAmqpClientTest with Eventually 
         for {
           publishResult <- client.publisher()(commandBuilder).attempt
         } yield {
-          publishResult shouldBe 'left
-          publishResult.left.get shouldBe a[TimeoutException]
+          publishResult.left.value shouldBe a[TimeoutException]
           handler.receivedMessages should have size 0
         }
       }

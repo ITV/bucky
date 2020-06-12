@@ -7,7 +7,10 @@ import com.itv.bucky.consume.{Ack, ConsumeAction, DeadLetter}
 import com.itv.bucky.{AmqpClient, ExchangeName, QueueName, RoutingKey}
 import com.itv.bucky.decl.{Declaration, Exchange, Queue}
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
-import org.scalatest.{FunSuite, Matchers}
+
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers._
+
 import com.itv.bucky.test._
 import com.itv.bucky._
 import com.itv.bucky.kamonSupport._
@@ -24,7 +27,7 @@ import kamon.executors.util.ContextAwareExecutorService
 import kamon.trace.Span.TagValue
 import kamon.trace.{IdentityProvider, Span}
 
-class KamonSupportTest extends FunSuite with Matchers with Eventually with SpanSupport {
+class KamonSupportTest extends AnyFunSuite with Eventually with SpanSupport {
   val queue = Queue(QueueName("kamon-spec-test"))
   val rk    = RoutingKey("kamon-spec-rk")
   val exchange = Exchange(ExchangeName("kamon-spec-exchange"))

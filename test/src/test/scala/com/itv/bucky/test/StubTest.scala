@@ -6,9 +6,10 @@ import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.consume.{Ack, DeadLetter}
 import com.itv.bucky.decl.{Exchange, Queue}
 import com.itv.bucky.{ExchangeName, QueueName, RoutingKey, consume, _}
-import org.scalatest.{FunSuite, Matchers}
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers._
 
-class StubTest extends FunSuite with Matchers with IOAmqpClientTest {
+class StubTest extends AnyFunSuite with IOAmqpClientTest {
   val exchange     = ExchangeName("anexchange")
   val queue        = QueueName("aqueue")
   val rk           = RoutingKey("ark")
@@ -106,7 +107,7 @@ class StubTest extends FunSuite with Matchers with IOAmqpClientTest {
           publishRes <- publisher(message).attempt
         } yield {
           consumer.receivedMessages shouldBe List(message)
-          publishRes shouldBe 'left
+          publishRes shouldBe Symbol("left")
         }
 
       }
@@ -126,7 +127,7 @@ class StubTest extends FunSuite with Matchers with IOAmqpClientTest {
         } yield {
           consumer.receivedMessages shouldBe List(message)
           consumer.returnedResults shouldBe List(Left(exception))
-          publishRes shouldBe 'left
+          publishRes shouldBe Symbol("left")
         }
       }
     }
@@ -144,7 +145,7 @@ class StubTest extends FunSuite with Matchers with IOAmqpClientTest {
           publishRes <- publisher(message).attempt
         } yield {
           consumer.receivedMessages shouldBe List(message)
-          publishRes shouldBe 'right
+          publishRes shouldBe Symbol("right")
         }
       }
     }
@@ -163,7 +164,7 @@ class StubTest extends FunSuite with Matchers with IOAmqpClientTest {
           publishRes <- publisher(message).attempt
         } yield {
           consumer.receivedMessages shouldBe List(message)
-          publishRes shouldBe 'right
+          publishRes shouldBe Symbol("right")
         }
       }
     }
@@ -182,7 +183,7 @@ class StubTest extends FunSuite with Matchers with IOAmqpClientTest {
         } yield {
           consumer.receivedMessages shouldBe List(message)
           consumer.returnedResults shouldBe List(Right(DeadLetter))
-          publishRes shouldBe 'right
+          publishRes shouldBe Symbol("right")
         }
       }
     }
@@ -202,7 +203,7 @@ class StubTest extends FunSuite with Matchers with IOAmqpClientTest {
         } yield {
           consumer.receivedMessages shouldBe List(message)
           consumer.returnedResults shouldBe List(Left(exception))
-          publishRes shouldBe 'left
+          publishRes shouldBe Symbol("left")
         }
       }
 

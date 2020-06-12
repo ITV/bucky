@@ -1,11 +1,11 @@
 package com.itv.bucky
 
-import org.scalatest.FunSuite
-import org.scalatest.Matchers._
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers._
 
 import scala.util.Random
 
-class PayloadTest extends FunSuite {
+class PayloadTest extends AnyFunSuite {
 
   test("2 Payload instances with identical values are considered equal") {
     val bytes = randomArrayOfBytes()
