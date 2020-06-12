@@ -44,7 +44,7 @@ pgpPublicRing := file("./ci/public.asc")
 
 pgpSecretRing := file("./ci/private.asc")
 
-pgpSigningKey := Some(-5373332187933973712L)
+pgpSigningKey := Some("4D815C603762F73A473009792DD6E012562E4F64")
 
 pgpPassphrase := Option(System.getenv("GPG_KEY_PASSPHRASE")).map(_.toArray)
 
