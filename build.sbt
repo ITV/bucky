@@ -33,6 +33,7 @@ releaseProcess := Seq[ReleaseStep](
   commitNextVersion,
   pushChanges
 )
+skip in publish in ThisBuild := true
 
 releaseCrossBuild := true
 publishMavenStyle := true
@@ -50,6 +51,8 @@ pgpSigningKey := Some("4D815C603762F73A473009792DD6E012562E4F64")
 
 pgpPassphrase := Option(System.getenv("GPG_KEY_PASSPHRASE")).map(_.toArray)
 
+useGpg := false
+
 lazy val kernelSettings = Seq(
   crossScalaVersions := Seq(scala212, scala213),
   scalaVersion := scala212,
@@ -62,6 +65,9 @@ lazy val kernelSettings = Seq(
     else
       Some("releases" at nexus + "service/local/staging/deploy/maven2")
   },
+  publishConfiguration := publishConfiguration.value.withOverwrite(isSnapshot.value),
+  publishLocalConfiguration := publishLocalConfiguration.value.withOverwrite(isSnapshot.value),
+  skip in publish := false,
   credentials ++= (for {
     username <- Option(System.getenv().get("SONATYPE_USER"))
     password <- Option(System.getenv().get("SONATYPE_PASS"))
