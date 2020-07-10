@@ -31,6 +31,7 @@ releaseProcess := Seq[ReleaseStep](
   commitNextVersion,
   pushChanges
 )
+skip in publish in ThisBuild := true
 
 releaseCrossBuild := true
 publishMavenStyle := true
@@ -63,6 +64,7 @@ lazy val kernelSettings = Seq(
   },
   publishConfiguration := publishConfiguration.value.withOverwrite(isSnapshot.value),
   publishLocalConfiguration := publishLocalConfiguration.value.withOverwrite(isSnapshot.value),
+  skip in publish := false,
   credentials ++= (for {
     username <- Option(System.getenv().get("SONATYPE_USER"))
     password <- Option(System.getenv().get("SONATYPE_PASS"))
