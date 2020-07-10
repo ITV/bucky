@@ -44,9 +44,11 @@ pgpPublicRing := file("./ci/public.asc")
 
 pgpSecretRing := file("./ci/private.asc")
 
-pgpSigningKey := Some(-5373332187933973712L)
+pgpSigningKey := Some(0x4D815C61)
 
 pgpPassphrase := Option(System.getenv("GPG_KEY_PASSPHRASE")).map(_.toArray)
+
+useGpg := false
 
 lazy val kernelSettings = Seq(
   organization := "com.itv",
