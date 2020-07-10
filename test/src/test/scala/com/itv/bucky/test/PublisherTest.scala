@@ -5,12 +5,14 @@ import cats.implicits._
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.publish._
 import com.itv.bucky.{ExchangeName, QueueName, RoutingKey, consume}
-import org.scalatest.{FunSuite, Matchers}
+import org.scalatest.EitherValues
 
 import scala.concurrent.duration._
 import scala.concurrent.{Future, TimeoutException}
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers._
 
-class PublisherTest extends FunSuite with Matchers with IOAmqpClientTest {
+class PublisherTest extends AnyFunSuite with IOAmqpClientTest with EitherValues {
   val exchange = ExchangeName("anexchange")
   val queue    = QueueName("aqueue")
   val rk       = RoutingKey("ark")
@@ -46,10 +48,9 @@ class PublisherTest extends FunSuite with Matchers with IOAmqpClientTest {
         listeners   <- IO(channel.confirmListeners.map(_.asInstanceOf[PendingConfirmListener[IO]]))
         pendingConf <- listeners.toList.map(_.pendingConfirmations.get).sequence
       } yield {
-        result shouldBe 'left
-        result.left.get shouldBe a[TimeoutException]
+        result.left.value shouldBe a[TimeoutException]
         withClue("Confirm listeners should be popped") {
-          pendingConf.flatMap(_.values) shouldBe 'empty
+          pendingConf.flatMap(_.values) shouldBe empty
         }
       }
     }
@@ -92,14 +93,12 @@ class PublisherTest extends FunSuite with Matchers with IOAmqpClientTest {
         areCompleted1 shouldBe List(false, false, false)
         areCompleted2 shouldBe List(true, true, true)
         val result1 :: result2 :: result3 :: Nil = result
-        result1 shouldBe 'left
-        result1.left.get shouldBe a[RuntimeException]
 
-        result2 shouldBe 'left
-        result2.left.get shouldBe a[RuntimeException]
+        result1.left.value shouldBe a[RuntimeException]
 
-        result3 shouldBe 'left
-        result3.left.get shouldBe a[RuntimeException]
+        result2.left.value shouldBe a[RuntimeException]
+
+        result3.left.value shouldBe a[RuntimeException]
       }
     }
   }
@@ -117,7 +116,7 @@ class PublisherTest extends FunSuite with Matchers with IOAmqpClientTest {
         _             <- IO(channel.confirmListeners.foreach(_.handleAck(0, false))) // ack 0
         _             <- IO(channel.confirmListeners.foreach(_.handleNack(2, true))) //nack 1, 2
         result <- IO.fromFuture(
-          IO(Future.sequence[Either[Throwable, Unit], List](List(publish1.attempt, publish2.attempt, publish3.attempt, publish4.attempt))))
+          IO(Future.sequence(List(publish1.attempt, publish2.attempt, publish3.attempt, publish4.attempt))))
         areCompleted2 <- IO(List(publish1.isCompleted, publish2.isCompleted, publish3.isCompleted, publish4.isCompleted))
       } yield {
         println(result)
@@ -125,8 +124,8 @@ class PublisherTest extends FunSuite with Matchers with IOAmqpClientTest {
         areCompleted2 shouldBe List(true, true, true, true)
 
         result.filter(_.isRight) should have size 1
-        result.filter(r => r.isLeft && r.left.get.isInstanceOf[RuntimeException]) should have size 2
-        result.filter(r => r.isLeft && r.left.get.isInstanceOf[TimeoutException]) should have size 1
+        result.filter(r => r.isLeft && r.left.value.isInstanceOf[RuntimeException]) should have size 2
+        result.filter(r => r.isLeft && r.left.value.isInstanceOf[TimeoutException]) should have size 1
       }
     }
   }

@@ -7,7 +7,7 @@ import com.rabbitmq.client.{Envelope => RabbitMQEnvelope}
 
 object MessagePropertiesConverters {
 
-  import scala.collection.JavaConverters._
+  import scala.jdk.CollectionConverters._
 
   def apply(envelope: RabbitMQEnvelope): Envelope =
     Envelope(envelope.getDeliveryTag, envelope.isRedeliver, ExchangeName(envelope.getExchange), RoutingKey(envelope.getRoutingKey))

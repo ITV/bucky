@@ -1,12 +1,14 @@
 package com.itv.bucky
 
 import com.itv.bucky.Unmarshaller._
-import org.scalatest.FunSuite
-import org.scalatest.Matchers._
 
 import scala.util.{Random, Try}
 import cats.implicits._
-class PayloadMarshalTest extends FunSuite {
+import org.scalatest.EitherValues
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers._
+
+class PayloadMarshalTest extends AnyFunSuite with EitherValues {
 
   test("Can marshal from/to String") {
     val value = Random.alphanumeric.take(10).mkString
@@ -29,7 +31,7 @@ class PayloadMarshalTest extends FunSuite {
 
     val value = Random.nextInt()
     Right(value) shouldBe Payload.from(value).unmarshal[Int]
-    "'blah' was not a valid integer" shouldBe Payload.from("blah").unmarshal[Int].left.get.getMessage
+    "'blah' was not a valid integer" shouldBe Payload.from("blah").unmarshal[Int].left.value.getMessage
   }
 
 }

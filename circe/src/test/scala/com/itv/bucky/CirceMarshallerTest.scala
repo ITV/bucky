@@ -4,10 +4,10 @@ import com.itv.bucky.circe.auto._
 import io.circe._
 import io.circe.generic.auto._
 import io.circe.syntax._
-import org.scalatest.FunSuite
-import org.scalatest.Matchers._
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers._
 
-class CirceMarshallerTest extends FunSuite {
+class CirceMarshallerTest extends AnyFunSuite {
 
   case class Foo(bar: String)
 

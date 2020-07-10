@@ -35,7 +35,9 @@ package object test {
     def publishTimeout[F[_]](implicit F: ConcurrentEffect[F], t: Timer[F], cs: ContextShift[F]): StubChannel[F] =
       new StubChannel[F]() {
         override def publish(sequenceNumber: Long, cmd: PublishCommand): F[Unit] = F.delay {
-          pubSeqLock.synchronized(publishSeq = sequenceNumber + 1)
+          pubSeqLock.synchronized {
+            publishSeq = sequenceNumber + 1
+          }
         }
         override def handlePublishHandlersResult(result: Either[Throwable, List[consume.ConsumeAction]]): F[Unit] =
           F.map(F.fromEither(result))(_ => ())

@@ -13,8 +13,10 @@ import com.itv.bucky.test.StubHandlers
 import com.itv.bucky.test.stubs.RecordingHandler
 import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.StrictLogging
-import org.scalatest.FunSuite
-import org.scalatest.Matchers._
+
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers._
+
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 
 import scala.collection.immutable.TreeSet
@@ -22,7 +24,7 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.higherKinds
 
-class HammerTest extends FunSuite with Eventually with IntegrationPatience with StrictLogging {
+class HammerTest extends AnyFunSuite with Eventually with IntegrationPatience with StrictLogging {
 
   case class TestFixture(stubHandler: RecordingHandler[IO, String], publisher: Publisher[IO, String], client: AmqpClient[IO])
 

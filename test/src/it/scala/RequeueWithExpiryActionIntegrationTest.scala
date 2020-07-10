@@ -15,8 +15,10 @@ import com.itv.bucky.publish._
 import com.itv.bucky.test.StubHandlers
 import com.itv.bucky.test.stubs.{RecordingHandler, RecordingRequeueHandler}
 import com.typesafe.config.ConfigFactory
-import org.scalatest.FunSuite
-import org.scalatest.Matchers._
+
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers._
+
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 
 import scala.collection.mutable.ListBuffer
@@ -24,7 +26,7 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.higherKinds
 
-class RequeueWithExpiryActionIntegrationTest extends FunSuite with Eventually with IntegrationPatience {
+class RequeueWithExpiryActionIntegrationTest extends AnyFunSuite with Eventually with IntegrationPatience {
 
   case class TestFixture(
                           stubHandler: RecordingRequeueHandler[IO, String],

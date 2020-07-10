@@ -8,8 +8,8 @@ import cats.effect.concurrent.{Deferred, Ref}
 import com.rabbitmq.client.ConfirmListener
 import com.typesafe.scalalogging.StrictLogging
 import scala.language.higherKinds
-
 import scala.collection.immutable.TreeMap
+import scala.collection.compat._
 
 private[bucky] case class PendingConfirmListener[F[_]](pendingConfirmations: Ref[F, TreeMap[Long, Deferred[F, Boolean]]])(
     implicit F: ConcurrentEffect[F])
@@ -19,7 +19,7 @@ private[bucky] case class PendingConfirmListener[F[_]](pendingConfirmations: Ref
   def pop[T](deliveryTag: Long, multiple: Boolean): F[List[Deferred[F, Boolean]]] =
     pendingConfirmations.modify { x =>
       if (multiple) {
-        val entries = x.until(deliveryTag + 1).toList
+        val entries = x.rangeUntil(deliveryTag + 1).toList
         (x -- entries.map { case (key, _) => key }, entries.map { case (_, value) => value })
       } else {
         (x - deliveryTag, x.get(deliveryTag).toList)

@@ -3,10 +3,12 @@ package com.itv.bucky
 import argonaut.Argonaut._
 import argonaut._
 import com.itv.bucky.ArgonautSupport._
-import org.scalatest.FunSuite
-import org.scalatest.Matchers._
 
-class ArgonautMarshallerTest extends FunSuite {
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers._
+
+
+class ArgonautMarshallerTest extends AnyFunSuite {
 
   case class Foo(bar: String)
 

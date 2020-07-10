@@ -14,15 +14,17 @@ import com.itv.bucky.publish._
 import com.itv.bucky.test.StubHandlers
 import com.itv.bucky.test.stubs.{RecordingHandler, RecordingRequeueHandler}
 import com.typesafe.config.ConfigFactory
-import org.scalatest.FunSuite
-import org.scalatest.Matchers._
+
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers._
+
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.higherKinds
 
-class ShutdownTimeoutTest extends FunSuite with Eventually with IntegrationPatience {
+class ShutdownTimeoutTest extends AnyFunSuite with Eventually with IntegrationPatience {
 
   case class TestFixture(stubHandler: RecordingRequeueHandler[IO, Delivery],
                          dlqHandler: RecordingHandler[IO, Delivery],

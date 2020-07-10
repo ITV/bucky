@@ -6,10 +6,10 @@ import com.itv.bucky.consume.Ack
 import com.itv.bucky.test.stubs.RecordingHandler
 import com.itv.bucky.wiring._
 import com.typesafe.scalalogging.StrictLogging
-import org.scalatest.FunSuite
-import org.scalatest.Matchers._
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers._
 
-class WiringPublishConsumeTest extends FunSuite with IOAmqpClientTest with StrictLogging {
+class WiringPublishConsumeTest extends AnyFunSuite with IOAmqpClientTest with StrictLogging {
 
   val incoming = new Wiring[String](WiringName("fs2.incoming"))
   val outgoing = new Wiring[String](WiringName("fs2.outgoing"))

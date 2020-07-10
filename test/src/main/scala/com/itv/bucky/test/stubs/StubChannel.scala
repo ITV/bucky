@@ -18,6 +18,7 @@ import com.typesafe.scalalogging.StrictLogging
 import scala.language.higherKinds
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
+import scala.collection.compat._
 
 abstract class StubChannel[F[_]](implicit F: ConcurrentEffect[F]) extends Channel[F] with StrictLogging {
   var publishSeq: Long                                                        = 0L
@@ -114,9 +115,9 @@ abstract class StubChannel[F[_]](implicit F: ConcurrentEffect[F]) extends Channe
       val matchType = bindingArgs.getOrElse("x-match", "all")
 
       if (matchType == "any") {
-        bindingArgs.filterKeys(_ != "x-match").exists(arg => publishCommand.basicProperties.headers.toSet.contains(arg))
+        bindingArgs.view.filterKeys(_ != "x-match").exists(arg => publishCommand.basicProperties.headers.toSet.contains(arg))
       } else if (matchType == "all") {
-        bindingArgs.filterKeys(_ != "x-match").forall(arg => publishCommand.basicProperties.headers.toSet.contains(arg))
+        bindingArgs.view.filterKeys(_ != "x-match").forall(arg => publishCommand.basicProperties.headers.toSet.contains(arg))
       } else throw new RuntimeException(s"Binding declared with x-match argument not equal to 'any' or 'all'. Exchange: ${publishCommand.exchange}")
     }
 
@@ -129,10 +130,12 @@ abstract class StubChannel[F[_]](implicit F: ConcurrentEffect[F]) extends Channe
   override def publish(sequenceNumber: Long, cmd: PublishCommand): F[Unit] = {
     val queues = lookupQueues(cmd)
     val subscribedHandlers = handlers
+      .view
       .filterKeys(queues.contains)
       .mapValues {
         case (handler, _) => handler
       }
+      .toMap
       .values
       .toList
     (for {

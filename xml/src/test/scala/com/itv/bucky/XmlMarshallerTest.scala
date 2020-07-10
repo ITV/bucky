@@ -1,9 +1,9 @@
 package com.itv.bucky
 
-import org.scalatest.FunSuite
-import org.scalatest.Matchers._
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers._
 
-class XmlMarshallerTest extends FunSuite {
+class XmlMarshallerTest extends AnyFunSuite {
 
   import com.itv.bucky.XmlSupport._
 
