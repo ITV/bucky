@@ -50,10 +50,6 @@ pgpPassphrase := Option(System.getenv("GPG_KEY_PASSPHRASE")).map(_.toArray)
 
 useGpg := false
 
-publishConfiguration := publishConfiguration.value.withOverwrite(isSnapshot.value)
-
-publishLocalConfiguration := publishLocalConfiguration.value.withOverwrite(isSnapshot.value)
-
 lazy val kernelSettings = Seq(
   organization := "com.itv",
   scalaVersion := "2.12.10",
