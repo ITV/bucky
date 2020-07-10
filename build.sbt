@@ -61,6 +61,8 @@ lazy val kernelSettings = Seq(
     else
       Some("releases" at nexus + "service/local/staging/deploy/maven2")
   },
+  publishConfiguration := publishConfiguration.value.withOverwrite(isSnapshot.value),
+  publishLocalConfiguration := publishLocalConfiguration.value.withOverwrite(isSnapshot.value),
   credentials ++= (for {
     username <- Option(System.getenv().get("SONATYPE_USER"))
     password <- Option(System.getenv().get("SONATYPE_PASS"))
