@@ -35,6 +35,20 @@ class KamonSupportTest extends AnyFunSuite with Matchers with Eventually with Te
 
   override def beforeEach(): Unit = reporter.clear()
 
+  test("Propagate the context via the headers") {
+    withPreDeclaredConsumer() { (reporter, publisher) =>
+      for {
+        _ <- publisher("some string")
+      } yield {
+        eventually(reporter.spans should have size 2)
+        val publishSpan = reporter.spans.find(_.operationName == s"bucky.publish.exchange.${exchange.name.value}").get
+        val consumeSpan = reporter.spans.find(_.operationName == s"bucky.consume.${queue.name.value}").get
+        publishSpan.id shouldBe consumeSpan.parentId
+        publishSpan.trace.id shouldBe consumeSpan.trace.id
+      }
+    }
+  }
+
   test("Register errors.") {
     withPreDeclaredConsumer(DeadLetter) { (reporter, publisher) =>
       for {

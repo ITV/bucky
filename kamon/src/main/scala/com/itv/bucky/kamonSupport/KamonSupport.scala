@@ -35,11 +35,11 @@ object KamonSupport {
             context       <- F.delay(Kamon.currentContext())
             clientSpan    <- F.delay(context.get(Span.Key))
             operationName <- s"bucky.publish.exchange.${cmd.exchange.value}".pure[F]
-            headers       <- headersFrom(context).pure[F]
             spanBuilder   <- F.delay(spanFor(operationName, clientSpan, cmd))
             span          <- F.delay(spanBuilder.start())
             newCtx        <- F.delay(context.withEntry(Span.Key, span))
             scope         <- F.delay(Kamon.storeContext(newCtx))
+            headers       <- headersFrom(newCtx).pure[F]
             newCmd        <- cmd.copy(basicProperties = cmd.basicProperties.copy(headers = cmd.basicProperties.headers ++ headers)).pure[F]
             result        <- originalPublisher(newCmd).attempt
             _             <- F.delay(scope.close())
