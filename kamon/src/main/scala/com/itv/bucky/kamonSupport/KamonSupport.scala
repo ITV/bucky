@@ -1,20 +1,18 @@
 package com.itv.bucky.kamonSupport
-import java.time.Instant
-
-import cats.effect.{ConcurrentEffect, IO, Resource}
-import com.itv.bucky.consume._
-import com.itv.bucky.{AmqpClient, Handler, Publisher, QueueName, decl}
-import cats.implicits._
-import cats._
-import kamon.{Kamon, context}
-import kamon.context.Context
-import kamon.trace.Tracer.SpanBuilder
-import kamon.trace.{Span, SpanCustomizer}
 import java.nio.charset.Charset
 
+import cats.effect.{ConcurrentEffect, Resource}
+import cats.implicits._
 import com.itv.bucky.LoggingAmqpClient.{logFailedHandler, logFailedPublishMessage, logSuccessfulHandler, logSuccessfullPublishMessage}
+import com.itv.bucky.consume._
 import com.itv.bucky.publish.PublishCommand
+import com.itv.bucky.{AmqpClient, Handler, Publisher, QueueName, decl}
+import kamon.Kamon
+import kamon.context.{Context, HttpPropagation}
+import kamon.tag.TagSet
+import kamon.trace.{Span, SpanBuilder}
 
+import scala.collection.mutable
 import scala.concurrent.duration._
 import scala.language.higherKinds
 import scala.util.Try
@@ -35,64 +33,62 @@ object KamonSupport {
         cmd: PublishCommand =>
           (for {
             context       <- F.delay(Kamon.currentContext())
-            clientSpan    <- F.delay(context.get(Span.ContextKey))
+            clientSpan    <- F.delay(context.get(Span.Key))
             operationName <- s"bucky.publish.exchange.${cmd.exchange.value}".pure[F]
             headers       <- headersFrom(context).pure[F]
             spanBuilder   <- F.delay(spanFor(operationName, clientSpan, cmd))
-            span          <- F.delay(context.get(SpanCustomizer.ContextKey).customize(spanBuilder).start())
-            newCtx        <- F.delay(context.withKey(Span.ContextKey, span))
+            span          <- F.delay(spanBuilder.start())
+            newCtx        <- F.delay(context.withEntry(Span.Key, span))
             scope         <- F.delay(Kamon.storeContext(newCtx))
             newCmd        <- cmd.copy(basicProperties = cmd.basicProperties.copy(headers = cmd.basicProperties.headers ++ headers)).pure[F]
             result        <- originalPublisher(newCmd).attempt
-            _             <- F.delay(Kamon.storeContext(context))
+            _             <- F.delay(scope.close())
             _             <- if (logging) result.fold(logFailedPublishMessage(_, charset, cmd), _ => logSuccessfullPublishMessage(charset, cmd)) else F.unit
             _ <- F.delay(
-              result.fold(e => span.addError("bucky.publish.failure", e).tag("result", "error"), _ => span.tag("result", "success"))
+              result.fold(e => span.fail("bucky.publish.failure", e).tag("result", "error"), _ => span.tag("result", "success"))
             )
-            _ <- F.delay(scope.close())
             _ <- F.delay(span.finish())
           } yield result).rethrow
       }
 
       private def spanFor(operationName: String, clientSpan: Span, cmd: PublishCommand): SpanBuilder = {
-        val span = Kamon
-          .buildSpan(operationName)
+        val span = Kamon.spanBuilder(operationName)
           .asChildOf(clientSpan)
-          .withMetricTag("span.kind", "bucky.publish")
-          .withMetricTag("component", "bucky")
-          .withMetricTag("exchange", cmd.exchange.value)
+          .tagMetrics(TagSet.from(Map(
+            "component" -> "bucky",
+            "span.kind" ->"bucky.publish",
+            "exchange" -> cmd.exchange.value
+          )))
 
         if (includePublishRK) {
-          span.withMetricTag("rk", cmd.routingKey.value)
+          span.tagMetrics("rk", cmd.routingKey.value)
         } else {
-          span.withTag("rk", cmd.routingKey.value)
+          span.tag("rk", cmd.routingKey.value)
         }
       }
 
-      private def headersFrom(ctx: Context): Map[String, AnyRef] =
-        Kamon
-          .contextCodec()
-          .HttpHeaders
-          .encode(ctx)
-          .values
-          .map { case (key, value) => (key, value) }
-          .toMap[String, AnyRef]
+      private def headersFrom(ctx: Context): Map[String, AnyRef] = {
+        def headerWriterFromMap(map: mutable.Map[String, String]): HttpPropagation.HeaderWriter = (header: String, value: String) => map.put(header, value)
+
+        val headers = mutable.Map.empty[String, String]
+        Kamon.defaultHttpPropagation().write(ctx, headerWriterFromMap(headers))
+        headers.toMap
+      }
 
       override def registerConsumer(queueN: QueueName, handler: Handler[F, Delivery], exceptionalAction: ConsumeAction, prefetchCount: Int, shutdownTimeout: FiniteDuration = 1.minutes,
                                     shutdownRetry: FiniteDuration = 500.millis): Resource[F, Unit] = {
         val newHandler = (delivery: Delivery) => {
           (for {
-            ctxMap      <- F.delay(contextMapFrom(delivery))
-            context     <- Kamon.contextCodec().HttpHeaders.decode(ctxMap).pure[F]
+            context      <- F.delay(contextFrom(delivery))
             spanBuilder <- consumerSpanFor(queueN, delivery, context).pure[F]
             span        <- F.delay(spanBuilder.start())
-            scope       <- F.delay(Kamon.storeContext(context.withKey(Span.ContextKey, span)))
+            scope       <- F.delay(Kamon.storeContext(context.withEntry(Span.Key, span)))
             result      <- handler(delivery).attempt
             end         <- F.delay(Kamon.clock().instant())
             _ <- if (logging)
               result.fold(logFailedHandler(charset, queueN, exceptionalAction, delivery, _), logSuccessfulHandler(charset, queueN, delivery, _))
             else F.unit
-            _ <- F.delay(result.leftMap(t => span.addError("bucky.consume.error", t).tag("result", exceptionalAction.toString.toLowerCase)))
+            _ <- F.delay(result.leftMap(t => span.fail("bucky.consume.error", t).tag("result", exceptionalAction.toString.toLowerCase)))
             _ <- F.delay(result.map(r => span.tag("result", r.toString.toLowerCase)))
             _ <- F.delay(scope.close())
             _ <- F.delay(span.finish(end))
@@ -101,23 +97,28 @@ object KamonSupport {
         amqpClient.registerConsumer(queueN, newHandler, exceptionalAction, prefetchCount)
       }
 
-      private def contextMapFrom(delivery: Delivery) = {
-        val contextMap = new context.TextMap.Default
-        delivery.properties.headers.foreach(t => Try { contextMap.put(t._1, t._2.toString) })
-        contextMap
+      private def contextFrom(delivery: Delivery): Context =
+        Kamon.defaultHttpPropagation().read(headerReaderFromMap(delivery.properties.headers.mapValues(_.toString)))
+
+      def headerReaderFromMap(map: Map[String, String]): HttpPropagation.HeaderReader = new HttpPropagation.HeaderReader {
+        override def read(header: String): Option[String] = map.get(header)
+        override def readAll(): Map[String, String] = map
       }
 
       private def consumerSpanFor(queueName: QueueName, d: Delivery, context: Context): SpanBuilder = {
         val span = Kamon
-          .buildSpan(s"bucky.consume.${queueName.value}")
-          .asChildOf(context.get(Span.ContextKey))
-          .withMetricTag("span.kind", "bucky.consume")
-          .withMetricTag("component", "bucky")
-          .withMetricTag("exchange", d.envelope.exchangeName.value)
+          .spanBuilder(s"bucky.consume.${queueName.value}")
+          .asChildOf(context.get(Span.Key))
+          .tagMetrics(TagSet.from(Map(
+            "component" -> "bucky",
+            "span.kind" -> "bucky.consume",
+            "exchange" -> d.envelope.exchangeName.value
+          )))
+
         if (includeConsumehRK) {
-          span.withMetricTag("rk", d.envelope.routingKey.value)
+          span.tagMetrics("rk", d.envelope.routingKey.value)
         } else {
-          span.withTag("rk", d.envelope.routingKey.value)
+          span.tag("rk", d.envelope.routingKey.value)
         }
       }
 

@@ -1,81 +1,80 @@
 package com.itv.bucky.kamonSupport
 
-import java.util.concurrent.Executors
+import java.util.concurrent.{ExecutorService, Executors}
 
 import cats.effect.{IO, Resource}
+import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.consume.{Ack, ConsumeAction, DeadLetter}
-import com.itv.bucky.{AmqpClient, ExchangeName, QueueName, RoutingKey}
-import com.itv.bucky.decl.{Declaration, Exchange, Queue}
-import org.scalatest.concurrent.{Eventually, IntegrationPatience}
-
-import org.scalatest.funsuite.AnyFunSuite
-import org.scalatest.matchers.should.Matchers._
-
+import com.itv.bucky.decl.{Exchange, Queue}
+import com.itv.bucky.publish.PublishCommandBuilder
 import com.itv.bucky.test._
 import com.itv.bucky._
-import com.itv.bucky.kamonSupport._
-import com.itv.bucky.test.stubs.{RecordingHandler, StubChannel, StubPublisher}
+import kamon.instrumentation.executor.ExecutorInstrumentation
+import kamon.tag.{Tag, TagSet}
+import kamon.testkit.TestSpanReporter
+import kamon.testkit.TestSpanReporter.BufferingSpanReporter
+import kamon.trace.Identifier
+import org.scalatest.concurrent.Eventually
+import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should._
+import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach}
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
-import cats._
-import cats.implicits._
-import cats.effect._
-import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
-import com.itv.bucky.publish.PublishCommandBuilder
-import kamon.executors.util.ContextAwareExecutorService
-import kamon.trace.Span.TagValue
-import kamon.trace.{IdentityProvider, Span}
+import scala.util.Random
 
-class KamonSupportTest extends AnyFunSuite with Eventually with SpanSupport {
+class KamonSupportTest extends AnyFunSuite with Matchers with Eventually with TestSpanReporter with BeforeAndAfterAll with BeforeAndAfterEach {
   val queue = Queue(QueueName("kamon-spec-test"))
   val rk    = RoutingKey("kamon-spec-rk")
   val exchange = Exchange(ExchangeName("kamon-spec-exchange"))
     .binding(rk -> queue.name)
 
-  test("Propagate the context.") {
-    withPreDeclaredConsumer() { (reporter, publisher, _) =>
-      for {
-        _ <- publisher("some string")
-      } yield {
-        eventually(reporter.spans should have size 2)
-        val publishSpan = reporter.spans.find(_.operationName == s"bucky.publish.exchange.${exchange.name.value}").get
-        val consumeSpan = reporter.spans.find(_.operationName == s"bucky.consume.${queue.name.value}").get
-        publishSpan.context.spanID shouldBe consumeSpan.context.parentID
-        publishSpan.context.traceID shouldBe consumeSpan.context.traceID
-      }
-    }
-  }
+  val reporter = testSpanReporter()
+
+  override def afterAll(): Unit = shutdownTestSpanReporter()
+
+  override def beforeEach(): Unit = reporter.clear()
 
   test("Register errors.") {
-    withPreDeclaredConsumer(DeadLetter) { (reporter, publisher, _) =>
+    withPreDeclaredConsumer(DeadLetter) { (reporter, publisher) =>
       for {
         _ <- publisher("some string")
       } yield {
         eventually(reporter.spans should have size 2)
         val publishSpan  = reporter.spans.find(_.operationName == s"bucky.publish.exchange.${exchange.name.value}").get
         val consumerSpan = reporter.spans.find(_.operationName == s"bucky.consume.${queue.name.value}").get
-        publishSpan.tags.mapValues(fromTagValueToString) shouldBe Map(
+        tagSetToMap(publishSpan.metricTags) shouldBe Map(
           "span.kind" -> "bucky.publish",
           "component" -> "bucky",
           "rk"        -> rk.value,
           "exchange"  -> exchange.name.value,
+          "operation" -> "bucky.publish.exchange.kamon-spec-exchange",
+          "error" -> "false"
+        )
+
+        tagSetToMap(publishSpan.tags) shouldBe Map(
           "result"    -> "success"
         )
-        consumerSpan.tags.mapValues(fromTagValueToString) shouldBe Map(
+
+        tagSetToMap(consumerSpan.metricTags) shouldBe Map(
           "span.kind" -> "bucky.consume",
           "component" -> "bucky",
           "rk"        -> rk.value,
           "exchange"  -> exchange.name.value,
+          "operation" -> "bucky.consume.kamon-spec-test",
+          "error" -> "false"
+        )
+
+        tagSetToMap(consumerSpan.tags) shouldBe Map(
           "result"    -> "deadletter"
         )
       }
     }
   }
 
-  test("consumers should be able to obtain trace and span ids form incoming message hears") {
-    val spanId  = new IdentityProvider.Default().spanIdGenerator().generate().string
-    val traceId = new IdentityProvider.Default().traceIdGenerator().generate().string
+  test("consumers should be able to obtain trace and span ids form incoming message headers") {
+    val spanId  = Identifier.Scheme.Single.spanIdFactory.generate().string
+    val traceId = Identifier.Scheme.Single.traceIdFactory.generate().string
     val headers = Map[String, AnyRef](
       "X-B3-TraceId" -> traceId,
       "X-B3-SpanId"  -> spanId,
@@ -94,47 +93,47 @@ class KamonSupportTest extends AnyFunSuite with Eventually with SpanSupport {
       } yield {
         eventually(reporter.spans should have size 1)
         val consumeSpan = reporter.spans.find(_.operationName == s"bucky.consume.${queue.name.value}").get
-        consumeSpan.context.traceID.string shouldBe traceId
-        consumeSpan.context.parentID.string shouldBe spanId
+        consumeSpan.trace.id.string shouldBe traceId
+        consumeSpan.parentId.string shouldBe spanId
       }
     }
   }
 
+  def instrument(executor: ExecutorService): ExecutorService = {
+    ExecutorInstrumentation.instrument(executor, Random.nextString(10), ExecutorInstrumentation.DefaultSettings.propagateContextOnSubmit())
+  }
+
   def withPreDeclaredConsumer(consumeAction: ConsumeAction = Ack)(
-      test: (AccTestSpanReporter, Publisher[IO, String], RecordingHandler[IO, String]) => IO[Unit]): Unit =
-    withSpanReporter { reporter =>
-      {
-        val handler        = StubHandlers.recordingHandler[IO, String](_ => IO.delay(consumeAction))
-        val declarations   = List(queue, exchange) ++ exchange.bindings
-        val executor       = ContextAwareExecutorService(Executors.newFixedThreadPool(10))
-        implicit val ec    = ExecutionContext.fromExecutor(executor)
-        implicit val timer = IO.timer(ec)
-        implicit val cs    = IO.contextShift(ec)
-        val result = IOAmqpClientTest(ec, timer, cs)
-          .clientForgiving()
-          .map(_.withKamonSupport(false))
-          .use(client => {
-            (for {
-              _ <- Resource.liftF(client.declare(declarations))
-              _ <- client.registerConsumerOf(queue.name, handler)
-            } yield ()).use { _ =>
-              for {
-                _      <- cs.shift
-                result <- test(reporter, client.publisherOf[String](exchange.name, rk), handler).attempt
-              } yield result
-            }
-          })
-          .unsafeRunSync()
-        IO.fromEither(result).unsafeRunSync()
-      }
+      test: (BufferingSpanReporter, Publisher[IO, String]) => IO[Unit]): Unit = {
+      val handler = StubHandlers.recordingHandler[IO, String](_ => IO.delay(consumeAction))
+      val declarations = List(queue, exchange) ++ exchange.bindings
+      val executor = instrument(Executors.newFixedThreadPool(10))
+      implicit val ec = ExecutionContext.fromExecutor(executor)
+      implicit val timer = IO.timer(ec)
+      implicit val cs = IO.contextShift(ec)
+      val result = IOAmqpClientTest(ec, timer, cs)
+        .clientForgiving()
+        .map(_.withKamonSupport(true))
+        .use(client => {
+          (for {
+            _ <- Resource.liftF(client.declare(declarations))
+            _ <- client.registerConsumerOf(queue.name, handler)
+          } yield ()).use { _ =>
+            for {
+              _ <- cs.shift
+              result <- test(reporter, client.publisherOf[String](exchange.name, rk)).attempt
+            } yield result
+          }
+        })
+        .unsafeRunSync()
+      IO.fromEither(result).unsafeRunSync()
     }
 
-  def withChannel(test: (AccTestSpanReporter, Channel[IO]) => IO[Unit]) =
-    withSpanReporter { reporter =>
+  def withChannel(test: (BufferingSpanReporter, Channel[IO]) => IO[Unit]) =
       {
         val handler        = StubHandlers.recordingHandler[IO, String](_ => IO.delay(Ack))
         val declarations   = List(queue, exchange) ++ exchange.bindings
-        val executor       = ContextAwareExecutorService(Executors.newFixedThreadPool(10))
+        val executor       = instrument(Executors.newFixedThreadPool(10))
         implicit val ec    = ExecutionContext.fromExecutor(executor)
         implicit val timer = IO.timer(ec)
         implicit val cs    = IO.contextShift(ec)
@@ -156,12 +155,8 @@ class KamonSupportTest extends AnyFunSuite with Eventually with SpanSupport {
 
         IO.fromEither(result).unsafeRunSync()
       }
-    }
 
-  def fromTagValueToString(tagValue: TagValue): String =
-    tagValue match {
-      case boolean: TagValue.Boolean => s"${boolean.text}"
-      case TagValue.String(string)   => s"$string"
-      case TagValue.Number(number)   => s"$number"
-    }
+
+  def tagSetToMap(tagSet: TagSet): Map[String, String] =
+    tagSet.all().map(t => (t.key, Tag.unwrapValue(t).toString)).toMap
 }

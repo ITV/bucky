@@ -20,7 +20,7 @@ val catsEffectVersion   = "2.0.0"
 val scalaXmlVersion     = "1.2.0"
 val scalaz              = "7.2.22"
 val logbackVersion      = "1.2.3"
-val kamonVersion        = "1.1.0"
+val kamonVersion        = "2.1.3"
 
 releaseProcess := Seq[ReleaseStep](
   checkSnapshotDependencies,
@@ -247,10 +247,9 @@ lazy val kamon = project
     libraryDependencies ++= Seq(
       "com.typesafe.scala-logging" %% "scala-logging"   % scalaLoggingVersion,
       "org.scalatest"              %% "scalatest"       % scalaTestVersion % "test, it",
-      "io.kamon"                   %% "kamon-core"      % kamonVersion,
-      "io.kamon"                   %% "kamon-testkit"   % kamonVersion % "test, it",
-      "ch.qos.logback"             % "logback-classic"  % logbackVersion % "test, it",
-      "io.kamon"                   %% "kamon-executors" % "1.0.2" % "test, it"
+      "io.kamon"                   %% "kamon-bundle"      % kamonVersion,
+      "io.kamon"                   %% "kamon-testkit"   % kamonVersion % "test",
+      "ch.qos.logback"             % "logback-classic"  % logbackVersion % "test, it"
     )
   )
 
