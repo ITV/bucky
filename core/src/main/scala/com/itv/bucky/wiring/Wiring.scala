@@ -25,7 +25,8 @@ class Wiring[T](
     setQueueName: Option[QueueName] = None,
     setExchangeType: Option[ExchangeType] = None,
     setRequeuePolicy: Option[RequeuePolicy] = None,
-    setPrefetchCount: Option[Int] = None
+    setPrefetchCount: Option[Int] = None,
+    setDeadLetterExchangeType: Option[ExchangeType] = None
 )(implicit
   val marshaller: PayloadMarshaller[T],
   val unmarshaller: PayloadUnmarshaller[T])
@@ -43,6 +44,10 @@ class Wiring[T](
     setRequeuePolicy.getOrElse(RequeuePolicy(maximumProcessAttempts = 10, 1.seconds))
   def prefetchCount: Int =
     setPrefetchCount.getOrElse(1)
+  lazy val dlxType: ExchangeType =
+    setDeadLetterExchangeType.getOrElse(Fanout)
+  def dlxRoutingKey: RoutingKey =
+    if (dlxType == Fanout) RoutingKey("-") else routingKey
 
   def exchange: Exchange =
     Exchange(exchangeName, exchangeType = exchangeType)
@@ -51,7 +56,7 @@ class Wiring[T](
   def publisherDeclarations: List[Declaration] =
     List(exchange)
   def consumerDeclarations: List[Declaration] =
-    List(exchangeWithBinding) ++ requeue.requeueDeclarations(queueName)
+    List(exchangeWithBinding) ++ requeue.requeueDeclarations(queueName, dlxType = dlxType, dlxRoutingKey)
   def allDeclarations: List[Declaration] =
     (publisherDeclarations ++ consumerDeclarations).distinct
 

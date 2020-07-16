@@ -7,17 +7,15 @@ import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
 import com.itv.bucky._
 import com.itv.bucky.consume._
-import com.itv.bucky.decl.Exchange
+import com.itv.bucky.decl.{Direct, Exchange}
 import com.itv.bucky.pattern.requeue
 import com.itv.bucky.pattern.requeue.RequeuePolicy
 import com.itv.bucky.publish._
 import com.itv.bucky.test.StubHandlers
 import com.itv.bucky.test.stubs.{RecordingHandler, RecordingRequeueHandler}
 import com.typesafe.config.ConfigFactory
-
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers._
-
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 
 import scala.concurrent.ExecutionContext
@@ -48,7 +46,7 @@ class ShutdownTimeoutTest extends AnyFunSuite with Eventually with IntegrationPa
     val exchangeName                                              = ExchangeName(UUID.randomUUID().toString)
     val routingKey                                                = RoutingKey(UUID.randomUUID().toString)
     val queueName                                                 = QueueName(UUID.randomUUID().toString)
-    val declarations                                              = List(Exchange(exchangeName).binding(routingKey -> queueName)) ++ requeue.requeueDeclarations(queueName)
+    val declarations                                              = List(Exchange(exchangeName).binding(routingKey -> queueName)) ++ requeue.requeueDeclarations(queueName, Direct, routingKey)
 
     AmqpClient[IO](config)
       .use { client =>

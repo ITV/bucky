@@ -379,7 +379,7 @@ class PublishConsumeTest extends AnyFunSuite with IOAmqpClientTest with Eventual
       val rk    = RoutingKey("ark")
 
       val declarations =
-        List(Queue(queue), Exchange(exchange).binding(rk -> queue)) ++ com.itv.bucky.pattern.requeue.requeueDeclarations(queue)
+        List(Queue(queue), Exchange(exchange).binding(rk -> queue)) ++ com.itv.bucky.pattern.requeue.requeueDeclarations(queue, Direct, rk)
 
       val requeueHandler = StubHandlers.ackHandler[IO, String]
 
