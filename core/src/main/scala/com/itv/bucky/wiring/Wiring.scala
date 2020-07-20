@@ -45,7 +45,7 @@ class Wiring[T](
   def prefetchCount: Int =
     setPrefetchCount.getOrElse(1)
   lazy val dlxType: ExchangeType =
-    setDeadLetterExchangeType.getOrElse(Direct)
+    setDeadLetterExchangeType.getOrElse(Fanout)
   def dlxRoutingKey: RoutingKey =
     if (dlxType == Fanout) RoutingKey("-") else routingKey
 
@@ -56,7 +56,7 @@ class Wiring[T](
   def publisherDeclarations: List[Declaration] =
     List(exchange)
   def consumerDeclarations: List[Declaration] =
-    List(exchangeWithBinding) ++ requeue.requeueDeclarations(queueName, dlxRoutingKey, Exchange(ExchangeName(s"${queueName.value}.dlx"), exchangeType = dlxType))
+    List(exchangeWithBinding) ++ requeue.requeueDeclarations(queueName, dlxRoutingKey, Some(ExchangeName(s"${queueName.value}.dlx")), dlxType)
   def allDeclarations: List[Declaration] =
     (publisherDeclarations ++ consumerDeclarations).distinct
 

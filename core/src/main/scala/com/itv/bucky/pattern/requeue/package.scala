@@ -14,26 +14,25 @@ package object requeue {
 
   case class RequeuePolicy(maximumProcessAttempts: Int, requeueAfter: FiniteDuration)
 
-  def requeueDeclarations(queueName: QueueName, routingKey: RoutingKey): Iterable[Declaration] =
-    requeueDeclarations(queueName, routingKey, Exchange(ExchangeName(s"${queueName.value}.dlx")))
-
   def requeueDeclarations(queueName: QueueName,
                           routingKey: RoutingKey,
-                          deadLetterExchange: Exchange,
+                          dlxName: Option[ExchangeName] = None,
+                          dlxType: ExchangeType = Fanout,
                           retryAfter: FiniteDuration = 5.minutes): Iterable[Declaration] = {
 
+    val name = dlxName.getOrElse(ExchangeName(s"${queueName.value}.dlx"))
     val deadLetterQueueName: QueueName = QueueName(s"${queueName.value}.dlq")
     val requeueQueueName: QueueName = QueueName(s"${queueName.value}.requeue")
     val redeliverExchangeName: ExchangeName = ExchangeName(s"${queueName.value}.redeliver")
     val requeueExchangeName: ExchangeName = ExchangeName(s"${queueName.value}.requeue")
 
     List(
-      Queue(queueName).deadLetterExchange(deadLetterExchange.name),
+      Queue(queueName).deadLetterExchange(name),
       Queue(deadLetterQueueName),
       Queue(requeueQueueName).deadLetterExchange(redeliverExchangeName).messageTTL(retryAfter),
-      Exchange(deadLetterExchange.name, exchangeType = deadLetterExchange.exchangeType).binding(routingKey -> deadLetterQueueName),
-      Exchange(requeueExchangeName, exchangeType = deadLetterExchange.exchangeType).binding(routingKey -> requeueQueueName),
-      Exchange(redeliverExchangeName, exchangeType = deadLetterExchange.exchangeType).binding(routingKey -> queueName)
+      Exchange(name, exchangeType = dlxType).binding(routingKey -> deadLetterQueueName),
+      Exchange(requeueExchangeName, exchangeType = dlxType).binding(routingKey -> requeueQueueName),
+      Exchange(redeliverExchangeName, exchangeType = dlxType).binding(routingKey -> queueName)
     )
   }
 

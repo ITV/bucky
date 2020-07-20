@@ -71,7 +71,7 @@ class WiringTest extends AnyFunSuite with StrictLogging {
   test("it should create declarations for publishers") {
     CustomTestWiring.publisherDeclarations shouldBe List(Exchange(ExchangeName("exchange")))
   }
-  test("it should create declarations for consumers with requeue exchange type of Direct by default") {
+  test("it should create declarations for consumers with requeue exchange type of Fanout by default") {
     val routingKey = RoutingKey("route")
     val queueName = QueueName("queue")
 
@@ -80,11 +80,11 @@ class WiringTest extends AnyFunSuite with StrictLogging {
         Exchange(ExchangeName("exchange"), Direct)
           .binding(routingKey -> queueName)
       ) ++
-        requeueDeclarations(QueueName("queue"), routingKey, Exchange(ExchangeName(s"${queueName.value}.dlx"), exchangeType = Direct))
+        requeueDeclarations(QueueName("queue"), RoutingKey("-"), Some(ExchangeName(s"${queueName.value}.dlx")), Fanout)
   }
   test("it should allow specification of dead letter exchange type") {
     val routingKey = RoutingKey("route")
-    val dlxType = Fanout
+    val dlxType = Direct
     val queueName = QueueName("queue")
     object CustomTestWiring
       extends Wiring[String](
@@ -102,7 +102,7 @@ class WiringTest extends AnyFunSuite with StrictLogging {
         Exchange(ExchangeName("exchange"), Direct)
           .binding(routingKey -> QueueName("queue"))
       ) ++
-        requeueDeclarations(QueueName("queue"), RoutingKey("-"), Exchange(ExchangeName(s"${queueName.value}.dlx"), exchangeType = dlxType))
+        requeueDeclarations(QueueName("queue"), routingKey, Some(ExchangeName(s"${queueName.value}.dlx")), dlxType)
   }
 
 }
