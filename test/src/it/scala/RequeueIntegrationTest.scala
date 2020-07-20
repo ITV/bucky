@@ -13,14 +13,12 @@ import com.itv.bucky.pattern.requeue.RequeuePolicy
 import com.itv.bucky.test.StubHandlers
 import com.itv.bucky.test.stubs.{RecordingHandler, RecordingRequeueHandler}
 import com.typesafe.config.ConfigFactory
-
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers._
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 
 import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext
-
 import scala.language.higherKinds
 
 class RequeueIntegrationTest extends AnyFunSuite with Eventually with IntegrationPatience {

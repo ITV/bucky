@@ -75,7 +75,7 @@ object Channel {
           channel
             .basicPublish(cmd.exchange.value, cmd.routingKey.value, false, false, MessagePropertiesConverters(cmd.basicProperties), cmd.body.value)
         )
-        _ <- F.delay(logger.debug("Published command with exchange:{} rk: {}.", cmd.exchange, cmd.routingKey))
+        _ <- F.delay(logger.info("Published message: {}", cmd))
       } yield ()
 
     override def sendAction(action: ConsumeAction)(envelope: Envelope): F[Unit] = action match {
@@ -122,18 +122,18 @@ object Channel {
                                   cs: ContextShift[F]): F[Unit] = {
 
       val deliveryCallback = new DefaultConsumer(channel) {
-        override def handleDelivery(consumerTag: String, envelope: RabbitMQEnvelope, properties: BasicProperties, body: Array[Byte]): Unit =
+        override def handleDelivery(consumerTag: String, envelope: RabbitMQEnvelope, properties: BasicProperties, body: Array[Byte]): Unit = {
+          val delivery = Consumer.deliveryFrom(consumerTag, envelope, properties, body)
           (for {
             _        <- cs.shift
-            delivery <- F.delay(Consumer.deliveryFrom(consumerTag, envelope, properties, body))
             _        <- F.delay(logger.debug("Received delivery with rk:{} on exchange: {}", delivery.envelope.routingKey, delivery.envelope.exchangeName))
             action   <- handler(delivery)
-            _        <- F.delay(logger.debug("Responding with {} to {} on {}", action, delivery))
+            _        <- F.delay(logger.info("Responding with {} to {} on {}", action, delivery, queue))
           } yield action).attempt
             .flatTap {
               case Left(e) =>
                 F.point {
-                  logger.error("Handler exception whilst processing delivery", e)
+                  logger.error(s"Handler exception whilst processing delivery: $delivery on $queue", e)
                 }
               case Right(_) =>
                 F.point {
@@ -147,6 +147,7 @@ object Channel {
             .flatMap(sendAction(_)(Envelope.fromEnvelope(envelope)))
             .toIO
             .unsafeRunAsyncAndForget
+          }
       }
       F.delay(channel.basicConsume(queue.value, false, consumerTag.value, deliveryCallback)).void
     }

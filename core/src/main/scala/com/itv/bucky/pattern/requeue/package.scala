@@ -14,34 +14,25 @@ package object requeue {
 
   case class RequeuePolicy(maximumProcessAttempts: Int, requeueAfter: FiniteDuration)
 
-  def basicRequeueDeclarations(queueName: QueueName, retryAfter: FiniteDuration = 5.minutes): Iterable[Declaration] = {
-    val deadLetterQueueName: QueueName = QueueName(s"${queueName.value}.dlq")
-    val dlxExchangeName: ExchangeName  = ExchangeName(s"${queueName.value}.dlx")
-    requeueDeclarations(queueName,
-                        RoutingKey(queueName.value),
-                        Exchange(dlxExchangeName).binding(RoutingKey(queueName.value) -> deadLetterQueueName),
-                        retryAfter)
-  }
-
-  def requeueDeclarations(queueName: QueueName, routingKey: RoutingKey): Iterable[Declaration] =
-    requeueDeclarations(queueName, routingKey, Exchange(ExchangeName(s"${queueName.value}.dlx")))
-
   def requeueDeclarations(queueName: QueueName,
                           routingKey: RoutingKey,
-                          deadletterExchange: Exchange,
+                          dlxName: Option[ExchangeName] = None,
+                          dlxType: ExchangeType = Fanout,
                           retryAfter: FiniteDuration = 5.minutes): Iterable[Declaration] = {
-    val deadLetterQueueName: QueueName      = QueueName(s"${queueName.value}.dlq")
-    val requeueQueueName: QueueName         = QueueName(s"${queueName.value}.requeue")
+
+    val name = dlxName.getOrElse(ExchangeName(s"${queueName.value}.dlx"))
+    val deadLetterQueueName: QueueName = QueueName(s"${queueName.value}.dlq")
+    val requeueQueueName: QueueName = QueueName(s"${queueName.value}.requeue")
     val redeliverExchangeName: ExchangeName = ExchangeName(s"${queueName.value}.redeliver")
-    val requeueExchangeName: ExchangeName   = ExchangeName(s"${queueName.value}.requeue")
+    val requeueExchangeName: ExchangeName = ExchangeName(s"${queueName.value}.requeue")
 
     List(
-      Queue(queueName).deadLetterExchange(deadletterExchange.name),
+      Queue(queueName).deadLetterExchange(name),
       Queue(deadLetterQueueName),
       Queue(requeueQueueName).deadLetterExchange(redeliverExchangeName).messageTTL(retryAfter),
-      deadletterExchange.binding(routingKey              -> deadLetterQueueName),
-      Exchange(requeueExchangeName).binding(routingKey   -> requeueQueueName),
-      Exchange(redeliverExchangeName).binding(routingKey -> queueName)
+      Exchange(name, exchangeType = dlxType).binding(routingKey -> deadLetterQueueName),
+      Exchange(requeueExchangeName, exchangeType = dlxType).binding(routingKey -> requeueQueueName),
+      Exchange(redeliverExchangeName, exchangeType = dlxType).binding(routingKey -> queueName)
     )
   }
 
@@ -56,7 +47,7 @@ package object requeue {
                                     unmarshalFailureAction: RequeueConsumeAction = DeadLetter,
                                     prefetchCount: Int = defaultPreFetchCount): Resource[F, Unit] = {
 
-      val deserializeHandler                              = new DeliveryUnmarshalHandler[F, T, RequeueConsumeAction](unmarshaller)(handler, unmarshalFailureAction)
+      val deserializeHandler = new DeliveryUnmarshalHandler[F, T, RequeueConsumeAction](unmarshaller)(handler, unmarshalFailureAction)
       val deserializeOnRequeueExpiryAction: Delivery => F[ConsumeAction] = new UnmarshalFailureAction[F, T](unmarshaller).apply(onRequeueExpiryAction)
       requeueOf(queueName, deserializeHandler, requeuePolicy, onHandlerException, deserializeOnRequeueExpiryAction, prefetchCount)
     }
@@ -68,10 +59,11 @@ package object requeue {
                   onRequeueExpiryAction: Delivery => F[ConsumeAction] = (_: Delivery) => F.point[ConsumeAction](DeadLetter),
                   prefetchCount: Int = defaultPreFetchCount): Resource[F, Unit] = {
       val requeueExchange = ExchangeName(s"${queueName.value}.requeue")
-      val requeuePublish  = amqpClient.publisher()
+      val requeuePublish = amqpClient.publisher()
       amqpClient.registerConsumer(queueName,
-                                  RequeueTransformer(requeuePublish, requeueExchange, requeuePolicy, onHandlerException, onRequeueExpiryAction)(handler),
-                                  prefetchCount = prefetchCount)
+        RequeueTransformer(requeuePublish, requeueExchange, requeuePolicy, onHandlerException, onRequeueExpiryAction)(handler),
+        prefetchCount = prefetchCount)
     }
   }
+
 }

@@ -71,13 +71,38 @@ class WiringTest extends AnyFunSuite with StrictLogging {
   test("it should create declarations for publishers") {
     CustomTestWiring.publisherDeclarations shouldBe List(Exchange(ExchangeName("exchange")))
   }
-  test("it should create declarations for consumers") {
+  test("it should create declarations for consumers with requeue exchange type of Fanout by default") {
+    val routingKey = RoutingKey("route")
+    val queueName = QueueName("queue")
+
     CustomTestWiring.consumerDeclarations shouldBe
       List(
         Exchange(ExchangeName("exchange"), Direct)
-          .binding(RoutingKey("route") -> QueueName("queue"))
+          .binding(routingKey -> queueName)
       ) ++
-        requeueDeclarations(QueueName("queue"), RoutingKey("route"))
+        requeueDeclarations(QueueName("queue"), RoutingKey("-"), Some(ExchangeName(s"${queueName.value}.dlx")), Fanout)
+  }
+  test("it should allow specification of dead letter exchange type") {
+    val routingKey = RoutingKey("route")
+    val dlxType = Direct
+    val queueName = QueueName("queue")
+    object CustomTestWiring
+      extends Wiring[String](
+        name = WiringName("test"),
+        setExchangeName = Some(ExchangeName("exchange")),
+        setRoutingKey = Some(routingKey),
+        setQueueName = Some(queueName),
+        setExchangeType = Some(Direct),
+        setRequeuePolicy = Some(RequeuePolicy(10, 1.hour)),
+        setPrefetchCount = Some(100),
+        setDeadLetterExchangeType = Some(dlxType)
+      )
+    CustomTestWiring.consumerDeclarations shouldBe
+      List(
+        Exchange(ExchangeName("exchange"), Direct)
+          .binding(routingKey -> QueueName("queue"))
+      ) ++
+        requeueDeclarations(QueueName("queue"), routingKey, Some(ExchangeName(s"${queueName.value}.dlx")), dlxType)
   }
 
 }

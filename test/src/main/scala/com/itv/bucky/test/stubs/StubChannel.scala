@@ -18,6 +18,7 @@ import com.typesafe.scalalogging.StrictLogging
 import scala.language.higherKinds
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
+import com.itv.bucky.decl.Fanout
 import scala.collection.compat._
 
 abstract class StubChannel[F[_]](implicit F: ConcurrentEffect[F]) extends Channel[F] with StrictLogging {
@@ -49,6 +50,7 @@ abstract class StubChannel[F[_]](implicit F: ConcurrentEffect[F]) extends Channe
 
     matchingExchanges.flatMap { ex =>
       if (ex.exchangeType == Headers) lookupQueuesForHeadersExchange(publishCommand)
+      else if (ex.exchangeType == Fanout) lookupQueuesForFanoutExchange(publishCommand)
       else lookupQueuesForRoutingKeyExchange(publishCommand)
     }.toList
   }
@@ -123,6 +125,13 @@ abstract class StubChannel[F[_]](implicit F: ConcurrentEffect[F]) extends Channe
 
     (bindings
       .filter(binding => binding.exchangeName == publishCommand.exchange && headersMatch(binding.arguments))
+      .map(_.queueName)
+      .toList)
+  }
+
+  private def lookupQueuesForFanoutExchange(publishCommand: PublishCommand): List[QueueName] = {
+    (bindings
+      .filter(binding => binding.exchangeName == publishCommand.exchange)
       .map(_.queueName)
       .toList)
   }

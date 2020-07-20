@@ -54,7 +54,7 @@ object MyApp extends IOApp {
   val declarations = List(
     Queue(QueueName("queue-name")),
     Exchange(ExchangeName("exchange-name")).binding(RoutingKey("rk") -> QueueName("queue-name"))
-  )
+  ) ++ requeueDeclarations(QueueName("queue-name"))
 
   class MyHandler extends RequeueHandler[IO, Message] {
     override def apply(m: Message): IO[RequeueConsumeAction] = IO(Ack)
