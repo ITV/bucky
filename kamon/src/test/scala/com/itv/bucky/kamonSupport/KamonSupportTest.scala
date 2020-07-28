@@ -138,7 +138,7 @@ class KamonSupportTest extends FunSuite with Matchers with Eventually with SpanS
         val actualChannel  = StubChannels.forgiving[IO]
         val channel        = Resource.make(IO(actualChannel))(_.close())
         val clientResource =
-          AmqpClient.apply[IO](Config.empty(3.seconds), () => channel.map(_.asInstanceOf[Channel[IO]]), channel.map(_.asInstanceOf[Channel[IO]]))
+          AmqpClient.apply[IO](Config.empty(3.seconds), () => channel.map(_.asInstanceOf[Channel[IO]]))
 
         val result =
           (for {

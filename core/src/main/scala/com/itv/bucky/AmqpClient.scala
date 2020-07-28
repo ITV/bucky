@@ -38,11 +38,12 @@ object AmqpClient extends StrictLogging {
           logger.info(s"Starting Channel")
           val channel = connection.createChannel()
           channel.addShutdownListener(new ShutdownListener {
-            override def shutdownCompleted(cause: ShutdownSignalException): Unit =
-              if (cause.isInitiatedByApplication)
+            override def shutdownCompleted(cause: ShutdownSignalException): Unit = {
+            if (cause.isInitiatedByApplication)
                 logger.info(s"Channel shut down due to explicit application action: ${cause.getMessage}")
               else
                 logger.error(s"Channel shut down by broker or because of detectable non-deliberate application failure", cause)
+              }
           })
           channel
         }
@@ -106,21 +107,19 @@ object AmqpClient extends StrictLogging {
                                             executionContext: ExecutionContext): Resource[F, AmqpClient[F]] =
     for {
       connection <- createConnection(config)
-      publishChannel = createChannel(connection).map(Channel.apply[F])
       buildChannel   = () => createChannel(connection).map(Channel.apply[F])
-      client <- apply[F](config, buildChannel, publishChannel)
+      client <- apply[F](config, buildChannel)
     } yield client
 
-  def apply[F[_]](config: AmqpClientConfig, buildChannel: () => Resource[F, Channel[F]], publishChannel: Resource[F, Channel[F]])(
+  def apply[F[_]](config: AmqpClientConfig, buildChannel: () => Resource[F, Channel[F]])(
       implicit F: ConcurrentEffect[F],
       cs: ContextShift[F],
       t: Timer[F],
-      executionContext: ExecutionContext): Resource[F, AmqpClient[F]] =
-    publishChannel.flatMap { channel =>
+      executionContext: ExecutionContext): Resource[F, AmqpClient[F]] = {
       val make =
         for {
           _                 <- cs.shift
-          connectionManager <- AmqpClientConnectionManager(config, channel)
+          connectionManager <- AmqpClientConnectionManager(config, buildChannel)
         } yield mkClient(buildChannel, connectionManager)
       Resource.make(make)(_ => F.unit)
     }
@@ -168,6 +167,6 @@ object AmqpClient extends StrictLogging {
       override def declare(declarations: Declaration*): F[Unit]          = connectionManager.declare(declarations)
       override def declare(declarations: Iterable[Declaration]): F[Unit] = connectionManager.declare(declarations)
 
-      override def isConnectionOpen: F[Boolean] = connectionManager.publishChannel.isConnectionOpen
+      override def isConnectionOpen: F[Boolean] = connectionManager.publishChannelRef.get.flatMap(_._1.isConnectionOpen)
     }
 }

@@ -13,7 +13,7 @@
     </appender>
 
     <logger name="ch.qos.logback" level="WARN"/>
-    <logger name="com.itv" level="ERROR"/>
+    <logger name="com.itv" level="INFO"/>
 
     <root level="ERROR">
         <appender-ref ref="STDOUT"/>

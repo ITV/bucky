@@ -16,15 +16,24 @@ import scala.util.Try
 
 private[bucky] case class AmqpClientConnectionManager[F[_]](
                                                              amqpConfig: AmqpClientConfig,
-                                                             publishChannel: Channel[F],
+                                                             publishChannelRef: Ref[F, (Channel[F], F[Unit])],
                                                              pendingConfirmListener: PendingConfirmListener[F])(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F])
     extends StrictLogging {
 
-  private def runWithChannelSync[T](action: F[T]): F[T] =
-    publishChannel.synchroniseIfNeeded {
+  private def runWithChannelSync[T](action: Channel[F] => F[T]): F[T] =
+    publishChannelRef.get.flatMap(channel => channel._1.synchroniseIfNeeded {
       F.fromTry(Try {
-        action.toIO.unsafeRunSync()
+        action(channel._1).toIO.unsafeRunSync()
       })
+    })
+
+  private def liftConfirmationResult(result: ConfirmationResult): F[Unit] =
+    result match {
+      case ConfirmationAck => F.unit
+      case ConfirmationNack =>
+        F.raiseError(new RuntimeException("Failed to publish due to nack from server"))
+      case ConfirmationAborted(exception) =>
+        F.raiseError(new RuntimeException("Failed to publish due to a channel exception", exception))
     }
 
   def publish(cmd: PublishCommand): F[Unit] =
@@ -32,8 +41,8 @@ private[bucky] case class AmqpClientConnectionManager[F[_]](
       _ <- cs.shift
       deliveryTag <- Ref.of[F, Option[Long]](None)
       _ <- (for {
-        signal <- Deferred[F, Boolean]
-        _ <- runWithChannelSync {
+        signal <- Deferred[F, ConfirmationResult]
+        _ <- runWithChannelSync { publishChannel =>
           for {
             nextPublishSeq <- publishChannel.getNextPublishSeqNo
             _              <- deliveryTag.set(Some(nextPublishSeq))
@@ -41,12 +50,12 @@ private[bucky] case class AmqpClientConnectionManager[F[_]](
             _              <- publishChannel.publish(nextPublishSeq, cmd)
           } yield ()
         }
-        _ <- signal.get.ifM(F.unit, F.raiseError[Unit](new RuntimeException("Failed to publish msg.")))
+        _ <- signal.get.flatMap(liftConfirmationResult)
       } yield ())
         .timeout(amqpConfig.publishingTimeout)
         .recoverWith {
           case e =>
-            runWithChannelSync {
+            runWithChannelSync { _ =>
               for {
                 dl          <- deliveryTag.get
                 deliveryTag <- F.fromOption(dl, new RuntimeException("Timeout occurred before a delivery tag could be obtained.", e))
@@ -68,17 +77,14 @@ private[bucky] case class AmqpClientConnectionManager[F[_]](
       _ <- F.delay(logger.debug("Successfully registered consumer for queue: {} with tag.", queueName.value), consumerTag.value)
     } yield ()
 
-  def declare(declarations: Iterable[Declaration]): F[Unit] = publishChannel.runDeclarations(declarations)
+  def declare(declarations: Iterable[Declaration]): F[Unit] = publishChannelRef.get.flatMap(_._1.runDeclarations(declarations))
 }
 
 private[bucky] object AmqpClientConnectionManager extends StrictLogging {
 
   def apply[F[_]](config: AmqpClientConfig,
-                  publishChannel: Channel[F])(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F]): F[AmqpClientConnectionManager[F]] =
+                  buildChannel: () => Resource[F, Channel[F]])(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F]): F[AmqpClientConnectionManager[F]] =
     for {
-      pendingConfirmations <- Ref.of[F, TreeMap[Long, Deferred[F, Boolean]]](TreeMap.empty)
-      _                    <- publishChannel.confirmSelect
-      confirmListener      <- F.delay(publish.PendingConfirmListener(pendingConfirmations))
-      _                    <- publishChannel.addConfirmListener(confirmListener)
-    } yield AmqpClientConnectionManager(config, publishChannel, confirmListener)
+      publishChannelManager <- PublishChannelManager(buildChannel())
+    } yield AmqpClientConnectionManager(config, publishChannelManager.publishChannelRef, publishChannelManager.pendingConfirmListener)
 }

@@ -10,7 +10,7 @@ import com.itv.bucky.decl.{Binding, Declaration, Exchange, ExchangeBinding, Queu
 import com.itv.bucky.publish.PublishCommand
 import com.rabbitmq.client.AMQP.BasicProperties
 import com.rabbitmq.client.impl.recovery.AutorecoveringConnection
-import com.rabbitmq.client.{ConfirmListener, DefaultConsumer, Channel => RabbitChannel, Envelope => RabbitMQEnvelope}
+import com.rabbitmq.client.{ConfirmListener, DefaultConsumer, ShutdownListener, ShutdownSignalException, Channel => RabbitChannel, Envelope => RabbitMQEnvelope}
 import com.typesafe.scalalogging.StrictLogging
 
 import scala.concurrent.ExecutionContext
@@ -24,6 +24,7 @@ trait Channel[F[_]] {
   def basicQos(prefetchCount: Int): F[Unit]
   def confirmSelect: F[Unit]
   def addConfirmListener(listener: ConfirmListener): F[Unit]
+  def addShutdownListener(listener: ShutdownListener): F[Unit]
   def getNextPublishSeqNo: F[Long]
   def publish(sequenceNumber: Long, cmd: PublishCommand): F[Unit]
   def sendAction(action: ConsumeAction)(envelope: Envelope): F[Unit]
@@ -154,6 +155,9 @@ object Channel {
     override def synchroniseIfNeeded[T](f: => T): T = this.synchronized(f)
 
     override def isConnectionOpen: F[Boolean] = F.delay(channel.getConnection.isOpen)
+
+    override def addShutdownListener(listener: ShutdownListener): F[Unit] =
+      F.delay(channel.addShutdownListener(listener))
   }
 
 }

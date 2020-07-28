@@ -90,8 +90,7 @@ package object test {
     def client(channel: StubChannel[F], config: AmqpClientConfig): Resource[F, AmqpClient[F]] =
       AmqpClient[F](
         config,
-        () => Resource.pure[F, Channel[F]](channel),
-        Resource.pure[F, Channel[F]](channel)
+        () => Resource.pure[F, Channel[F]](channel)
       )
 
     /**

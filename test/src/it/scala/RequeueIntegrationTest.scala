@@ -22,7 +22,7 @@ import org.scalatest.Matchers._
 
 import scala.language.higherKinds
 
-class RequeueIntegrationTest extends FunSuite with Eventually with IntegrationPatience {
+class RequeueIntegrationTestRequeueIntegrationTest extends FunSuite with Eventually with IntegrationPatience {
 
   case class TestFixture(
                           stubHandler: RecordingRequeueHandler[IO, Delivery],

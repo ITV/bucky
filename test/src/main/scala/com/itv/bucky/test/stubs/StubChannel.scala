@@ -8,7 +8,7 @@ import com.itv.bucky.consume._
 import com.itv.bucky.publish._
 import com.itv.bucky.{Channel, Envelope, ExchangeName, Handler, QueueName, RoutingKey}
 import com.itv.bucky.decl.{Binding, Direct, Exchange, ExchangeBinding, ExchangeType, Headers, Queue, Topic}
-import com.rabbitmq.client.ConfirmListener
+import com.rabbitmq.client.{ConfirmListener, ShutdownListener}
 import cats._
 import cats.effect._
 import cats.effect.ConcurrentEffect
@@ -169,6 +169,7 @@ abstract class StubChannel[F[_]](implicit F: ConcurrentEffect[F]) extends Channe
     F.delay(handlers.synchronized(handlers.put(queue, handler -> onHandlerException))).void
 
   override def addConfirmListener(listener: ConfirmListener): F[Unit] = F.delay(confirmListeners.synchronized(confirmListeners += listener))
+  override def addShutdownListener(listener: ShutdownListener): F[Unit] = F.delay(())
   override def declareExchange(exchange: Exchange): F[Unit]           = F.delay(exchanges.synchronized(exchanges += exchange)).void
   override def declareQueue(queue: Queue): F[Unit]                    = F.delay(queues.synchronized(queues += queue)).void
   override def declareBinding(binding: Binding): F[Unit] = {
