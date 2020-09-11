@@ -9,6 +9,7 @@ lazy val scala213 = "2.13.2"
 
 scalaVersion := scala212
 scalacOptions += "-Ypartial-unification"
+scalacOptions += "-language:higherKinds"
 
 val amqpClientVersion   = "5.8.0"
 val scalaLoggingVersion = "3.9.2"
@@ -273,6 +274,31 @@ lazy val xml = project
     )
   )
 
+lazy val `http4s-document` = project
+  .settings(name := "com.itv")
+  .settings(moduleName := "bucky-http4s-docs")
+  .settings(kernelSettings: _*)
+  .aggregate(core, test)
+  .dependsOn(core, test % "test,it")
+  .configs(IntegrationTest)
+  .settings(Defaults.itSettings)
+  .settings(
+    internalDependencyClasspath in IntegrationTest += Attributed.blank((classDirectory in Test).value),
+    parallelExecution in IntegrationTest := false
+  )
+  .settings(
+    libraryDependencies ++= Seq(
+      "org.typelevel" %% "cats-effect" % "2.2.0",
+      "io.circe"                   %% "circe-core"    % circeVersion,
+      "io.circe"                   %% "circe-generic" % circeVersion,
+//      "io.circe"                   %% "circe-parser"  % circeVersion,
+      "org.http4s" %% "http4s-dsl" % "0.21.6",
+      "org.http4s" %% "http4s-blaze-server" % "0.21.6",
+      "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
+      "org.scalatest"              %% "scalatest"     % scalaTestVersion % "test, it"
+    )
+  )
+
 lazy val root = (project in file("."))
-  .aggregate(xml, circe, kamon, argonaut, example, test, core)
+  .aggregate(xml, circe, `http4s-document`, kamon, argonaut, example, test, core)
   .settings(publishArtifact := false)
