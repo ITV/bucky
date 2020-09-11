@@ -1,5 +1,7 @@
 package com.itv.bucky.pattern.requeue
 
+import java.util.UUID
+
 import cats.effect.Sync
 import com.typesafe.scalalogging.StrictLogging
 
@@ -23,6 +25,7 @@ case class RequeueTransformer[F[_]](
     with StrictLogging {
 
   private val requeueCountHeaderName = "x-bucky-requeue-counter"
+  private val deadLetterIdHeaderName = "x-deadletter-id"
 
   private def remainingAttempts(delivery: Delivery): Option[Int] =
     for {
@@ -35,7 +38,13 @@ case class RequeueTransformer[F[_]](
       .withHeader(requeueCountHeaderName -> remainingAttempts.toString)
       .copy(expiration = Some(requeueAfter.toMillis.toString))
 
-    PublishCommand(requeueExchange, delivery.envelope.routingKey, properties, delivery.body)
+    //TODO: WIP - Doesn't seem to propagate to the final DL
+    if (remainingAttempts == 1) {
+      val propsWithDlId = properties.copy(headers = properties.headers + (deadLetterIdHeaderName -> UUID.randomUUID().toString))
+      PublishCommand(requeueExchange, delivery.envelope.routingKey, propsWithDlId, delivery.body)
+    } else {
+      PublishCommand(requeueExchange, delivery.envelope.routingKey, properties, delivery.body)
+    }
   }
 
   override def apply(delivery: Delivery): F[ConsumeAction] = {
