@@ -10,8 +10,11 @@ import scala.reflect.{ClassTag, classTag}
 
 package object document {
 
-  case class RMQPublishRoute[T: ClassTag](exchangeName: ExchangeName, routingKey: RoutingKey) {
+  case class RMQPublishRoute[T: ClassTag: PayloadMarshaller](exchangeName: ExchangeName, routingKey: RoutingKey) {
     def document: String = s"ExchangeName: ${exchangeName.value}\nRoutingKey: ${routingKey.value}\nPayload: ${classTag[T].runtimeClass.getName}"
+
+    def getPublisher[F[_]](amqpClient: AmqpClient[F]): T => F[Unit] =
+      amqpClient.publisherOf(exchangeName, routingKey)
   }
 
   trait Documentation[F[_]] {
