@@ -8,7 +8,7 @@ some key concepts which are important in order to fully understand Bucky.
 
 A [connection](https://www.rabbitmq.com/connections.html) is a no more than a TCP connection to a Rabbit Broker.
 Connections are meant to be long lived and to be shared by multiple consumers in a single application. Unless explicitly
-specified otherwise (by creating multiple connections), bucky will only allocate one connection per application.
+specified otherwise (by creating multiple connections), Bucky will allocate only one connection per application.
 
 ### Channel
 
