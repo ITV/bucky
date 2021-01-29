@@ -13,7 +13,7 @@ scalacOptions += "-Ypartial-unification"
 
 val amqpClientVersion   = "5.8.0"
 val scalaLoggingVersion = "3.9.2"
-val scalaTestVersion    = "3.1.2"
+val scalaTestVersion    = "3.2.3"
 val argonautVersion     = "6.2.3"
 val circeVersion        = "0.13.0"
 val typeSafeVersion     = "1.4.0"
