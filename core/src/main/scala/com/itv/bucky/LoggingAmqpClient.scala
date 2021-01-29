@@ -1,60 +1,34 @@
 package com.itv.bucky
 
 import cats.effect.{ConcurrentEffect, Resource}
-import cats._
-import cats.implicits._
-import java.nio.charset.Charset
-
 import com.itv.bucky.consume._
 import com.itv.bucky.publish._
-import scala.concurrent.duration._
-import scala.concurrent.duration.FiniteDuration
-import scala.language.higherKinds
 import org.typelevel.log4cats.Logger
 
-object LoggingAmqpClient extends StrictLogging {
+import java.nio.charset.Charset
+import scala.language.higherKinds
+import cats.syntax.all._
+
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
+
+object LoggingAmqpClient {
 
   private[bucky] def logSuccessfullPublishMessage[F[_]](charset: Charset, cmd: PublishCommand)(implicit F: ConcurrentEffect[F], logger: Logger[F]): F[Unit] =
-      logger.info("Successfully published message with rk:'{}', exchange:{} and message:'{}'",
-                  cmd.routingKey.value,
-                  cmd.exchange.value,
-                  new String(cmd.body.value, charset))
+      logger.info(s"Successfully published message with rk:${ cmd.routingKey.value}, exchange:${cmd.exchange.value} and message:${new String(cmd.body.value, charset)}")
 
   private[bucky] def logFailedPublishMessage[F[_]](t: Throwable, charset: Charset, cmd: PublishCommand)(implicit F: ConcurrentEffect[F], logger: Logger[F]): F[Unit] =
-
-      logger.error("Failed to publish message with rk:'{}', exchange:'{}' and message:'{}'",
-                   cmd.routingKey.value,
-                   cmd.exchange.value,
-                   new String(cmd.body.value, charset),
-                   t)
+      logger.error(t)(s"Failed to publish message with rk:${cmd.routingKey.value}, exchange:${cmd.exchange.value} and message:${new String(cmd.body.value, charset)}")
 
   private[bucky] def logFailedHandler[F[_]](charset: Charset,
                                             queueName: QueueName,
                                             exceptionalAction: ConsumeAction,
                                             delivery: Delivery,
                                             t: Throwable)(implicit F: ConcurrentEffect[F], logger: Logger[F]): F[Unit] = 
-    logger.error(
-      s"Failed to execute handler for message with rk '{}' on queue '{}' and exchange '{}'. Will return '{}'. message: '{}', headers:'{}'",
-      delivery.envelope.routingKey.value,
-      queueName.value,
-      delivery.envelope.exchangeName,
-      exceptionalAction,
-      new String(delivery.body.value, charset),
-      delivery.properties.headers,
-      t
-    )
+    logger.error(t)(s"Failed to execute handler for message with rk ${delivery.envelope.routingKey.value} on queue ${queueName.value} and exchange ${delivery.envelope.exchangeName}. Will return $exceptionalAction. message: ${new String(delivery.body.value, charset)}, headers:${delivery.properties.headers}")
 
   private[bucky] def logSuccessfulHandler[F[_]](charset: Charset, queueName: QueueName, delivery: Delivery, ca: ConsumeAction)(
       implicit F: ConcurrentEffect[F], logger: Logger[F]): F[Unit] = 
-    logger.info(
-      "Executed handler for message with rk:'{}' on queue:'{}' and exchange '{}'. Will return '{}'. message: '{}'",
-      delivery.envelope.routingKey.value,
-      queueName.value,
-      delivery.envelope.exchangeName,
-      ca.toString.toLowerCase,
-      new String(delivery.body.value, charset)
-    )
-  }
+    logger.info(s"Executed handler for message with rk:${ delivery.envelope.routingKey.value} on queue:${queueName.value} and exchange ${delivery.envelope.exchangeName}. Will return ${ca.toString.toLowerCase}. message: ${new String(delivery.body.value, charset)}")
 
   def apply[F[_]](amqpClient: AmqpClient[F], charset: Charset)(implicit F: ConcurrentEffect[F], logger: Logger[F]): AmqpClient[F] =
     new AmqpClient[F] {
@@ -63,7 +37,7 @@ object LoggingAmqpClient extends StrictLogging {
 
       override def publisher(): Publisher[F, PublishCommand] = {
         val originalPublisher = amqpClient.publisher()
-        cmd: PublishCommand =>
+        (cmd: PublishCommand) =>
           {
             (for {
               result <- originalPublisher(cmd).attempt

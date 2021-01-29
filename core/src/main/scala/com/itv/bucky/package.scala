@@ -1,7 +1,6 @@
 package com.itv
 
 import java.nio.charset.{Charset, StandardCharsets}
-
 import cats.effect.{ConcurrentEffect, Resource, Sync}
 import cats.{Applicative, ApplicativeError}
 import com.itv.bucky.Unmarshaller.toDeliveryUnmarshaller
@@ -9,6 +8,7 @@ import com.itv.bucky.consume._
 import com.itv.bucky.decl.Declaration
 import com.itv.bucky.pattern.requeue.{RequeueOps, RequeuePolicy}
 import com.itv.bucky.publish.PublishCommandBuilder
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
 import scala.language.higherKinds
@@ -59,7 +59,7 @@ package object bucky {
         onHandlerException: RequeueConsumeAction = Requeue,
         unmarshalFailureAction: RequeueConsumeAction = DeadLetter,
         onRequeueExpiryAction: T => F[ConsumeAction] = (_: T) => F.point[ConsumeAction](DeadLetter),
-        prefetchCount: Int = defaultPreFetchCount)(implicit unmarshaller: PayloadUnmarshaller[T], F: Sync[F]): Resource[F, Unit] =
+        prefetchCount: Int = defaultPreFetchCount)(implicit unmarshaller: PayloadUnmarshaller[T], F: Sync[F], logger: Logger[F]): Resource[F, Unit] =
       new RequeueOps(amqpClient).requeueDeliveryHandlerOf[T](
         queueName = queueName,
         handler = handler,
@@ -78,7 +78,7 @@ package object bucky {
         onHandlerException: RequeueConsumeAction = Requeue,
         unmarshalFailureAction: RequeueConsumeAction = DeadLetter,
         onRequeueExpiryAction: T => F[ConsumeAction] = (_: T) => F.point[ConsumeAction](DeadLetter),
-        prefetchCount: Int = defaultPreFetchCount)(implicit unmarshaller: DeliveryUnmarshaller[T], F: Sync[F]): Resource[F, Unit] =
+        prefetchCount: Int = defaultPreFetchCount)(implicit unmarshaller: DeliveryUnmarshaller[T], F: Sync[F], logger: Logger[F]): Resource[F, Unit] =
       new RequeueOps(amqpClient).requeueDeliveryHandlerOf[T](
         queueName = queueName,
         handler = handler,
@@ -96,7 +96,7 @@ package object bucky {
         requeuePolicy: RequeuePolicy = RequeuePolicy(maximumProcessAttempts = 10, requeueAfter = 3.minutes),
         onHandlerException: RequeueConsumeAction = Requeue,
         prefetchCount: Int = defaultPreFetchCount
-    )(implicit F: Sync[F]): Resource[F, Unit] =
+    )(implicit F: Sync[F], logger: Logger[F]): Resource[F, Unit] =
       new RequeueOps(amqpClient).requeueOf(queueName, handler, requeuePolicy, onHandlerException, prefetchCount = prefetchCount)
 
   }
@@ -105,7 +105,7 @@ package object bucky {
 
     def publisherOf[T](implicit publishCommandBuilder: PublishCommandBuilder[T]): Publisher[F, T] = {
       val basePublisher = amqpClient.publisher()
-      value: T =>
+      (value: T) =>
         {
           val command = publishCommandBuilder.toPublishCommand(value)
           basePublisher.apply(command)
@@ -149,7 +149,7 @@ package object bucky {
   }
 
   implicit class LoggingSyntax[F[_]](client: AmqpClient[F]) {
-    def withLogging(charset: Charset = StandardCharsets.UTF_8)(implicit F: ConcurrentEffect[F]): AmqpClient[F] = LoggingAmqpClient(client, charset)
+    def withLogging(charset: Charset = StandardCharsets.UTF_8)(implicit F: ConcurrentEffect[F], logger: Logger[F]): AmqpClient[F] = LoggingAmqpClient(client, charset)
   }
 
   val defaultPreFetchCount: Int = 1

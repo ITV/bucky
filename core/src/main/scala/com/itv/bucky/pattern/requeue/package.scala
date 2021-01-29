@@ -1,14 +1,13 @@
 package com.itv.bucky.pattern
 
 import cats.effect.{Resource, Sync}
-import com.itv.bucky.{AmqpClient, DeliveryUnmarshalHandler, _}
-import com.itv.bucky.Unmarshaller._
-import com.itv.bucky.consume.{ConsumeAction, DeadLetter, Delivery, Requeue, RequeueConsumeAction}
+import com.itv.bucky.consume.{RequeueHandler => _, _}
 import com.itv.bucky.decl._
+import com.itv.bucky.{AmqpClient, DeliveryUnmarshalHandler, _}
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration.{FiniteDuration, _}
 import scala.language.higherKinds
-import com.itv.bucky.consume.{ConsumeAction, DeadLetter, Delivery, Requeue, RequeueConsumeAction}
 
 package object requeue {
 
@@ -36,7 +35,7 @@ package object requeue {
     )
   }
 
-  private[bucky] class RequeueOps[F[_]](val amqpClient: AmqpClient[F])(implicit val F: Sync[F]) {
+  private[bucky] class RequeueOps[F[_]](val amqpClient: AmqpClient[F])(implicit val F: Sync[F], logger: Logger[F]) {
 
     def requeueDeliveryHandlerOf[T](queueName: QueueName,
                                     handler: RequeueHandler[F, T],

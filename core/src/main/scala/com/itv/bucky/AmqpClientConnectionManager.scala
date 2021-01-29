@@ -8,7 +8,7 @@ import com.itv.bucky.consume._
 import com.itv.bucky.publish._
 import com.itv.bucky.decl.Declaration
 import com.itv.bucky.publish.PendingConfirmListener
-import com.typesafe.scalalogging.StrictLogging
+import org.typelevel.log4cats.Logger
 
 import scala.collection.immutable.TreeMap
 import scala.language.higherKinds
@@ -17,8 +17,7 @@ import scala.util.Try
 private[bucky] case class AmqpClientConnectionManager[F[_]](
                                                              amqpConfig: AmqpClientConfig,
                                                              publishChannel: Channel[F],
-                                                             pendingConfirmListener: PendingConfirmListener[F])(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F])
-    extends StrictLogging {
+                                                             pendingConfirmListener: PendingConfirmListener[F])(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F], logger: Logger[F]) {
 
   private def runWithChannelSync[T](action: F[T]): F[T] =
     publishChannel.synchroniseIfNeeded {
@@ -61,20 +60,20 @@ private[bucky] case class AmqpClientConnectionManager[F[_]](
     for {
       _ <- cs.shift
       consumerTag <- F.delay(ConsumerTag.create(queueName))
-      _ <- F.delay(logger.debug("Registering consumer for queue: {} with tag {}.", queueName.value, consumerTag.value))
+      _ <- logger.debug(s"Registering consumer for queue: ${queueName.value} with tag ${consumerTag.value}.")
       _ <- channel.basicQos(prefetchCount)
       _ <- channel.registerConsumer(handler, onHandlerException, queueName, consumerTag, cs)
-      _ <- F.delay(logger.debug("Consumer for queue: {} with tag {} was successfully registered.", queueName.value, consumerTag.value))
-      _ <- F.delay(logger.debug("Successfully registered consumer for queue: {} with tag.", queueName.value), consumerTag.value)
+      _ <- logger.debug(s"Consumer for queue: ${queueName.value} with tag ${consumerTag.value} was successfully registered.")
+      _ <- logger.debug(s"Successfully registered consumer for queue: ${queueName.value} with tag.")
     } yield ()
 
   def declare(declarations: Iterable[Declaration]): F[Unit] = publishChannel.runDeclarations(declarations)
 }
 
-private[bucky] object AmqpClientConnectionManager extends StrictLogging {
+private[bucky] object AmqpClientConnectionManager {
 
   def apply[F[_]](config: AmqpClientConfig,
-                  publishChannel: Channel[F])(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F]): F[AmqpClientConnectionManager[F]] =
+                  publishChannel: Channel[F])(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F], logger: Logger[F]): F[AmqpClientConnectionManager[F]] =
     for {
       pendingConfirmations <- Ref.of[F, TreeMap[Long, Deferred[F, Boolean]]](TreeMap.empty)
       _                    <- publishChannel.confirmSelect
