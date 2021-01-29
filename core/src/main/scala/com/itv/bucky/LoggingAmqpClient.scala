@@ -1,7 +1,6 @@
 package com.itv.bucky
 
 import cats.effect.{ConcurrentEffect, Resource}
-import com.typesafe.scalalogging.StrictLogging
 import cats._
 import cats.implicits._
 import java.nio.charset.Charset
@@ -11,31 +10,29 @@ import com.itv.bucky.publish._
 import scala.concurrent.duration._
 import scala.concurrent.duration.FiniteDuration
 import scala.language.higherKinds
+import org.typelevel.log4cats.Logger
 
 object LoggingAmqpClient extends StrictLogging {
 
-  private[bucky] def logSuccessfullPublishMessage[F[_]](charset: Charset, cmd: PublishCommand)(implicit F: ConcurrentEffect[F]): F[Unit] =
-    F.delay(
+  private[bucky] def logSuccessfullPublishMessage[F[_]](charset: Charset, cmd: PublishCommand)(implicit F: ConcurrentEffect[F], logger: Logger[F]): F[Unit] =
       logger.info("Successfully published message with rk:'{}', exchange:{} and message:'{}'",
                   cmd.routingKey.value,
                   cmd.exchange.value,
                   new String(cmd.body.value, charset))
-    )
 
-  private[bucky] def logFailedPublishMessage[F[_]](t: Throwable, charset: Charset, cmd: PublishCommand)(implicit F: ConcurrentEffect[F]): F[Unit] =
-    F.delay(
+  private[bucky] def logFailedPublishMessage[F[_]](t: Throwable, charset: Charset, cmd: PublishCommand)(implicit F: ConcurrentEffect[F], logger: Logger[F]): F[Unit] =
+
       logger.error("Failed to publish message with rk:'{}', exchange:'{}' and message:'{}'",
                    cmd.routingKey.value,
                    cmd.exchange.value,
                    new String(cmd.body.value, charset),
                    t)
-    )
 
   private[bucky] def logFailedHandler[F[_]](charset: Charset,
                                             queueName: QueueName,
                                             exceptionalAction: ConsumeAction,
                                             delivery: Delivery,
-                                            t: Throwable)(implicit F: ConcurrentEffect[F]): F[Unit] = F.delay {
+                                            t: Throwable)(implicit F: ConcurrentEffect[F], logger: Logger[F]): F[Unit] = 
     logger.error(
       s"Failed to execute handler for message with rk '{}' on queue '{}' and exchange '{}'. Will return '{}'. message: '{}', headers:'{}'",
       delivery.envelope.routingKey.value,
@@ -46,10 +43,9 @@ object LoggingAmqpClient extends StrictLogging {
       delivery.properties.headers,
       t
     )
-  }
 
   private[bucky] def logSuccessfulHandler[F[_]](charset: Charset, queueName: QueueName, delivery: Delivery, ca: ConsumeAction)(
-      implicit F: ConcurrentEffect[F]): F[Unit] = F.delay {
+      implicit F: ConcurrentEffect[F], logger: Logger[F]): F[Unit] = 
     logger.info(
       "Executed handler for message with rk:'{}' on queue:'{}' and exchange '{}'. Will return '{}'. message: '{}'",
       delivery.envelope.routingKey.value,
@@ -60,7 +56,7 @@ object LoggingAmqpClient extends StrictLogging {
     )
   }
 
-  def apply[F[_]](amqpClient: AmqpClient[F], charset: Charset)(implicit F: ConcurrentEffect[F]): AmqpClient[F] =
+  def apply[F[_]](amqpClient: AmqpClient[F], charset: Charset)(implicit F: ConcurrentEffect[F], logger: Logger[F]): AmqpClient[F] =
     new AmqpClient[F] {
       override def declare(declarations: decl.Declaration*): F[Unit]          = amqpClient.declare(declarations)
       override def declare(declarations: Iterable[decl.Declaration]): F[Unit] = amqpClient.declare(declarations)

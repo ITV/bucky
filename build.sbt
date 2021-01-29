@@ -8,7 +8,7 @@ lazy val scala212 = "2.12.10"
 lazy val scala213 = "2.13.2"
 lazy val scala3   = "3.0.0-M3"
 
-scalaVersion := scala212
+scalaVersion := scala3
 scalacOptions += "-Ypartial-unification"
 
 val amqpClientVersion   = "5.8.0"
@@ -22,7 +22,7 @@ val scalaXmlVersion     = "1.2.0"
 val scalaz              = "7.2.22"
 val logbackVersion      = "1.2.3"
 val kamonVersion        = "2.1.3"
-val log4catsVersion     = "2.0.0-M1"
+val log4catsVersion     = "1.2.0-RC2"
 
 releaseProcess := Seq[ReleaseStep](
   checkSnapshotDependencies,
