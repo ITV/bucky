@@ -14,7 +14,7 @@ scalacOptions += "-Ypartial-unification"
 val amqpClientVersion   = "5.8.0"
 val scalaLoggingVersion = "3.9.2"
 val scalaTestVersion    = "3.2.3"
-val argonautVersion     = "6.2.3"
+val argonautVersion     = "6.3.3"
 val circeVersion        = "0.13.0"
 val typeSafeVersion     = "1.4.0"
 val catsEffectVersion   = "2.3.1"
@@ -22,6 +22,7 @@ val scalaXmlVersion     = "1.2.0"
 val scalaz              = "7.2.22"
 val logbackVersion      = "1.2.3"
 val kamonVersion        = "2.1.3"
+val log4catsVersion     = "2.0.0-M1"
 
 releaseProcess := Seq[ReleaseStep](
   checkSnapshotDependencies,
@@ -147,6 +148,8 @@ lazy val core = project
   .settings(
     libraryDependencies ++= Seq(
 //      "com.typesafe.scala-logging" %% "scala-logging"           % scalaLoggingVersion,
+      "org.typelevel" %% "log4cats-core"    % log4catsVersion,  // Only if you want to Support Any Backend
+      "org.typelevel" %% "log4cats-slf4j"   % log4catsVersion,  // Direct Slf4j Support - Recommended"
       "org.scalatest"          %% "scalatest"               % scalaTestVersion % "test",
       "org.typelevel"          %% "cats-effect"             % catsEffectVersion,
       "com.rabbitmq"           % "amqp-client"              % amqpClientVersion,
