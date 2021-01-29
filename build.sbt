@@ -155,12 +155,14 @@ lazy val core = project
     )
   )
   .settings(
-    CrossVersion.partialVersion(scalaVersion.value) match {
-      case Some((3, _)) =>
-        libraryDependencies += "com.typesafe.scala-logging" % "scala-logging_2.13" % scalaLoggingVersion
-      case _ =>
-        libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion
-    }
+    libraryDependencies += (
+      CrossVersion.partialVersion(scalaVersion.value) match {
+        case Some((3, _)) =>
+          "com.typesafe.scala-logging" % "scala-logging_2.13" % scalaLoggingVersion
+        case _ =>
+          "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion
+      }
+    )
   )
   .configs(IntegrationTest)
 
@@ -189,12 +191,14 @@ lazy val test = project
     )
   )
   .settings(
-    CrossVersion.partialVersion(scalaVersion.value) match {
-      case Some((3, _)) =>
-        libraryDependencies += "com.typesafe.scala-logging" % "scala-logging_2.13" % scalaLoggingVersion
-      case _ =>
-        libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion
-    }
+    libraryDependencies += (
+      CrossVersion.partialVersion(scalaVersion.value) match {
+        case Some((3, _)) =>
+          "com.typesafe.scala-logging" % "scala-logging_2.13" % scalaLoggingVersion
+        case _ =>
+          "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion
+      }
+    )
   )
 
 lazy val example = project
@@ -212,12 +216,14 @@ lazy val example = project
     )
   )
   .settings(
-    CrossVersion.partialVersion(scalaVersion.value) match {
-      case Some((3, _)) =>
-        libraryDependencies += "com.typesafe.scala-logging" % "scala-logging_2.13" % scalaLoggingVersion
-      case _ =>
-        libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion
-    }
+    libraryDependencies += (
+      CrossVersion.partialVersion(scalaVersion.value) match {
+        case Some((3, _)) =>
+          "com.typesafe.scala-logging" % "scala-logging_2.13" % scalaLoggingVersion
+        case _ =>
+          "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion
+      }
+    )
   )
 
 lazy val argonaut = project
@@ -240,12 +246,14 @@ lazy val argonaut = project
     )
   )
   .settings(
-    CrossVersion.partialVersion(scalaVersion.value) match {
-      case Some((3, _)) =>
-        libraryDependencies += "com.typesafe.scala-logging" % "scala-logging_2.13" % scalaLoggingVersion
-      case _ =>
-        libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion
-    }
+    libraryDependencies += (
+      CrossVersion.partialVersion(scalaVersion.value) match {
+        case Some((3, _)) =>
+          "com.typesafe.scala-logging" % "scala-logging_2.13" % scalaLoggingVersion
+        case _ =>
+          "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion
+      }
+    )
   )
 
 lazy val circe = project
@@ -270,12 +278,14 @@ lazy val circe = project
     )
   )
   .settings(
-    CrossVersion.partialVersion(scalaVersion.value) match {
-      case Some((3, _)) =>
-        libraryDependencies += "com.typesafe.scala-logging" % "scala-logging_2.13" % scalaLoggingVersion
-      case _ =>
-        libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion
-    }
+    libraryDependencies += (
+      CrossVersion.partialVersion(scalaVersion.value) match {
+        case Some((3, _)) =>
+          "com.typesafe.scala-logging" % "scala-logging_2.13" % scalaLoggingVersion
+        case _ =>
+          "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion
+      }
+    )
   )
 
 lazy val kamon = project
@@ -300,12 +310,14 @@ lazy val kamon = project
     )
   )
   .settings(
-    CrossVersion.partialVersion(scalaVersion.value) match {
-      case Some((3, _)) =>
-        libraryDependencies += "com.typesafe.scala-logging" % "scala-logging_2.13" % scalaLoggingVersion
-      case _ =>
-        libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion
-    }
+    libraryDependencies += (
+      CrossVersion.partialVersion(scalaVersion.value) match {
+        case Some((3, _)) =>
+          "com.typesafe.scala-logging" % "scala-logging_2.13" % scalaLoggingVersion
+        case _ =>
+          "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion
+      }
+    )
   )
 
 lazy val xml = project
@@ -325,6 +337,16 @@ lazy val xml = project
       "org.scala-lang.modules" %% "scala-xml" % scalaXmlVersion,
 //      "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
       "org.scalatest" %% "scalatest" % scalaTestVersion % "test, it"
+    )
+  )
+  .settings(
+    libraryDependencies += (
+      CrossVersion.partialVersion(scalaVersion.value) match {
+        case Some((3, _)) =>
+          "com.typesafe.scala-logging" % "scala-logging_2.13" % scalaLoggingVersion
+        case _ =>
+          "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion
+      }
     )
   )
 
