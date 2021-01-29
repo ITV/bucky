@@ -6,6 +6,7 @@ name := "bucky"
 
 lazy val scala212 = "2.12.10"
 lazy val scala213 = "2.13.2"
+lazy val scala3   = "3.0.0-M3"
 
 scalaVersion := scala212
 scalacOptions += "-Ypartial-unification"
@@ -16,7 +17,7 @@ val scalaTestVersion    = "3.1.2"
 val argonautVersion     = "6.2.3"
 val circeVersion        = "0.13.0"
 val typeSafeVersion     = "1.4.0"
-val catsEffectVersion   = "2.0.0"
+val catsEffectVersion   = "2.3.1"
 val scalaXmlVersion     = "1.2.0"
 val scalaz              = "7.2.22"
 val logbackVersion      = "1.2.3"
@@ -54,7 +55,7 @@ pgpPassphrase := Option(System.getenv("GPG_KEY_PASSPHRASE")).map(_.toArray)
 useGpg := false
 
 lazy val kernelSettings = Seq(
-  crossScalaVersions := Seq(scala212, scala213),
+  crossScalaVersions := Seq(scala212, scala213, scala3),
   scalaVersion := scala212,
   organization := "com.itv",
   scalacOptions ++= Seq("-feature", "-deprecation", "-Xfatal-warnings"),
@@ -145,16 +146,30 @@ lazy val core = project
   .settings(kernelSettings: _*)
   .settings(
     libraryDependencies ++= Seq(
-      "com.typesafe.scala-logging" %% "scala-logging"  % scalaLoggingVersion,
-      "org.scalatest"              %% "scalatest"      % scalaTestVersion % "test",
-      "org.typelevel"              %% "cats-effect"    % catsEffectVersion,
-      "com.rabbitmq"               % "amqp-client"     % amqpClientVersion,
-      "ch.qos.logback"             % "logback-classic" % logbackVersion % "test,it",
-      "org.scala-lang.modules" %% "scala-collection-compat" % "2.1.6"
+//      "com.typesafe.scala-logging" %% "scala-logging"           % scalaLoggingVersion,
+      "org.scalatest"          %% "scalatest"               % scalaTestVersion % "test",
+      "org.typelevel"          %% "cats-effect"             % catsEffectVersion,
+      "com.rabbitmq"           % "amqp-client"              % amqpClientVersion,
+      "ch.qos.logback"         % "logback-classic"          % logbackVersion % "test,it",
+      "org.scala-lang.modules" %% "scala-collection-compat" % "2.4.0"
     )
+  )
+  .settings(
+    CrossVersion.partialVersion(scalaVersion.value) match {
+      case Some((3, _)) =>
+        libraryDependencies += "com.typesafe.scala-logging" % "scala-logging_2.13" % scalaLoggingVersion
+      case _ =>
+        libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion
+    }
   )
   .configs(IntegrationTest)
 
+/**
+  * CrossVersion.partialVersion(scalaVersion) match {
+         case Some((2, scalaMajor)) if scalaMajor == 9 => Nil
+         case _ => Seq("-language:_")
+       }
+  */
 lazy val test = project
   .settings(name := "com.itv")
   .settings(moduleName := "bucky-test")
@@ -165,13 +180,21 @@ lazy val test = project
   .settings(Defaults.itSettings)
   .settings(
     libraryDependencies ++= Seq(
-      "com.typesafe.scala-logging" %% "scala-logging"  % scalaLoggingVersion,
-      "org.scalatest"              %% "scalatest"      % scalaTestVersion % "test,it",
-      "org.typelevel"              %% "cats-effect"    % catsEffectVersion,
-      "com.rabbitmq"               % "amqp-client"     % amqpClientVersion,
-      "com.typesafe"               % "config"          % typeSafeVersion % "it",
-      "ch.qos.logback"             % "logback-classic" % logbackVersion % "test,it"
+//      "com.typesafe.scala-logging" %% "scala-logging"  % scalaLoggingVersion,
+      "org.scalatest"  %% "scalatest"      % scalaTestVersion % "test,it",
+      "org.typelevel"  %% "cats-effect"    % catsEffectVersion,
+      "com.rabbitmq"   % "amqp-client"     % amqpClientVersion,
+      "com.typesafe"   % "config"          % typeSafeVersion % "it",
+      "ch.qos.logback" % "logback-classic" % logbackVersion % "test,it"
     )
+  )
+  .settings(
+    CrossVersion.partialVersion(scalaVersion.value) match {
+      case Some((3, _)) =>
+        libraryDependencies += "com.typesafe.scala-logging" % "scala-logging_2.13" % scalaLoggingVersion
+      case _ =>
+        libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion
+    }
   )
 
 lazy val example = project
@@ -182,11 +205,19 @@ lazy val example = project
   .dependsOn(core, argonaut, circe, test)
   .settings(
     libraryDependencies ++= Seq(
-      "io.argonaut"                %% "argonaut"      % argonautVersion,
-      "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
-      "org.scalatest"              %% "scalatest"     % scalaTestVersion,
-      "com.typesafe"               % "config"         % typeSafeVersion
+      "io.argonaut" %% "argonaut" % argonautVersion,
+//      "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
+      "org.scalatest" %% "scalatest" % scalaTestVersion,
+      "com.typesafe"  % "config"     % typeSafeVersion
     )
+  )
+  .settings(
+    CrossVersion.partialVersion(scalaVersion.value) match {
+      case Some((3, _)) =>
+        libraryDependencies += "com.typesafe.scala-logging" % "scala-logging_2.13" % scalaLoggingVersion
+      case _ =>
+        libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion
+    }
   )
 
 lazy val argonaut = project
@@ -203,10 +234,18 @@ lazy val argonaut = project
   )
   .settings(
     libraryDependencies ++= Seq(
-      "io.argonaut"                %% "argonaut"      % argonautVersion,
-      "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
-      "org.scalatest"              %% "scalatest"     % scalaTestVersion % "test, it"
+      "io.argonaut" %% "argonaut" % argonautVersion,
+//      "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
+      "org.scalatest" %% "scalatest" % scalaTestVersion % "test, it"
     )
+  )
+  .settings(
+    CrossVersion.partialVersion(scalaVersion.value) match {
+      case Some((3, _)) =>
+        libraryDependencies += "com.typesafe.scala-logging" % "scala-logging_2.13" % scalaLoggingVersion
+      case _ =>
+        libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion
+    }
   )
 
 lazy val circe = project
@@ -223,12 +262,20 @@ lazy val circe = project
   )
   .settings(
     libraryDependencies ++= Seq(
-      "io.circe"                   %% "circe-core"    % circeVersion,
-      "io.circe"                   %% "circe-generic" % circeVersion,
-      "io.circe"                   %% "circe-parser"  % circeVersion,
-      "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
-      "org.scalatest"              %% "scalatest"     % scalaTestVersion % "test, it"
+      "io.circe" %% "circe-core"    % circeVersion,
+      "io.circe" %% "circe-generic" % circeVersion,
+      "io.circe" %% "circe-parser"  % circeVersion,
+//      "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
+      "org.scalatest" %% "scalatest" % scalaTestVersion % "test, it"
     )
+  )
+  .settings(
+    CrossVersion.partialVersion(scalaVersion.value) match {
+      case Some((3, _)) =>
+        libraryDependencies += "com.typesafe.scala-logging" % "scala-logging_2.13" % scalaLoggingVersion
+      case _ =>
+        libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion
+    }
   )
 
 lazy val kamon = project
@@ -245,12 +292,20 @@ lazy val kamon = project
   )
   .settings(
     libraryDependencies ++= Seq(
-      "com.typesafe.scala-logging" %% "scala-logging"   % scalaLoggingVersion,
-      "org.scalatest"              %% "scalatest"       % scalaTestVersion % "test, it",
-      "io.kamon"                   %% "kamon-bundle"      % kamonVersion,
-      "io.kamon"                   %% "kamon-testkit"   % kamonVersion % "test",
-      "ch.qos.logback"             % "logback-classic"  % logbackVersion % "test, it"
+//      "com.typesafe.scala-logging" %% "scala-logging"  % scalaLoggingVersion,
+      "org.scalatest"  %% "scalatest"      % scalaTestVersion % "test, it",
+      "io.kamon"       %% "kamon-bundle"   % kamonVersion,
+      "io.kamon"       %% "kamon-testkit"  % kamonVersion % "test",
+      "ch.qos.logback" % "logback-classic" % logbackVersion % "test, it"
     )
+  )
+  .settings(
+    CrossVersion.partialVersion(scalaVersion.value) match {
+      case Some((3, _)) =>
+        libraryDependencies += "com.typesafe.scala-logging" % "scala-logging_2.13" % scalaLoggingVersion
+      case _ =>
+        libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion
+    }
   )
 
 lazy val xml = project
@@ -267,9 +322,9 @@ lazy val xml = project
   )
   .settings(
     libraryDependencies ++= Seq(
-      "org.scala-lang.modules"     %% "scala-xml"     % scalaXmlVersion,
-      "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
-      "org.scalatest"              %% "scalatest"     % scalaTestVersion % "test, it"
+      "org.scala-lang.modules" %% "scala-xml" % scalaXmlVersion,
+//      "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
+      "org.scalatest" %% "scalatest" % scalaTestVersion % "test, it"
     )
   )
 
