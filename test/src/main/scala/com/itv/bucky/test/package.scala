@@ -56,13 +56,13 @@ package object test {
   }
 
   object IOAmqpClientTest {
-    def apply(executionContext: ExecutionContext, t: Timer[IO], cs: ContextShift[IO], logger: Logger[IO]): AmqpClientTest[IO] =
+    def apply(executionContext: ExecutionContext, t: Timer[IO], cs: ContextShift[IO], aLogger: Logger[IO]): AmqpClientTest[IO] =
       new AmqpClientTest[IO] {
         implicit val ec: ExecutionContext = executionContext
         override implicit val timer: Timer[IO] = IO.timer(executionContext)
         override implicit val contextShift: ContextShift[IO] = IO.contextShift(executionContext)
         override implicit val F: ConcurrentEffect[IO] = IO.ioConcurrentEffect(contextShift)
-        override implicit val logger: Logger[IO] = logger
+        override implicit val logger: Logger[IO] = aLogger
       }
   }
 
@@ -79,13 +79,13 @@ package object test {
                     t: Timer[F],
                     cs: ContextShift[F],
                     executionContext: ExecutionContext, 
-                    logger: Logger[F]): AmqpClientTest[F] =
+                    aLogger: Logger[F]): AmqpClientTest[F] =
       new AmqpClientTest[F]() {
         override implicit val F: ConcurrentEffect[F]        = concurrentEffect
         override implicit val timer: Timer[F]               = t
         override implicit val contextShift: ContextShift[F] = cs
         override implicit val ec: ExecutionContext          = executionContext
-        override implicit val logger = logger
+        override implicit val logger = aLogger
       }
   }
 

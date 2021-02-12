@@ -16,7 +16,7 @@ class ArgonautPayloadUnmarshallersTest extends AnyFunSuite {
   import com.itv.bucky.ArgonautSupport._
 
   case class Foo(foo: String)
-  implicit val someCodec: CodecJson[Foo] = casecodec1(Foo.apply, foo => Some(foo.foo))("foo")
+  implicit val someCodec: CodecJson[Foo] = casecodec1[String, Foo](Foo.apply, foo => Some(foo.foo))("foo")
 
   test("it should parse a json object") {
     val expectedValue    = s"bar ${new Random().nextInt(10)}"

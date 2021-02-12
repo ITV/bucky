@@ -5,7 +5,6 @@ import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.implicits._
 import cats.implicits._
 import cats.instances.list._
-import cats.syntax.traverse._
 import com.rabbitmq.client.ConfirmListener
 import org.typelevel.log4cats.Logger
 

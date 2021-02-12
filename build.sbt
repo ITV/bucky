@@ -293,5 +293,5 @@ lazy val xml = project
   )
 
 lazy val root = (project in file("."))
-  .aggregate(xml, circe, argonaut, example, kamon, test, core)
+  .aggregate(xml, circe, argonaut, example, test, core, kamon)
   .settings(publishArtifact := false)
