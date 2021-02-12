@@ -8,7 +8,9 @@ import io.circe.{Decoder, Encoder, Json}
 
 package object semiauto {
 
-  val JsonPayloadMarshaller: PayloadMarshaller[Json] = StringPayloadMarshaller.contramap[Json](_.noSpaces)
+  object JsonPayloadMarshaller extends PayloadMarshaller[Json] {
+    override def apply(json: Json): Payload = Payload.from(json.noSpaces)
+  }
 
   def unmarshallerFromDecodeJson[T](implicit decoder: Decoder[T]): PayloadUnmarshaller[T] =
     StringPayloadUnmarshaller
@@ -18,6 +20,8 @@ package object semiauto {
       })
 
   def marshallerFromEncodeJson[T](implicit encoder: Encoder[T]): PayloadMarshaller[T] =
-    JsonPayloadMarshaller.contramap(encoder(_))
+    StringPayloadMarshaller.contramap { value =>
+      encoder(value).noSpaces
+    }
 
 }

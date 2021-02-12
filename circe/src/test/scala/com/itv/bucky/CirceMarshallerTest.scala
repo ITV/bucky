@@ -17,7 +17,7 @@ class CirceMarshallerTest extends AnyFunSuite {
     val marshaller: PayloadMarshaller[Foo] = marshallerFromEncodeJson
 
     val foo = Foo("bar")
-    marshaller(foo) shouldBe Payload.from(foo.asJson)(JsonPayloadMarshaller)
+    marshaller(foo) shouldBe Payload.from(foo.asJson)
   }
 
   test("Can marshall a json") {
