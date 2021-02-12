@@ -18,7 +18,7 @@ val argonautVersion     = "6.3.3"
 val circeVersion        = "0.14.0-M3"
 val typeSafeVersion     = "1.4.0"
 val catsEffectVersion   = "2.3.1"
-val scalaXmlVersion     = "1.2.0"
+val scalaXmlVersion     = "2.0.0-M4"
 val scalaz              = "7.2.22"
 val logbackVersion      = "1.2.3"
 val kamonVersion        = "2.1.3"
@@ -157,16 +157,6 @@ lazy val core = project
       "org.scala-lang.modules" %% "scala-collection-compat" % "2.4.0"
     )
   )
-  .settings(
-    libraryDependencies += (
-      CrossVersion.partialVersion(scalaVersion.value) match {
-        case Some((3, _)) =>
-          "com.typesafe.scala-logging" % "scala-logging_2.13" % scalaLoggingVersion
-        case _ =>
-          "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion
-      }
-    )
-  )
   .configs(IntegrationTest)
 
 /**
@@ -195,16 +185,6 @@ lazy val test = project
       "ch.qos.logback" % "logback-classic" % logbackVersion % "test,it"
     )
   )
-  .settings(
-    libraryDependencies += (
-      CrossVersion.partialVersion(scalaVersion.value) match {
-        case Some((3, _)) =>
-          "com.typesafe.scala-logging" % "scala-logging_2.13" % scalaLoggingVersion
-        case _ =>
-          "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion
-      }
-    )
-  )
 
 lazy val example = project
   .settings(name := "com.itv")
@@ -220,16 +200,6 @@ lazy val example = project
       "org.typelevel" %% "log4cats-slf4j" % log4catsVersion, // Direct Slf4j Support - Recommended"
       "org.scalatest" %% "scalatest"      % scalaTestVersion,
       "com.typesafe"  % "config"          % typeSafeVersion
-    )
-  )
-  .settings(
-    libraryDependencies += (
-      CrossVersion.partialVersion(scalaVersion.value) match {
-        case Some((3, _)) =>
-          "com.typesafe.scala-logging" % "scala-logging_2.13" % scalaLoggingVersion
-        case _ =>
-          "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion
-      }
     )
   )
 
@@ -303,6 +273,7 @@ lazy val kamon = project
   .settings(name := "com.itv")
   .settings(moduleName := "bucky-kamon")
   .settings(kernelSettings: _*)
+  .aggregate(core, test)
   .dependsOn(core, test % "test,it")
   .configs(IntegrationTest)
   .settings(Defaults.itSettings)
@@ -352,16 +323,6 @@ lazy val xml = project
       "org.typelevel" %% "log4cats-core"  % log4catsVersion, // Only if you want to Support Any Backend
       "org.typelevel" %% "log4cats-slf4j" % log4catsVersion, // Direct Slf4j Support - Recommended"
       "org.scalatest" %% "scalatest"      % scalaTestVersion % "test, it"
-    )
-  )
-  .settings(
-    libraryDependencies += (
-      CrossVersion.partialVersion(scalaVersion.value) match {
-        case Some((3, _)) =>
-          "com.typesafe.scala-logging" % "scala-logging_2.13" % scalaLoggingVersion
-        case _ =>
-          "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion
-      }
     )
   )
 

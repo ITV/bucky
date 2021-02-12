@@ -3,7 +3,7 @@ import java.nio.charset.Charset
 
 import cats.effect.{ConcurrentEffect, Resource}
 import cats.implicits._
-import com.itv.bucky.LoggingAmqpClient.{logFailedHandler, logFailedPublishMessage, logSuccessfulHandler, logSuccessfullPublishMessage}
+import _root_.com.itv.bucky.LoggingAmqpClient.{logFailedHandler, logFailedPublishMessage, logSuccessfulHandler, logSuccessfullPublishMessage}
 import com.itv.bucky.consume._
 import com.itv.bucky.publish.PublishCommand
 import com.itv.bucky.{AmqpClient, Handler, Publisher, QueueName, decl}

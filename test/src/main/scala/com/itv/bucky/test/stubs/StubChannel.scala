@@ -12,7 +12,6 @@ import cats._
 import cats.effect._
 import cats.effect.ConcurrentEffect
 import cats.implicits._
-import com.typesafe.scalalogging.StrictLogging
 
 import scala.language.higherKinds
 import scala.collection.mutable
