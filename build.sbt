@@ -276,3 +276,13 @@ lazy val xml = project
 lazy val root = (project in file("."))
   .aggregate(xml, circe, kamon, argonaut, example, test, core)
   .settings(publishArtifact := false)
+
+ThisBuild / crossScalaVersions := Seq(scala213, scala212)
+ThisBuild / scalaVersion := scala213
+ThisBuild / githubWorkflowPublishTargetBranches := Seq()
+ThisBuild / githubWorkflowJavaVersions := Seq("adopt@1.11")
+ThisBuild / githubWorkflowArtifactUpload := false
+ThisBuild / githubWorkflowBuildMatrixAdditions +=
+  "ci" -> List("clean", "compile", "test", "it:test")
+ThisBuild / githubWorkflowBuild :=
+  Seq(WorkflowStep.Sbt(List("${{ matrix.ci }}"), name = Some("Validation")))
