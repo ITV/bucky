@@ -1,20 +1,20 @@
 package com.itv.bucky.publish
 
-import cats._
-import cats.implicits._
 import cats.effect._
-import cats.effect.implicits._
 import cats.effect.concurrent.{Deferred, Ref}
+import cats.effect.implicits._
+import cats.implicits._
+import cats.instances.list._
 import com.rabbitmq.client.ConfirmListener
-import com.typesafe.scalalogging.StrictLogging
-import scala.language.higherKinds
-import scala.collection.immutable.TreeMap
+import org.typelevel.log4cats.Logger
+
 import scala.collection.compat._
+import scala.collection.immutable.TreeMap
+import scala.language.higherKinds
 
 private[bucky] case class PendingConfirmListener[F[_]](pendingConfirmations: Ref[F, TreeMap[Long, Deferred[F, Boolean]]])(
-    implicit F: ConcurrentEffect[F])
-    extends ConfirmListener
-    with StrictLogging {
+    implicit F: ConcurrentEffect[F], logger: Logger[F])
+    extends ConfirmListener {
 
   def pop[T](deliveryTag: Long, multiple: Boolean): F[List[Deferred[F, Boolean]]] =
     pendingConfirmations.modify { x =>
@@ -29,7 +29,7 @@ private[bucky] case class PendingConfirmListener[F[_]](pendingConfirmations: Ref
   override def handleAck(deliveryTag: Long, multiple: Boolean): Unit =
     (for {
       toComplete <- pop(deliveryTag, multiple)
-      _          <- F.delay(logger.info("Received ack for delivery tag: {} and multiple: {}", deliveryTag, multiple))
+      _          <- logger.info(s"Received ack for delivery tag: $deliveryTag and multiple: $multiple")
       _          <- toComplete.traverse(_.complete(true))
     } yield ()).toIO
       .unsafeRunSync()
@@ -37,7 +37,7 @@ private[bucky] case class PendingConfirmListener[F[_]](pendingConfirmations: Ref
   override def handleNack(deliveryTag: Long, multiple: Boolean): Unit =
     (for {
       toComplete <- pop(deliveryTag, multiple)
-      _          <- F.delay(logger.error("Received Nack for delivery tag: {} and multiple: {}", deliveryTag, multiple))
+      _          <- logger.error(s"Received Nack for delivery tag: $deliveryTag and multiple: $multiple")
       _          <- toComplete.traverse(_.complete(false))
     } yield ()).toIO
       .unsafeRunSync()

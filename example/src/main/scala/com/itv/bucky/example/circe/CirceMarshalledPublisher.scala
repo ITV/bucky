@@ -7,6 +7,7 @@ import com.itv.bucky.decl._
 import com.itv.bucky.example.circe.Shared.Person
 import com.itv.bucky.publish._
 import com.typesafe.config.ConfigFactory
+import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -27,13 +28,16 @@ object CirceMarshalledPublisher extends IOApp {
   val config                             = ConfigFactory.load("bucky")
   val amqpClientConfig: AmqpClientConfig = AmqpClientConfig(config.getString("rmq.host"), 5672, "guest", "guest")
 
-  override def run(args: List[String]): IO[ExitCode] =
-    AmqpClient[IO](amqpClientConfig).use { client =>
-      for {
-        _ <- client.declare(Declarations.all)
-        publisher = client.publisherOf[Person](Declarations.exchange.name, Declarations.routingKey)
-        _ <- publisher(Person("bob", 22))
-      } yield ExitCode.Success
+  override def run(args: List[String]): IO[ExitCode] = {
+    Slf4jLogger.create[IO].flatMap { implicit logger =>
+      AmqpClient[IO](amqpClientConfig).use { client =>
+        for {
+          _ <- client.declare(Declarations.all)
+          publisher = client.publisherOf[Person](Declarations.exchange.name, Declarations.routingKey)
+          _ <- publisher(Person("bob", 22))
+        } yield ExitCode.Success
+      }
     }
+  }
 
 }

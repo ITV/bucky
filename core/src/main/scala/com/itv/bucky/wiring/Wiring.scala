@@ -1,19 +1,16 @@
 package com.itv.bucky.wiring
 
 import cats.effect.{Resource, Sync}
+import cats.implicits._
+import com.itv.bucky.consume.{ConsumeAction, RequeueConsumeAction}
 import com.itv.bucky.decl._
 import com.itv.bucky.pattern.requeue
 import com.itv.bucky.pattern.requeue.RequeuePolicy
-import com.itv.bucky.{AmqpClient, ExchangeName, PayloadMarshaller, PayloadUnmarshaller, Publisher, QueueName, RoutingKey}
-import com.typesafe.scalalogging.StrictLogging
-import com.itv.bucky._
+import com.itv.bucky.publish.PublishCommandBuilder
+import com.itv.bucky.{AmqpClient, ExchangeName, PayloadMarshaller, PayloadUnmarshaller, Publisher, QueueName, RoutingKey, _}
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
-import cats.implicits._
-import cats.effect.implicits._
-import com.itv.bucky.consume.{ConsumeAction, DeadLetter, RequeueConsumeAction}
-import com.itv.bucky.publish.PublishCommandBuilder
-
 import scala.language.higherKinds
 
 final case class WiringName(value: String) extends AnyVal
@@ -29,8 +26,7 @@ class Wiring[T](
     setDeadLetterExchangeType: Option[ExchangeType] = None
 )(implicit
   val marshaller: PayloadMarshaller[T],
-  val unmarshaller: PayloadUnmarshaller[T])
-    extends StrictLogging {
+  val unmarshaller: PayloadUnmarshaller[T]) {
 
   def exchangeName: ExchangeName =
     setExchangeName.getOrElse(ExchangeName(s"bucky.exchange.${name.value}"))
@@ -60,34 +56,19 @@ class Wiring[T](
   def allDeclarations: List[Declaration] =
     (publisherDeclarations ++ consumerDeclarations).distinct
 
-  def publisher[F[_]](client: AmqpClient[F], timeout: FiniteDuration = 10.seconds)(implicit F: Sync[F]): F[Publisher[F, T]] =
+  def publisher[F[_]](client: AmqpClient[F], timeout: FiniteDuration = 10.seconds)(implicit F: Sync[F], logger: Logger[F]): F[Publisher[F, T]] =
     for {
-      _ <- F.delay(
-        logger.info(
-          s"Creating publisher: " +
-            s"exchange=${exchangeName.value} " +
-            s"routingKey=${routingKey.value} " +
-            s"queue=${queueName.value} " +
-            s"type=${exchangeType.value} " +
-            s"requeuePolicy=$requeuePolicy"))
+      _ <- logger.info(s"Creating publisher: exchange=${exchangeName.value} routingKey=${routingKey.value} queue=${queueName.value} type=${exchangeType.value} requeuePolicy=$requeuePolicy")
       _ <- client.declare(publisherDeclarations)
     } yield client.publisherOf(publisherBuilder)
 
-  def publisherWithHeaders[F[_]](client: AmqpClient[F])(implicit F: Sync[F]): F[PublisherWithHeaders[F, T]] =
+  def publisherWithHeaders[F[_]](client: AmqpClient[F])(implicit F: Sync[F], logger: Logger[F]): F[PublisherWithHeaders[F, T]] =
     for {
-      _ <- F.delay {
-        logger.info(
-          s"Creating publisher with headers: " +
-            s"exchange=${exchangeName.value} " +
-            s"routingKey=${routingKey.value} " +
-            s"queue=${queueName.value} " +
-            s"type=${exchangeType.value} " +
-            s"requeuePolicy=$requeuePolicy")
-      }
+      _ <- logger.info(s"Creating publisher with headers: exchange=${exchangeName.value} routingKey=${routingKey.value} queue=${queueName.value} type=${exchangeType.value} requeuePolicy=$requeuePolicy")
       _ <- client.declare(publisherDeclarations)
     } yield client.publisherWithHeadersOf(publisherBuilder)
 
-  def registerConsumer[F[_]](client: AmqpClient[F])(handleMessage: T => F[ConsumeAction])(implicit F: Sync[F]): Resource[F, Unit] = {
+  def registerConsumer[F[_]](client: AmqpClient[F])(handleMessage: T => F[ConsumeAction])(implicit F: Sync[F], logger: Logger[F]): Resource[F, Unit] = {
     val runDeclarations =
       for {
         _ <- F.delay {
@@ -108,40 +89,24 @@ class Wiring[T](
     } yield ()
   }
 
-  def registerRequeueConsumer[F[_]](client: AmqpClient[F])(handleMessage: T => F[RequeueConsumeAction])(implicit F: Sync[F]): Resource[F, Unit] = {
+  def registerRequeueConsumer[F[_]](client: AmqpClient[F])(handleMessage: T => F[RequeueConsumeAction])(implicit F: Sync[F], logger: Logger[F]): Resource[F, Unit] = {
     val runDeclarations =
       for {
-        _ <- F.delay {
-          logger.info(
-            s"Creating consumer: " +
-              s"exchange=${exchangeName.value} " +
-              s"routingKey=${routingKey.value} " +
-              s"queue=${queueName.value} " +
-              s"type=${exchangeType.value} " +
-              s"requeuePolicy=$requeuePolicy")
-        }
+        _ <- logger.info(s"Creating consumer: exchange=${exchangeName.value} routingKey=${routingKey.value} queue=${queueName.value} type=${exchangeType.value} requeuePolicy=$requeuePolicy")
         _ <- client.declare(consumerDeclarations)
       } yield ()
 
     for {
       _ <- Resource.make(runDeclarations)(_ => F.pure(()))
-      _ <- client.registerRequeueConsumerOf(queueName, handleMessage, requeuePolicy)(unmarshaller, F)
+      _ <- client.registerRequeueConsumerOf(queueName, handleMessage, requeuePolicy)(unmarshaller, F, logger)
     } yield ()
   }
 
   def registerRequeueConsumer[F[_]](client: AmqpClient[F], onRequeueExpiryAction: T => F[ConsumeAction])(handleMessage: T => F[RequeueConsumeAction])(
-      implicit F: Sync[F]): Resource[F, Unit] = {
+      implicit F: Sync[F], logger: Logger[F]): Resource[F, Unit] = {
     val runDeclarations =
       for {
-        _ <- F.delay {
-          logger.info(
-            s"Creating consumer: " +
-              s"exchange=${exchangeName.value} " +
-              s"routingKey=${routingKey.value} " +
-              s"queue=${queueName.value} " +
-              s"type=${exchangeType.value} " +
-              s"requeuePolicy=$requeuePolicy")
-        }
+        _ <- logger.info(s"Creating consumer: exchange=${exchangeName.value} routingKey=${routingKey.value} queue=${queueName.value} type=${exchangeType.value} requeuePolicy=$requeuePolicy")
         _ <- client.declare(consumerDeclarations)
       } yield ()
 
@@ -150,7 +115,7 @@ class Wiring[T](
       _ <- client.registerRequeueConsumerOf(queueName = queueName,
                                             handler = handleMessage,
                                             requeuePolicy = requeuePolicy,
-                                            onRequeueExpiryAction = onRequeueExpiryAction)(unmarshaller, F)
+                                            onRequeueExpiryAction = onRequeueExpiryAction)(unmarshaller, F, logger)
     } yield ()
   }
 
@@ -159,5 +124,4 @@ class Wiring[T](
       .using(exchangeName)
       .using(routingKey)
 
-  private[wiring] def getLogger = logger
 }

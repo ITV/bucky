@@ -6,15 +6,18 @@ import com.itv.bucky.decl._
 import com.itv.bucky.example.marshalling.Shared.Person
 import com.itv.bucky.publish._
 import com.typesafe.config.ConfigFactory
+import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 import scala.concurrent._
 import scala.concurrent.duration._
-
 import scala.concurrent.ExecutionContext.Implicits.global
 
 object MarshallingPublisher extends IOApp {
   import com.itv.bucky._
 
+  implicit val logger: Logger[IO] = Slf4jLogger.getLogger[IO]
+  
   //start snippet 1
   val brokerHostname                     = ConfigFactory.load("bucky").getString("rmq.host")
   val amqpClientConfig: AmqpClientConfig = AmqpClientConfig(brokerHostname, 5672, "guest", "guest")

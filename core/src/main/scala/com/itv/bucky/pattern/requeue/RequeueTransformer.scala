@@ -1,16 +1,15 @@
 package com.itv.bucky.pattern.requeue
 
 import cats.effect.Sync
-import com.typesafe.scalalogging.StrictLogging
+import cats.implicits._
+import com.itv.bucky.consume.{Ack, ConsumeAction, Delivery, RequeueConsumeAction}
+import com.itv.bucky.publish.PublishCommand
+import com.itv.bucky.{ExchangeName, Handler, Publisher, RequeueHandler}
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration.FiniteDuration
 import scala.language.higherKinds
 import scala.util.Try
-import cats.implicits._
-import cats.effect.implicits._
-import com.itv.bucky.{ExchangeName, Handler, Publisher, RequeueHandler}
-import com.itv.bucky.consume.{Ack, ConsumeAction, DeadLetter, Delivery, RequeueConsumeAction}
-import com.itv.bucky.publish.PublishCommand
 
 case class RequeueTransformer[F[_]](
                                      requeuePublisher: Publisher[F, PublishCommand],
@@ -18,9 +17,8 @@ case class RequeueTransformer[F[_]](
                                      requeuePolicy: RequeuePolicy,
                                      onHandlerException: RequeueConsumeAction,
                                      onRequeueExpiryAction: Delivery => F[ConsumeAction]
-)(handler: RequeueHandler[F, Delivery])(implicit F: Sync[F])
-    extends Handler[F, Delivery]
-    with StrictLogging {
+)(handler: RequeueHandler[F, Delivery])(implicit F: Sync[F], logger: Logger[F])
+    extends Handler[F, Delivery] {
 
   private val requeueCountHeaderName = "x-bucky-requeue-counter"
 
@@ -60,9 +58,7 @@ case class RequeueTransformer[F[_]](
 
     val safePerform = F.flatMap(F.delay(handler(delivery)))(identity)
     F.handleErrorWith(F.flatMap(safePerform)(perform)) {
-      case t: Throwable =>
-        logger.error(s"Unable to process ${delivery.body} due to handler failure, will $onHandlerException", t)
-        perform(onHandlerException)
+      logger.error(_)(s"Unable to process ${delivery.body} due to handler failure, will $onHandlerException") >> perform(onHandlerException)
     }
   }
 

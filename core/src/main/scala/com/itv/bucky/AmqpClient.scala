@@ -8,14 +8,14 @@ import cats.effect.implicits._
 import cats.effect.concurrent.Ref
 import cats.implicits._
 import com.itv.bucky.consume.{ConsumeAction, DeadLetter, Delivery}
-import com.rabbitmq.client.{ConnectionFactory, ShutdownListener, ShutdownSignalException, Channel => RabbitChannel, Connection => RabbitConnection}
+import com.rabbitmq.client.{ConnectionFactory, ShutdownSignalException, Channel => RabbitChannel, Connection => RabbitConnection}
 import com.itv.bucky.decl._
 import com.itv.bucky.publish.PublishCommand
-import com.typesafe.scalalogging.StrictLogging
 import scala.concurrent.duration._
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutorService}
 import scala.language.higherKinds
+import org.typelevel.log4cats.Logger
 
 trait AmqpClient[F[_]] {
   def declare(declarations: Declaration*): F[Unit]
@@ -30,36 +30,26 @@ trait AmqpClient[F[_]] {
   def isConnectionOpen: F[Boolean]
 }
 
-object AmqpClient extends StrictLogging {
+object AmqpClient{
 
-  private def createChannel[F[_]](connection: RabbitConnection)(implicit F: Sync[F], cs: ContextShift[F]): Resource[F, RabbitChannel] = {
-    val make =
-      F.delay {
-          logger.info(s"Starting Channel")
-          val channel = connection.createChannel()
-          channel.addShutdownListener(new ShutdownListener {
-            override def shutdownCompleted(cause: ShutdownSignalException): Unit =
-              if (cause.isInitiatedByApplication)
-                logger.info(s"Channel shut down due to explicit application action: ${cause.getMessage}")
-              else
-                logger.error(s"Channel shut down by broker or because of detectable non-deliberate application failure", cause)
-          })
-          channel
-        }
-        .attempt
-        .flatTap {
-          case Right(_) =>
-            F.delay(logger.info(s"Channel has been started successfully!"))
-          case Left(exception) =>
-            F.delay(logger.error(s"Failure when starting Channel because ${exception.getMessage}", exception))
-        }
-        .rethrow
-
-    Resource.make(cs.shift.flatMap(_ => make))(channel => F.delay(channel.close()))
+  private def createChannel[F[_]](connection: RabbitConnection)(implicit F: Sync[F], cs: ContextShift[F], logger: Logger[F]): Resource[F, RabbitChannel] = {
+    for {
+      _       <- Resource.liftF[F, Unit](logger.info(s"Starting Channel"))
+      channel <- Resource.fromAutoCloseable(Sync[F].delay(connection.createChannel())).onFinalizeCase {
+          case ExitCase.Completed => 
+            logger.info("Channel shutdown")
+          case ExitCase.Error(cause : ShutdownSignalException) if cause.isInitiatedByApplication => 
+            logger.info(s"Channel shut down due to explicit application action: ${cause.getMessage}")
+          case ExitCase.Error(cause) => 
+            logger.error(cause)(s"Channel shut down by broker or because of detectable non-deliberate application failure")
+          case ExitCase.Canceled =>
+            logger.info("Channel shutdown (cancelled)")
+      }
+    } yield channel
   }
 
   private def createConnection[F[_]](
-      config: AmqpClientConfig)(implicit F: Sync[F], cs: ContextShift[F], executionContext: ExecutionContext): Resource[F, RabbitConnection] = {
+      config: AmqpClientConfig)(implicit F: Sync[F], cs: ContextShift[F], executionContext: ExecutionContext, logger: Logger[F]): Resource[F, RabbitConnection] = {
     val make =
       F.delay {
           logger.info(s"Starting AmqpClient")
@@ -93,7 +83,7 @@ object AmqpClient extends StrictLogging {
           case Right(_) =>
             logger.info(s"AmqpClient has been started successfully!").pure[F]
           case Left(exception) =>
-            logger.error(s"Failure when starting AmqpClient because ${exception.getMessage}", exception).pure[F]
+            logger.error(exception)(s"Failure when starting AmqpClient because ${exception.getMessage}").pure[F]
         }
         .rethrow
 
@@ -103,7 +93,8 @@ object AmqpClient extends StrictLogging {
   def apply[F[_]](config: AmqpClientConfig)(implicit F: ConcurrentEffect[F],
                                             cs: ContextShift[F],
                                             t: Timer[F],
-                                            executionContext: ExecutionContext): Resource[F, AmqpClient[F]] =
+                                            executionContext: ExecutionContext,
+                                            logger:Logger[F]): Resource[F, AmqpClient[F]] =
     for {
       connection <- createConnection(config)
       publishChannel = createChannel(connection).map(Channel.apply[F])
@@ -115,6 +106,7 @@ object AmqpClient extends StrictLogging {
       implicit F: ConcurrentEffect[F],
       cs: ContextShift[F],
       t: Timer[F],
+      logger: Logger[F],
       executionContext: ExecutionContext): Resource[F, AmqpClient[F]] =
     publishChannel.flatMap { channel =>
       val make =
@@ -125,10 +117,9 @@ object AmqpClient extends StrictLogging {
       Resource.make(make)(_ => F.unit)
     }
 
-  
   private def mkClient[F[_]](
       buildChannel: () => Resource[F, Channel[F]],
-      connectionManager: AmqpClientConnectionManager[F])(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F]): AmqpClient[F] =
+      connectionManager: AmqpClientConnectionManager[F])(implicit F: ConcurrentEffect[F], cs: ContextShift[F], t: Timer[F], logger: Logger[F]): AmqpClient[F] =
     new AmqpClient[F] {
       private def repeatUntil[A](eval: F[A])(pred: A => Boolean)(sleep: FiniteDuration): F[Unit] =
         for {
@@ -153,7 +144,7 @@ object AmqpClient extends StrictLogging {
         for {
           channel <- buildChannel()
           handling <- Resource.make(Ref.of[F, Set[UUID]](Set.empty))(set =>
-            repeatUntil(F.delay(logger.debug("Verifying running handlers.")) *> set.get)(_.isEmpty)(shutdownRetry).timeout(shutdownTimeout))
+            repeatUntil(logger.debug("Verifying running handlers.") *> set.get)(_.isEmpty)(shutdownRetry).timeout(shutdownTimeout))
           newHandler = (delivery: Delivery) =>
             for {
               id            <- F.delay(UUID.randomUUID())

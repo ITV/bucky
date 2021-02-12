@@ -11,8 +11,13 @@ import scala.concurrent.duration._
 import scala.concurrent.{Future, TimeoutException}
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers._
+import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 class PublisherTest extends AnyFunSuite with IOAmqpClientTest with EitherValues {
+
+  implicit val logger: Logger[IO] = Slf4jLogger.getLogger[IO]
+  
   val exchange = ExchangeName("anexchange")
   val queue    = QueueName("aqueue")
   val rk       = RoutingKey("ark")
@@ -35,6 +40,7 @@ class PublisherTest extends AnyFunSuite with IOAmqpClientTest with EitherValues 
         _            <- IO.fromFuture(IO(future)).timeout(3.seconds) //no point waiting for the initial timeout
       } yield {
         isCompleted1 shouldBe false
+        ()
       }
     }
   }
@@ -51,6 +57,7 @@ class PublisherTest extends AnyFunSuite with IOAmqpClientTest with EitherValues 
         result.left.value shouldBe a[TimeoutException]
         withClue("Confirm listeners should be popped") {
           pendingConf.flatMap(_.values) shouldBe empty
+          ()
         }
       }
     }
@@ -72,6 +79,7 @@ class PublisherTest extends AnyFunSuite with IOAmqpClientTest with EitherValues 
       } yield {
         areCompleted1 shouldBe List(false, false, false)
         areCompleted2 shouldBe List(true, true, true)
+        ()
       }
     }
   }
@@ -99,6 +107,7 @@ class PublisherTest extends AnyFunSuite with IOAmqpClientTest with EitherValues 
         result2.left.value shouldBe a[RuntimeException]
 
         result3.left.value shouldBe a[RuntimeException]
+        ()
       }
     }
   }
@@ -126,6 +135,7 @@ class PublisherTest extends AnyFunSuite with IOAmqpClientTest with EitherValues 
         result.filter(_.isRight) should have size 1
         result.filter(r => r.isLeft && r.left.value.isInstanceOf[RuntimeException]) should have size 2
         result.filter(r => r.isLeft && r.left.value.isInstanceOf[TimeoutException]) should have size 1
+        ()
       }
     }
   }

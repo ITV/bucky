@@ -6,21 +6,23 @@ name := "bucky"
 
 lazy val scala212 = "2.12.10"
 lazy val scala213 = "2.13.2"
+lazy val scala3   = "3.0.0-M3"
 
 scalaVersion := scala212
 scalacOptions += "-Ypartial-unification"
 
 val amqpClientVersion   = "5.8.0"
 val scalaLoggingVersion = "3.9.2"
-val scalaTestVersion    = "3.1.2"
-val argonautVersion     = "6.2.3"
-val circeVersion        = "0.13.0"
+val scalaTestVersion    = "3.2.3"
+val argonautVersion     = "6.3.3"
+val circeVersion        = "0.14.0-M3"
 val typeSafeVersion     = "1.4.0"
-val catsEffectVersion   = "2.0.0"
-val scalaXmlVersion     = "1.2.0"
+val catsEffectVersion   = "2.3.1"
+val scalaXmlVersion     = "2.0.0-M4"
 val scalaz              = "7.2.22"
 val logbackVersion      = "1.2.3"
 val kamonVersion        = "2.1.3"
+val log4catsVersion     = "1.2.0-RC2"
 
 releaseProcess := Seq[ReleaseStep](
   checkSnapshotDependencies,
@@ -54,7 +56,7 @@ pgpPassphrase := Option(System.getenv("GPG_KEY_PASSPHRASE")).map(_.toArray)
 useGpg := false
 
 lazy val kernelSettings = Seq(
-  crossScalaVersions := Seq(scala212, scala213),
+  crossScalaVersions := Seq(scala212, scala213, scala3),
   scalaVersion := scala212,
   organization := "com.itv",
   scalacOptions ++= Seq("-feature", "-deprecation", "-Xfatal-warnings"),
@@ -145,16 +147,24 @@ lazy val core = project
   .settings(kernelSettings: _*)
   .settings(
     libraryDependencies ++= Seq(
-      "com.typesafe.scala-logging" %% "scala-logging"  % scalaLoggingVersion,
-      "org.scalatest"              %% "scalatest"      % scalaTestVersion % "test",
-      "org.typelevel"              %% "cats-effect"    % catsEffectVersion,
-      "com.rabbitmq"               % "amqp-client"     % amqpClientVersion,
-      "ch.qos.logback"             % "logback-classic" % logbackVersion % "test,it",
-      "org.scala-lang.modules" %% "scala-collection-compat" % "2.1.6"
+      "org.scala-lang.modules" %% "scala-xml" % scalaXmlVersion,
+      "org.typelevel"          %% "log4cats-core"           % log4catsVersion, // Only if you want to Support Any Backend
+      "org.typelevel"          %% "log4cats-slf4j"          % log4catsVersion, // Direct Slf4j Support - Recommended"
+      "org.scalatest" %% "scalatest"      % scalaTestVersion % "test, it" excludeAll(ExclusionRule("org.scala-lang.modules")),
+      "org.typelevel"          %% "cats-effect"             % catsEffectVersion,
+      "com.rabbitmq"           % "amqp-client"              % amqpClientVersion,
+      "ch.qos.logback"         % "logback-classic"          % logbackVersion % "test,it",
+      "org.scala-lang.modules" %% "scala-collection-compat" % "2.4.0"
     )
   )
   .configs(IntegrationTest)
 
+/**
+  * CrossVersion.partialVersion(scalaVersion) match {
+         case Some((2, scalaMajor)) if scalaMajor == 9 => Nil
+         case _ => Seq("-language:_")
+       }
+  */
 lazy val test = project
   .settings(name := "com.itv")
   .settings(moduleName := "bucky-test")
@@ -165,12 +175,14 @@ lazy val test = project
   .settings(Defaults.itSettings)
   .settings(
     libraryDependencies ++= Seq(
-      "com.typesafe.scala-logging" %% "scala-logging"  % scalaLoggingVersion,
-      "org.scalatest"              %% "scalatest"      % scalaTestVersion % "test,it",
-      "org.typelevel"              %% "cats-effect"    % catsEffectVersion,
-      "com.rabbitmq"               % "amqp-client"     % amqpClientVersion,
-      "com.typesafe"               % "config"          % typeSafeVersion % "it",
-      "ch.qos.logback"             % "logback-classic" % logbackVersion % "test,it"
+      "org.scala-lang.modules" %% "scala-xml" % scalaXmlVersion,
+      "org.typelevel"  %% "log4cats-core"  % log4catsVersion, // Only if you want to Support Any Backend
+      "org.typelevel"  %% "log4cats-slf4j" % log4catsVersion, // Direct Slf4j Support - Recommended"
+      "org.scalatest" %% "scalatest"      % scalaTestVersion % "test, it" excludeAll(ExclusionRule("org.scala-lang.modules")),
+      "org.typelevel"  %% "cats-effect"    % catsEffectVersion,
+      "com.rabbitmq"   % "amqp-client"     % amqpClientVersion,
+      "com.typesafe"   % "config"          % typeSafeVersion % "it",
+      "ch.qos.logback" % "logback-classic" % logbackVersion % "test,it"
     )
   )
 
@@ -182,10 +194,12 @@ lazy val example = project
   .dependsOn(core, argonaut, circe, test)
   .settings(
     libraryDependencies ++= Seq(
-      "io.argonaut"                %% "argonaut"      % argonautVersion,
-      "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
-      "org.scalatest"              %% "scalatest"     % scalaTestVersion,
-      "com.typesafe"               % "config"         % typeSafeVersion
+      "io.argonaut" %% "argonaut" % argonautVersion,
+      "org.typelevel" %% "log4cats-core"  % log4catsVersion, // Only if you want to Support Any Backend
+      "org.typelevel" %% "log4cats-slf4j" % log4catsVersion, // Direct Slf4j Support - Recommended"
+      "org.scala-lang.modules" %% "scala-xml" % scalaXmlVersion,
+      "org.scalatest" %% "scalatest"      % scalaTestVersion % "test" excludeAll(ExclusionRule("org.scala-lang.modules")),
+      "com.typesafe"  % "config"          % typeSafeVersion
     )
   )
 
@@ -203,9 +217,10 @@ lazy val argonaut = project
   )
   .settings(
     libraryDependencies ++= Seq(
-      "io.argonaut"                %% "argonaut"      % argonautVersion,
-      "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
-      "org.scalatest"              %% "scalatest"     % scalaTestVersion % "test, it"
+      "io.argonaut" %% "argonaut" % argonautVersion,
+      "org.typelevel" %% "log4cats-core"  % log4catsVersion, // Only if you want to Support Any Backend
+      "org.typelevel" %% "log4cats-slf4j" % log4catsVersion, // Direct Slf4j Support - Recommended"
+      "org.scalatest" %% "scalatest"      % scalaTestVersion % "test, it" excludeAll(ExclusionRule("org.scala-lang.modules"))
     )
   )
 
@@ -223,11 +238,12 @@ lazy val circe = project
   )
   .settings(
     libraryDependencies ++= Seq(
-      "io.circe"                   %% "circe-core"    % circeVersion,
-      "io.circe"                   %% "circe-generic" % circeVersion,
-      "io.circe"                   %% "circe-parser"  % circeVersion,
-      "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
-      "org.scalatest"              %% "scalatest"     % scalaTestVersion % "test, it"
+      "io.circe" %% "circe-core"    % circeVersion,
+      "io.circe" %% "circe-generic" % circeVersion,
+      "io.circe" %% "circe-parser"  % circeVersion,
+      "org.typelevel" %% "log4cats-core"  % log4catsVersion, // Only if you want to Support Any Backend
+      "org.typelevel" %% "log4cats-slf4j" % log4catsVersion, // Direct Slf4j Support - Recommended"
+      "org.scalatest" %% "scalatest"      % scalaTestVersion % "test, it" excludeAll(ExclusionRule("org.scala-lang.modules"))
     )
   )
 
@@ -235,6 +251,7 @@ lazy val kamon = project
   .settings(name := "com.itv")
   .settings(moduleName := "bucky-kamon")
   .settings(kernelSettings: _*)
+  .aggregate(core, test)
   .dependsOn(core, test % "test,it")
   .configs(IntegrationTest)
   .settings(Defaults.itSettings)
@@ -245,11 +262,12 @@ lazy val kamon = project
   )
   .settings(
     libraryDependencies ++= Seq(
-      "com.typesafe.scala-logging" %% "scala-logging"   % scalaLoggingVersion,
-      "org.scalatest"              %% "scalatest"       % scalaTestVersion % "test, it",
-      "io.kamon"                   %% "kamon-bundle"      % kamonVersion,
-      "io.kamon"                   %% "kamon-testkit"   % kamonVersion % "test",
-      "ch.qos.logback"             % "logback-classic"  % logbackVersion % "test, it"
+      "org.typelevel"  %% "log4cats-core"  % log4catsVersion, // Only if you want to Support Any Backend
+      "org.typelevel"  %% "log4cats-slf4j" % log4catsVersion, // Direct Slf4j Support - Recommended"
+      "org.scalatest" %% "scalatest"      % scalaTestVersion % "test, it" excludeAll(ExclusionRule("org.scala-lang.modules")),
+      "io.kamon"       %% "kamon-bundle"   % kamonVersion,
+      "io.kamon"       %% "kamon-testkit"  % kamonVersion % "test",
+      "ch.qos.logback" % "logback-classic" % logbackVersion % "test, it"
     )
   )
 
@@ -267,12 +285,13 @@ lazy val xml = project
   )
   .settings(
     libraryDependencies ++= Seq(
-      "org.scala-lang.modules"     %% "scala-xml"     % scalaXmlVersion,
-      "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
-      "org.scalatest"              %% "scalatest"     % scalaTestVersion % "test, it"
+      "org.scala-lang.modules" %% "scala-xml" % scalaXmlVersion,
+      "org.typelevel" %% "log4cats-core"  % log4catsVersion, // Only if you want to Support Any Backend
+      "org.typelevel" %% "log4cats-slf4j" % log4catsVersion, // Direct Slf4j Support - Recommended"
+      "org.scalatest" %% "scalatest"      % scalaTestVersion % "test, it" excludeAll(ExclusionRule("org.scala-lang.modules"))
     )
   )
 
 lazy val root = (project in file("."))
-  .aggregate(xml, circe, kamon, argonaut, example, test, core)
+  .aggregate(xml, circe, argonaut, example, test, core, kamon)
   .settings(publishArtifact := false)

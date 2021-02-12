@@ -12,7 +12,6 @@ import com.itv.bucky.decl.{Exchange, Queue}
 import com.itv.bucky.test.StubHandlers
 import com.itv.bucky.test.stubs.RecordingHandler
 import com.typesafe.config.ConfigFactory
-import com.typesafe.scalalogging.StrictLogging
 
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers._
@@ -23,13 +22,16 @@ import scala.collection.immutable.TreeSet
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.higherKinds
+import org.typelevel.log4cats.slf4j.Slf4jLogger
+import org.typelevel.log4cats.Logger
 
-class HammerTest extends AnyFunSuite with Eventually with IntegrationPatience with StrictLogging {
+class HammerTest extends AnyFunSuite with Eventually with IntegrationPatience {
 
   case class TestFixture(stubHandler: RecordingHandler[IO, String], publisher: Publisher[IO, String], client: AmqpClient[IO])
 
   implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(300))
   implicit val cs: ContextShift[IO] = IO.contextShift(ec)
+  implicit val logger: Logger[IO] = Slf4jLogger.getLogger[IO]
   implicit val timer: Timer[IO]     = IO.timer(ec)
 
   def withTestFixture(test: TestFixture => IO[Unit]): Unit = {
