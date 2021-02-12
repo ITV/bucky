@@ -2,20 +2,20 @@ package com.itv.bucky.example.requeue
 
 import cats.effect.{ExitCode, IO, IOApp, Resource}
 import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
-import com.itv.bucky.decl._
 import com.itv.bucky._
 import com.itv.bucky.consume._
+import com.itv.bucky.decl._
 import com.itv.bucky.pattern.requeue._
 import com.typesafe.config.{Config, ConfigFactory}
-import com.typesafe.scalalogging.StrictLogging
+import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
-import cats.effect._
-import cats.implicits._
+object RequeueConsumer extends IOApp {
 
-object RequeueConsumer extends IOApp with StrictLogging {
+  implicit val logger: Logger[IO] = Slf4jLogger.getLogger[IO]
 
   object Declarations {
     val queue = Queue(QueueName(s"requeue_string-1"))
@@ -26,10 +26,8 @@ object RequeueConsumer extends IOApp with StrictLogging {
   val amqpClientConfig: AmqpClientConfig = AmqpClientConfig(config.getString("rmq.host"), 5672, "guest", "guest")
 
   val stringToLogRequeueHandler: RequeueHandler[IO, String] =
-    RequeueHandler[IO, String] { message: String =>
-      IO.delay {
-        logger.info(message)
-
+    RequeueHandler[IO, String] { (message: String) =>
+      logger.info(message).as {
         message match {
           case "requeue"    => Requeue
           case "deadletter" => DeadLetter

@@ -9,11 +9,15 @@ import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.StrictLogging
 import cats.effect._
 import cats.implicits._
+import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-object UnmarshallingConsumer extends IOApp with StrictLogging {
+object UnmarshallingConsumer extends IOApp {
 
+  implicit val logger: Logger[IO] = Slf4jLogger.getLogger[IO]
+  
   //start snippet 1
   val config                             = ConfigFactory.load("bucky")
   val amqpClientConfig: AmqpClientConfig = AmqpClientConfig(config.getString("rmq.host"), 5672, "guest", "guest")
@@ -44,11 +48,8 @@ object UnmarshallingConsumer extends IOApp with StrictLogging {
 
   //start snippet 3
   val personHandler: Handler[IO, Person] =
-    Handler[IO, Person] { message: Person =>
-      IO {
-        logger.info(s"${message.name} is ${message.age} years old")
-        Ack
-      }
+    Handler[IO, Person] { (message: Person) =>
+        logger.info(s"${message.name} is ${message.age} years old").as(Ack)
     }
   //end snippet 3
 
