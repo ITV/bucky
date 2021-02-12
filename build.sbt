@@ -283,6 +283,6 @@ ThisBuild / githubWorkflowPublishTargetBranches := Seq()
 ThisBuild / githubWorkflowJavaVersions := Seq("adopt@1.11")
 ThisBuild / githubWorkflowArtifactUpload := false
 ThisBuild / githubWorkflowBuildMatrixAdditions +=
-  "ci" -> List("clean", "compile", "test", "it:test")
+  "ci" -> List("clean ;compile ;test ;it:test")
 ThisBuild / githubWorkflowBuild :=
   Seq(WorkflowStep.Sbt(List("${{ matrix.ci }}"), name = Some("Validation")))
