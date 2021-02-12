@@ -2,7 +2,6 @@ package com.itv.bucky.test.stubs
 
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicLong
-
 import com.itv.bucky
 import com.itv.bucky.consume._
 import com.itv.bucky.publish._
@@ -19,9 +18,11 @@ import scala.language.higherKinds
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import com.itv.bucky.decl.Fanout
+import org.typelevel.log4cats.Logger
+
 import scala.collection.compat._
 
-abstract class StubChannel[F[_]](implicit F: ConcurrentEffect[F]) extends Channel[F] with StrictLogging {
+abstract class StubChannel[F[_]](implicit F: ConcurrentEffect[F], logger: Logger[F]) extends Channel[F] {
   var publishSeq: Long                                                        = 0L
   val pubSeqLock: Object                                                      = new Object
   val exchanges: ListBuffer[Exchange]                                         = ListBuffer.empty
@@ -149,25 +150,23 @@ abstract class StubChannel[F[_]](implicit F: ConcurrentEffect[F]) extends Channe
       .toList
     (for {
       id       <- F.delay(UUID.randomUUID())
-      _        <- F.delay(logger.debug("Publishing message with rk: {}, exchange: {} ,body: {} and pid {}", cmd.routingKey, cmd.exchange, cmd.body, id))
-      _        <- F.delay(logger.debug("Found {} queues for pid {}.", queues.toList.map(_.value), id))
-      _        <- F.delay(logger.debug("Found {} handlers for pid {}.", subscribedHandlers.size, id))
-      delivery <- deliveryFor(cmd, sequenceNumber)
+      _        <- logger.debug(s"Publishing message with rk: ${cmd.routingKey}, exchange: ${cmd.exchange} ,body: ${cmd.body} and pid $id")
+      _        <- logger.debug(s"Found ${queues.map(_.value)} queues for pid $id.")
+      _        <- logger.debug(s"Found ${subscribedHandlers.size} handlers for pid $id.")
+      delivery = deliveryFor(cmd, sequenceNumber)
       result   <- subscribedHandlers.traverse(_(delivery)).attempt
-      _        <- F.delay(logger.debug("Message pid {} published with result {}.", id, result))
+      _        <- logger.debug(s"Message pid $id published with result $result.")
       _        <- handlePublishHandlersResult(result)
       _        <- confirmListeners.toList.traverse(cl => F.delay(cl.handleAck(delivery.envelope.deliveryTag, false)))
     } yield ()).attempt.rethrow
   }
 
-  private def deliveryFor(publishCommand: PublishCommand, sequenceNumber: Long): F[Delivery] =
-    F.pure(
-      Delivery(
-        publishCommand.body,
-        ConsumerTag("test"),
-        Envelope(sequenceNumber, redeliver = false, publishCommand.exchange, publishCommand.routingKey),
-        publishCommand.basicProperties
-      )
+  private def deliveryFor(publishCommand: PublishCommand, sequenceNumber: Long): Delivery =
+    Delivery(
+      publishCommand.body,
+      ConsumerTag("test"),
+      Envelope(sequenceNumber, redeliver = false, publishCommand.exchange, publishCommand.routingKey),
+      publishCommand.basicProperties
     )
 
   override def sendAction(action: ConsumeAction)(envelope: bucky.Envelope): F[Unit] =

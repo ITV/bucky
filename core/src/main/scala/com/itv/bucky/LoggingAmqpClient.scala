@@ -13,22 +13,31 @@ import scala.concurrent.duration.{DurationInt, FiniteDuration}
 
 object LoggingAmqpClient {
 
-  private[bucky] def logSuccessfullPublishMessage[F[_]](charset: Charset, cmd: PublishCommand)(implicit F: ConcurrentEffect[F], logger: Logger[F]): F[Unit] =
-      logger.info(s"Successfully published message with rk:${ cmd.routingKey.value}, exchange:${cmd.exchange.value} and message:${new String(cmd.body.value, charset)}")
+  private[bucky] def logSuccessfullPublishMessage[F[_]](charset: Charset, cmd: PublishCommand)(implicit F: ConcurrentEffect[F],
+                                                                                               logger: Logger[F]): F[Unit] =
+    logger.info(
+      s"Successfully published message with rk:${cmd.routingKey.value}, exchange:${cmd.exchange.value} and message:${new String(cmd.body.value, charset)}")
 
-  private[bucky] def logFailedPublishMessage[F[_]](t: Throwable, charset: Charset, cmd: PublishCommand)(implicit F: ConcurrentEffect[F], logger: Logger[F]): F[Unit] =
-      logger.error(t)(s"Failed to publish message with rk:${cmd.routingKey.value}, exchange:${cmd.exchange.value} and message:${new String(cmd.body.value, charset)}")
+  private[bucky] def logFailedPublishMessage[F[_]](t: Throwable, charset: Charset, cmd: PublishCommand)(implicit F: ConcurrentEffect[F],
+                                                                                                        logger: Logger[F]): F[Unit] =
+    logger.error(t)(
+      s"Failed to publish message with rk:${cmd.routingKey.value}, exchange:${cmd.exchange.value} and message:${new String(cmd.body.value, charset)}")
 
   private[bucky] def logFailedHandler[F[_]](charset: Charset,
                                             queueName: QueueName,
                                             exceptionalAction: ConsumeAction,
                                             delivery: Delivery,
-                                            t: Throwable)(implicit F: ConcurrentEffect[F], logger: Logger[F]): F[Unit] = 
-    logger.error(t)(s"Failed to execute handler for message with rk ${delivery.envelope.routingKey.value} on queue ${queueName.value} and exchange ${delivery.envelope.exchangeName}. Will return $exceptionalAction. message: ${new String(delivery.body.value, charset)}, headers:${delivery.properties.headers}")
+                                            t: Throwable)(implicit F: ConcurrentEffect[F], logger: Logger[F]): F[Unit] =
+    logger.error(t)(
+      s"Failed to execute handler for message with rk ${delivery.envelope.routingKey.value} on queue ${queueName.value} and exchange ${delivery.envelope.exchangeName}. Will return $exceptionalAction. message: ${new String(
+        delivery.body.value,
+        charset)}, headers:${delivery.properties.headers}")
 
   private[bucky] def logSuccessfulHandler[F[_]](charset: Charset, queueName: QueueName, delivery: Delivery, ca: ConsumeAction)(
-      implicit F: ConcurrentEffect[F], logger: Logger[F]): F[Unit] = 
-    logger.info(s"Executed handler for message with rk:${ delivery.envelope.routingKey.value} on queue:${queueName.value} and exchange ${delivery.envelope.exchangeName}. Will return ${ca.toString.toLowerCase}. message: ${new String(delivery.body.value, charset)}")
+      implicit F: ConcurrentEffect[F],
+      logger: Logger[F]): F[Unit] =
+    logger.info(
+      s"Executed handler for message with rk:${delivery.envelope.routingKey.value} on queue:${queueName.value} and exchange ${delivery.envelope.exchangeName}. Will return ${ca.toString.toLowerCase}. message: ${new String(delivery.body.value, charset)}")
 
   def apply[F[_]](amqpClient: AmqpClient[F], charset: Charset)(implicit F: ConcurrentEffect[F], logger: Logger[F]): AmqpClient[F] =
     new AmqpClient[F] {
