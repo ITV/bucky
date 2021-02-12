@@ -24,7 +24,7 @@ jobs:
         os: [ubuntu-latest]
         scala: [2.13.2, 2.12.10]
         java: [adopt@1.11]
-        ci: [clean, compile, test, 'it:test']
+        ci: ['clean ;compile ;test ;it:test']
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout current branch (full)
