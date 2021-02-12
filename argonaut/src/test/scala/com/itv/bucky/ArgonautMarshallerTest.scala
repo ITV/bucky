@@ -28,7 +28,7 @@ class ArgonautMarshallerTest extends AnyFunSuite {
   }
 
   object Foo {
-    implicit val codec: CodecJson[Foo] = casecodec1(Foo.apply, Foo.unapply)("bar")
+    implicit val codec: CodecJson[Foo] = casecodec1(Foo.apply, foo => Some(foo.bar))("bar")
   }
 
 }

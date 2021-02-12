@@ -10,56 +10,55 @@ import org.scalatest.matchers.should.Matchers._
 
 import scala.util.Random
 
-class ArgonautPayloadUnmarshallersTest extends AnyFunSuite with OptionValues with EitherValues {
+class ArgonautPayloadUnmarshallersTest extends AnyFunSuite {
 
   import com.itv.bucky.test._
   import com.itv.bucky.ArgonautSupport._
 
-  case class Some(foo: String)
-  implicit val someCodec: CodecJson[Some] = casecodec1(Some.apply, Some.unapply)("foo")
+  case class Foo(foo: String)
+  implicit val someCodec: CodecJson[Foo] = casecodec1(Foo.apply, foo => Some(foo.foo))("foo")
 
   test("it should parse a json object") {
     val expectedValue    = s"bar ${new Random().nextInt(10)}"
     val payload: Payload = validJson(expectedValue)
-    val jsonResult: Json = unmarshallerFromDecodeJson[Json].unmarshal(payload).toOption.value
-
-    jsonResult.fieldOr("foo", fail).stringOr(fail) shouldBe expectedValue
+    val jsonResult: Json = unmarshallerFromDecodeJson[Json].unmarshal(payload).toOption.get
+    jsonResult.fieldOr("foo", fail()).stringOr(fail()) shouldBe expectedValue
   }
 
   test("it should not parse an invalid json") {
     val payload = invalidJson()
-    val failure = unmarshallerFromDecodeJson[Json].unmarshal(payload).left.value
+    val failure = unmarshallerFromDecodeJson[Json].unmarshal(payload).left.getOrElse(fail())
 
-    failure.getMessage should include(StringPayloadUnmarshaller.unmarshal(payload).toOption.value)
+    failure.getMessage should include(StringPayloadUnmarshaller.unmarshal(payload).toOption.get)
   }
 
   test("it should convert to a type") {
     val expectedValue = s"Test-${new Random().nextInt().toString.take(10)}"
     val payload       = validJson(expectedValue)
 
-    val someResult = unmarshallerFromDecodeJson[Some].unmarshal(payload).toOption.value
+    val someResult = unmarshallerFromDecodeJson[Foo].unmarshal(payload).toOption.get
 
     someResult.foo shouldBe expectedValue
   }
 
   test("it should not parse to a type with an invalid json") {
     val payload    = invalidJson()
-    val jsonResult = unmarshallerFromDecodeJson[Some].unmarshal(payload).left.value
-    jsonResult.getMessage should include(StringPayloadUnmarshaller.unmarshal(payload).toOption.value)
+    val jsonResult = unmarshallerFromDecodeJson[Foo].unmarshal(payload).left.getOrElse(fail())
+    jsonResult.getMessage should include(StringPayloadUnmarshaller.unmarshal(payload).toOption.get)
   }
 
   test("can implicitly unmarshal a json") {
     val jsonPayload = validJson("Hello")
-    val result      = jsonPayload.unmarshal(unmarshallerFromDecodeJson[Json]).toOption.value.nospaces
-    val expected    = StringPayloadUnmarshaller.unmarshal(jsonPayload).toOption.value
+    val result      = jsonPayload.unmarshal(unmarshallerFromDecodeJson[Json]).toOption.get.nospaces
+    val expected    = StringPayloadUnmarshaller.unmarshal(jsonPayload).toOption.get
     result shouldBe expected
   }
 
   test("can implicitly unmarshal a type") {
     val jsonPayload = validJson("Hello")
 
-    val result   = jsonPayload.unmarshal(unmarshallerFromDecodeJson[Some]).toOption.value.asJson.nospaces
-    val expected = StringPayloadUnmarshaller.unmarshal(jsonPayload).toOption.value
+    val result   = jsonPayload.unmarshal(unmarshallerFromDecodeJson[Foo]).toOption.get.asJson.nospaces
+    val expected = StringPayloadUnmarshaller.unmarshal(jsonPayload).toOption.get
 
     result shouldBe expected
   }
