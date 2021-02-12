@@ -23,6 +23,8 @@ import scala.collection.mutable.ListBuffer
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.higherKinds
+import org.typelevel.log4cats.slf4j.Slf4jLogger
+import org.typelevel.log4cats.Logger
 
 class RequeueWithExpiryActionIntegrationTest extends AnyFunSuite with Eventually with IntegrationPatience {
 
@@ -33,6 +35,7 @@ class RequeueWithExpiryActionIntegrationTest extends AnyFunSuite with Eventually
 
   implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(300))
   implicit val cs: ContextShift[IO] = IO.contextShift(ec)
+  implicit val logger: Logger[IO] = Slf4jLogger.getLogger[IO]
   implicit val timer: Timer[IO]     = IO.timer(ec)
   val requeuePolicy = RequeuePolicy(maximumProcessAttempts = 5, requeueAfter = 2.seconds)
 

@@ -21,6 +21,8 @@ import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.higherKinds
+import org.typelevel.log4cats.slf4j.Slf4jLogger
+import org.typelevel.log4cats.Logger
 
 class ShutdownTimeoutTest extends AnyFunSuite with Eventually with IntegrationPatience {
 
@@ -31,6 +33,7 @@ class ShutdownTimeoutTest extends AnyFunSuite with Eventually with IntegrationPa
 
   implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(300))
   implicit val cs: ContextShift[IO] = IO.contextShift(ec)
+  implicit val logger: Logger[IO] = Slf4jLogger.getLogger[IO]
   implicit val timer: Timer[IO]     = IO.timer(ec)
   val requeuePolicy                 = RequeuePolicy(maximumProcessAttempts = 5, requeueAfter = 2.seconds)
 

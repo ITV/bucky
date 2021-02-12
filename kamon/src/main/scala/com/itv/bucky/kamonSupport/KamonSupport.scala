@@ -11,6 +11,7 @@ import kamon.Kamon
 import kamon.context.{Context, HttpPropagation}
 import kamon.tag.TagSet
 import kamon.trace.{Span, SpanBuilder}
+import org.typelevel.log4cats.Logger
 
 import scala.collection.mutable
 import scala.concurrent.duration._
@@ -19,7 +20,7 @@ import scala.util.Try
 
 object KamonSupport {
 
-  def apply[F[_]](amqpClient: AmqpClient[F], logging: Boolean, charset: Charset)(implicit F: ConcurrentEffect[F]): AmqpClient[F] =
+  def apply[F[_]](amqpClient: AmqpClient[F], logging: Boolean, charset: Charset)(implicit F: ConcurrentEffect[F], logger: Logger[F]): AmqpClient[F] =
     new AmqpClient[F] {
       private val config            = Kamon.config()
       private val includePublishRK  = Try { config.getBoolean("kamon.bucky.publish.add-routing-key-as-metric-tag") }.getOrElse(true)

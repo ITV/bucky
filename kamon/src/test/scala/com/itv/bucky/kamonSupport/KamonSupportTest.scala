@@ -18,12 +18,16 @@ import org.scalatest.concurrent.Eventually
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should._
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach}
+import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.util.Random
 
 class KamonSupportTest extends AnyFunSuite with Matchers with Eventually with TestSpanReporter with BeforeAndAfterAll with BeforeAndAfterEach {
+
+  implicit val logger: Logger[IO] = Slf4jLogger.getLogger[IO]
   val queue = Queue(QueueName("kamon-spec-test"))
   val rk    = RoutingKey("kamon-spec-rk")
   val exchange = Exchange(ExchangeName("kamon-spec-exchange"))
@@ -125,7 +129,7 @@ class KamonSupportTest extends AnyFunSuite with Matchers with Eventually with Te
       implicit val ec = ExecutionContext.fromExecutor(executor)
       implicit val timer = IO.timer(ec)
       implicit val cs = IO.contextShift(ec)
-      val result = IOAmqpClientTest(ec, timer, cs)
+      val result = IOAmqpClientTest(ec, timer, cs, logger)
         .clientForgiving()
         .map(_.withKamonSupport(true))
         .use(client => {
