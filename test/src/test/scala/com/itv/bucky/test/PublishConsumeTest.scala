@@ -1,23 +1,26 @@
 package com.itv.bucky.test
 
 import java.util.concurrent.TimeoutException
-
 import cats.effect.{IO, Resource}
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.consume._
 import com.itv.bucky.decl.{Direct, Exchange, ExchangeBinding, Headers, Queue, Topic}
 import com.itv.bucky.publish._
 import com.itv.bucky.{ExchangeName, Handler, PayloadMarshaller, PublisherSugar, QueueName, RequeueHandler, RoutingKey}
-import org.scalatest.{EitherValues, FunSuite}
-import org.scalatest.Matchers._
+import org.scalatest.EitherValues
 import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers._
+import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
+import com.itv.bucky.ConsumerSugar
 
 import scala.language.reflectiveCalls
 
 class PublishConsumeTest extends AnyFunSuite with IOAmqpClientTest with Eventually with IntegrationPatience with ScalaFutures with EitherValues {
 
+  implicit val logger: Logger[IO] = Slf4jLogger.getLogger[IO]
+  
   test("A message can be published and consumed") {
     runAmqpTest { client =>
       val exchange = ExchangeName("anexchange")
@@ -37,6 +40,7 @@ class PublishConsumeTest extends AnyFunSuite with IOAmqpClientTest with Eventual
           _ <- client.publisher()(commandBuilder)
         } yield {
           handler.receivedMessages should have size 1
+          ()
         }
       }
     }
@@ -61,6 +65,7 @@ class PublishConsumeTest extends AnyFunSuite with IOAmqpClientTest with Eventual
           _ <- client.publisher()(commandBuilder)
         } yield {
           handler.receivedMessages should have size 1
+          ()
         }
       }
     }
@@ -87,6 +92,7 @@ class PublishConsumeTest extends AnyFunSuite with IOAmqpClientTest with Eventual
           _ <- client.publisher()(commandBuilder.using(rkUnrouted).toPublishCommand(message))
         } yield {
           handler.receivedMessages should have size 1
+          ()
         }
       }
     }
@@ -113,6 +119,7 @@ class PublishConsumeTest extends AnyFunSuite with IOAmqpClientTest with Eventual
           _ <- client.publisher()(commandBuilder.using(rkUnrouted).toPublishCommand(message))
         } yield {
           handler.receivedMessages should have size 1
+          ()
         }
       }
     }
@@ -145,6 +152,7 @@ class PublishConsumeTest extends AnyFunSuite with IOAmqpClientTest with Eventual
           _ <- client.publisher()(commandBuilder)
         } yield {
           handler.receivedMessages should have size 1
+          ()
         }
       }
     }
@@ -178,6 +186,7 @@ class PublishConsumeTest extends AnyFunSuite with IOAmqpClientTest with Eventual
           _ <- client.publisher()(commandBuilder)
         } yield {
           handler.receivedMessages should have size 1
+          ()
         }
       }
     }
@@ -222,6 +231,7 @@ class PublishConsumeTest extends AnyFunSuite with IOAmqpClientTest with Eventual
         } yield {
           firstCount shouldBe 0
           secondCount shouldBe 1
+          ()
         }
       }
     }
@@ -258,6 +268,7 @@ class PublishConsumeTest extends AnyFunSuite with IOAmqpClientTest with Eventual
           _ <- client.publisher()(commandBuilder)
         } yield {
           handler.receivedMessages should have size 1
+          ()
         }
       }
     }
@@ -286,6 +297,7 @@ class PublishConsumeTest extends AnyFunSuite with IOAmqpClientTest with Eventual
         } yield {
           handler.receivedMessages should have size 1
           handler.receivedMessages.head.properties.headers shouldBe headers
+          ()
         }
       }
     }
@@ -311,6 +323,7 @@ class PublishConsumeTest extends AnyFunSuite with IOAmqpClientTest with Eventual
         } yield {
           publishResult.left.value shouldBe a[TimeoutException]
           handler.receivedMessages should have size 0
+          ()
         }
       }
     }
@@ -336,6 +349,7 @@ class PublishConsumeTest extends AnyFunSuite with IOAmqpClientTest with Eventual
           _ <- publisher(message)
         } yield {
           handler.receivedMessages should have size 1
+          ()
         }
       }
     }
@@ -358,6 +372,7 @@ class PublishConsumeTest extends AnyFunSuite with IOAmqpClientTest with Eventual
           _ <- publisher(message)
         } yield {
           handler.receivedMessages should have size 1
+          ()
         }
       }
     }
@@ -396,6 +411,7 @@ class PublishConsumeTest extends AnyFunSuite with IOAmqpClientTest with Eventual
             _ <- publisher("hello")
           } yield {
             requeueHandler.receivedMessages should have size 1
+            ()
           }
         }
     }

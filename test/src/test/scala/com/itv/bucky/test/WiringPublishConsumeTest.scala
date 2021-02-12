@@ -5,11 +5,14 @@ import com.itv.bucky.AmqpClient
 import com.itv.bucky.consume.Ack
 import com.itv.bucky.test.stubs.RecordingHandler
 import com.itv.bucky.wiring._
-import com.typesafe.scalalogging.StrictLogging
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers._
+import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
 
-class WiringPublishConsumeTest extends AnyFunSuite with IOAmqpClientTest with StrictLogging {
+class WiringPublishConsumeTest extends AnyFunSuite with IOAmqpClientTest {
+
+  override implicit val logger: Logger[IO] = Slf4jLogger.getLogger[IO]
 
   val incoming = new Wiring[String](WiringName("fs2.incoming"))
   val outgoing = new Wiring[String](WiringName("fs2.outgoing"))

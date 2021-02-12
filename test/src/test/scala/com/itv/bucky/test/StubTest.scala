@@ -8,8 +8,13 @@ import com.itv.bucky.decl.{Exchange, Queue}
 import com.itv.bucky.{ExchangeName, QueueName, RoutingKey, consume, _}
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers._
+import org.typelevel.log4cats.Logger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
 
 class StubTest extends AnyFunSuite with IOAmqpClientTest {
+
+  implicit val logger: Logger[IO] = Slf4jLogger.getLogger[IO]
+  
   val exchange     = ExchangeName("anexchange")
   val queue        = QueueName("aqueue")
   val rk           = RoutingKey("ark")
@@ -27,6 +32,7 @@ class StubTest extends AnyFunSuite with IOAmqpClientTest {
         } yield {
           all(consumer.receivedMessages) should be(message)
           all(consumer.returnedResults) should be(Right(Ack))
+          ()
         }
       }
     }
@@ -67,7 +73,10 @@ class StubTest extends AnyFunSuite with IOAmqpClientTest {
           for {
             publisher <- IO(client.publisherOf[String](exchange, rk))
             _         <- publisher(message)
-          } yield stubPubslisher.recordedMessages shouldBe List(message)
+          } yield {
+            stubPubslisher.recordedMessages shouldBe List(message)
+            ()
+          }
         }
     }
   }
@@ -90,6 +99,7 @@ class StubTest extends AnyFunSuite with IOAmqpClientTest {
           all(consumer1.returnedResults) should be(Right(Ack))
           all(consumer2.receivedMessages) should be(message)
           all(consumer2.returnedResults) should be(Right(Ack))
+          ()
         }
       }
     }
@@ -108,6 +118,7 @@ class StubTest extends AnyFunSuite with IOAmqpClientTest {
         } yield {
           consumer.receivedMessages shouldBe List(message)
           publishRes shouldBe Symbol("left")
+          ()
         }
 
       }
@@ -128,6 +139,7 @@ class StubTest extends AnyFunSuite with IOAmqpClientTest {
           consumer.receivedMessages shouldBe List(message)
           consumer.returnedResults shouldBe List(Left(exception))
           publishRes shouldBe Symbol("left")
+          ()
         }
       }
     }
@@ -146,6 +158,7 @@ class StubTest extends AnyFunSuite with IOAmqpClientTest {
         } yield {
           consumer.receivedMessages shouldBe List(message)
           publishRes shouldBe Symbol("right")
+          ()
         }
       }
     }
@@ -165,6 +178,7 @@ class StubTest extends AnyFunSuite with IOAmqpClientTest {
         } yield {
           consumer.receivedMessages shouldBe List(message)
           publishRes shouldBe Symbol("right")
+          ()
         }
       }
     }
@@ -184,6 +198,7 @@ class StubTest extends AnyFunSuite with IOAmqpClientTest {
           consumer.receivedMessages shouldBe List(message)
           consumer.returnedResults shouldBe List(Right(DeadLetter))
           publishRes shouldBe Symbol("right")
+          ()
         }
       }
     }
@@ -204,6 +219,7 @@ class StubTest extends AnyFunSuite with IOAmqpClientTest {
           consumer.receivedMessages shouldBe List(message)
           consumer.returnedResults shouldBe List(Left(exception))
           publishRes shouldBe Symbol("left")
+          ()
         }
       }
 
