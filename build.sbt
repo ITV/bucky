@@ -8,7 +8,7 @@ lazy val scala212 = "2.12.10"
 lazy val scala213 = "2.13.2"
 lazy val scala3   = "3.0.0-M3"
 
-scalaVersion := scala3
+scalaVersion := scala212
 scalacOptions += "-Ypartial-unification"
 
 val amqpClientVersion   = "5.8.0"
@@ -198,7 +198,7 @@ lazy val example = project
       "org.typelevel" %% "log4cats-core"  % log4catsVersion, // Only if you want to Support Any Backend
       "org.typelevel" %% "log4cats-slf4j" % log4catsVersion, // Direct Slf4j Support - Recommended"
       "org.scala-lang.modules" %% "scala-xml" % scalaXmlVersion,
-      "org.scalatest" %% "scalatest"      % scalaTestVersion % "test, it" excludeAll(ExclusionRule("org.scala-lang.modules")),
+      "org.scalatest" %% "scalatest"      % scalaTestVersion % "test" excludeAll(ExclusionRule("org.scala-lang.modules")),
       "com.typesafe"  % "config"          % typeSafeVersion
     )
   )
