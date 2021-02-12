@@ -2,7 +2,6 @@ package com.itv.bucky.example.circe
 
 import cats.effect.{ExitCode, IO, IOApp, Resource}
 import com.itv.bucky.AmqpClient
-import com.typesafe.scalalogging.StrictLogging
 import com.itv.bucky._
 import com.itv.bucky.circe.auto._
 import com.itv.bucky.consume.{Ack, Handler}

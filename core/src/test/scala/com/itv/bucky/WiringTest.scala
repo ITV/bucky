@@ -1,7 +1,5 @@
 package com.itv.bucky
 
-import com.typesafe.scalalogging.StrictLogging
-
 import scala.concurrent.duration._
 import com.itv.bucky.wiring._
 import com.itv.bucky.decl._
@@ -9,7 +7,7 @@ import com.itv.bucky.pattern.requeue._
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers._
 
-class WiringTest extends AnyFunSuite with StrictLogging {
+class WiringTest extends AnyFunSuite {
 
   object TestWiring extends Wiring[String](WiringName("test"))
 

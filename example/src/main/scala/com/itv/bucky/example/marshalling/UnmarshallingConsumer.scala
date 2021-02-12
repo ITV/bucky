@@ -6,7 +6,6 @@ import com.itv.bucky._
 import com.itv.bucky.consume._
 import com.itv.bucky.decl._
 import com.typesafe.config.ConfigFactory
-import com.typesafe.scalalogging.StrictLogging
 import cats.effect._
 import cats.implicits._
 import org.typelevel.log4cats.Logger
