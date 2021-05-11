@@ -87,7 +87,7 @@ class WiringTest extends AnyFunSuite with StrictLogging {
                             CustomTestWiring.requeuePolicy.requeueAfter)
   }
 
-  test("it should default to the requeue ttl of 5 minutes where a requeue policy is not set") {
+  test("it should set the requeue ttl to 5 minutes where the requeue policy has a wait time of lower than 5 minutes") {
     val routingKey = RoutingKey("route")
     val queueName  = QueueName("queue")
 
@@ -99,7 +99,7 @@ class WiringTest extends AnyFunSuite with StrictLogging {
           setQueueName = Some(QueueName("queue")),
           setExchangeType = Some(Direct),
           setPrefetchCount = Some(100),
-          setRequeuePolicy = None
+          setRequeuePolicy = Some(RequeuePolicy(10, 1.minute)),
         )
 
     CustomTestWiring.consumerDeclarations shouldBe

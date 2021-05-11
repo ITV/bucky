@@ -60,7 +60,13 @@ class Wiring[T](
                                                              dlxRoutingKey,
                                                              Some(ExchangeName(s"${queueName.value}.dlx")),
                                                              dlxType,
-                                                             setRequeuePolicy.fold(5.minutes)(_.requeueAfter))
+                                                             requeueRetryAfter)
+
+  //retain the default requeue ttl of 5 minutes, unless requeue policy requires a longer delay
+  private def requeueRetryAfter: FiniteDuration =
+    if (requeuePolicy.requeueAfter <= 5.minutes) 5.minutes
+    else requeuePolicy.requeueAfter
+
   def allDeclarations: List[Declaration] =
     (publisherDeclarations ++ consumerDeclarations).distinct
 
