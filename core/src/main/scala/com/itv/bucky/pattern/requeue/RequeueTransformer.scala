@@ -35,7 +35,7 @@ case class RequeueTransformer[F[_]](
       .withHeader(requeueCountHeaderName -> remainingAttempts.toString)
       .copy(expiration = Some(requeueAfter.toMillis.toString))
 
-    PublishCommand(requeueExchange, delivery.envelope.routingKey, properties, delivery.body)
+    PublishCommand(requeueExchange, delivery.envelope.routingKey, properties, delivery.body, mandatory = true)
   }
 
   override def apply(delivery: Delivery): F[ConsumeAction] = {
