@@ -56,7 +56,11 @@ class Wiring[T](
   def publisherDeclarations: List[Declaration] =
     List(exchange)
   def consumerDeclarations: List[Declaration] =
-    List(exchangeWithBinding) ++ requeue.requeueDeclarations(queueName, dlxRoutingKey, Some(ExchangeName(s"${queueName.value}.dlx")), dlxType)
+    List(exchangeWithBinding) ++ requeue.requeueDeclarations(queueName,
+                                                             dlxRoutingKey,
+                                                             Some(ExchangeName(s"${queueName.value}.dlx")),
+                                                             dlxType,
+                                                             setRequeuePolicy.fold(5.minutes)(_.requeueAfter))
   def allDeclarations: List[Declaration] =
     (publisherDeclarations ++ consumerDeclarations).distinct
 
