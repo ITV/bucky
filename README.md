@@ -26,3 +26,4 @@ Version 2.0.0-M30 introduced a change to the `Wiring` module where, if a requeue
 passed into the `x-message-ttl` parameter of the requeue queue, which previously defaulted to 5 minutes. 
 This means that the `retryAfter` value being declared will be respected.
 In this scenario, as the queue policy is being changed, it may need to the requeue queue to be manually deleted so that the application can recreate it. The application may fail to start up otherwise.
+
