@@ -20,6 +20,7 @@ If you really must continue using a Direct exchange:
  - If using Wiring, use `setDeadLetterExchangeType = ExchangeType.Direct`
  - If using requeueDeclarations, you will need to pass in `dlxType=Direct`.
 
+
 # Migrating to 2.0.0-M30 and above
 
 Version 2.0.0-M30 introduced a change to the `Wiring` module where, if a requeue policy is being explicitly set, the `retryAfter` value is
