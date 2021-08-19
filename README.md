@@ -19,3 +19,4 @@ To upgrade:
 If you really must continue using a Direct exchange:
  - If using Wiring, use `setDeadLetterExchangeType = ExchangeType.Direct`
  - If using requeueDeclarations, you will need to pass in `dlxType=Direct`.
+
