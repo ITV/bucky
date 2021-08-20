@@ -63,9 +63,7 @@ class Wiring[T](
                                                              requeueRetryAfter)
 
   //retain the default requeue ttl of 5 minutes, unless requeue policy requires a longer delay
-  private def requeueRetryAfter: FiniteDuration =
-    if (requeuePolicy.requeueAfter <= 5.minutes) 5.minutes
-    else requeuePolicy.requeueAfter
+  private def requeueRetryAfter: FiniteDuration = requeuePolicy.requeueAfter.max(5.minutes)
 
   def allDeclarations: List[Declaration] =
     (publisherDeclarations ++ consumerDeclarations).distinct
