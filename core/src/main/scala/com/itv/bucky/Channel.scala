@@ -125,10 +125,10 @@ object Channel {
         override def handleDelivery(consumerTag: String, envelope: RabbitMQEnvelope, properties: BasicProperties, body: Array[Byte]): Unit = {
           val delivery = Consumer.deliveryFrom(consumerTag, envelope, properties, body)
           (for {
-            _        <- cs.shift
-            _        <- F.delay(logger.debug("Received delivery with rk:{} on exchange: {}", delivery.envelope.routingKey, delivery.envelope.exchangeName))
-            action   <- handler(delivery)
-            _        <- F.delay(logger.info("Responding with {} to {} on {}", action, delivery, queue))
+            _      <- cs.shift
+            _      <- F.delay(logger.debug("Received delivery with rk:{} on exchange: {}", delivery.envelope.routingKey, delivery.envelope.exchangeName))
+            action <- handler(delivery)
+            _      <- F.delay(logger.info("Responding with {} to {} on {}", action, delivery, queue))
           } yield action).attempt
             .flatTap {
               case Left(e) =>
@@ -142,12 +142,13 @@ object Channel {
             }
             .flatMap {
               case Right(r) => F.delay(r)
-              case Left(e)  => F.delay(logger.debug(s"Handler failure with {} will recover to: {}", e.getMessage, onHandlerException)) *> F.delay(onHandlerException)
+              case Left(e) =>
+                F.delay(logger.debug(s"Handler failure with {} will recover to: {}", e.getMessage, onHandlerException)) *> F.delay(onHandlerException)
             }
             .flatMap(sendAction(_)(Envelope.fromEnvelope(envelope)))
             .toIO
-            .unsafeRunAsyncAndForget
-          }
+            .unsafeRunAsyncAndForget()
+        }
       }
       F.delay(channel.basicConsume(queue.value, false, consumerTag.value, deliveryCallback)).void
     }
