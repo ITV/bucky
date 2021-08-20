@@ -24,7 +24,7 @@ class PublisherTest extends AnyFunSuite with IOAmqpClientTest with EitherValues 
     .toPublishCommand(message)
 
   test("A message publishing should only complete when an ack is returned.") {
-    val channel                               = StubChannels.publishTimeout[IO]
+    val channel = StubChannels.publishTimeout[IO]
     runAmqpTest(client(channel, Config.empty(10.seconds))) { client =>
       for {
         pubSeq       <- IO(channel.publishSeq)
@@ -40,7 +40,7 @@ class PublisherTest extends AnyFunSuite with IOAmqpClientTest with EitherValues 
   }
 
   test("A message publishing should timeout if no ack is ever received.") {
-    val channel                               = StubChannels.publishTimeout[IO]
+    val channel = StubChannels.publishTimeout[IO]
     runAmqpTest(client(channel, Config.empty(1.second))) { client =>
       for {
         future      <- IO(client.publisher()(commandBuilder).unsafeToFuture())
@@ -57,7 +57,7 @@ class PublisherTest extends AnyFunSuite with IOAmqpClientTest with EitherValues 
   }
 
   test("Multiple messages can be ack when the channel acks multiple messages") {
-    val channel                               = StubChannels.publishTimeout[IO]
+    val channel = StubChannels.publishTimeout[IO]
     runAmqpTest(client(channel, Config.empty(30.seconds))) { client =>
       for {
         publish1      <- IO(client.publisher()(commandBuilder).unsafeToFuture())
@@ -77,8 +77,8 @@ class PublisherTest extends AnyFunSuite with IOAmqpClientTest with EitherValues 
   }
 
   test("Multiple messages can be Nack when the channel Nacks multiple messages") {
-    val channel                               = StubChannels.publishTimeout[IO]
-    runAmqpTest(client(channel, Config.empty(15.seconds))) { client =>
+    val channel = StubChannels.publishTimeout[IO]
+    runAmqpTest(client(channel, Config.empty(30.seconds))) { client =>
       for {
         publish1      <- IO(client.publisher()(commandBuilder).unsafeToFuture())
         publish2      <- IO(client.publisher()(commandBuilder).unsafeToFuture())
@@ -104,7 +104,7 @@ class PublisherTest extends AnyFunSuite with IOAmqpClientTest with EitherValues 
   }
 
   test("Multiple messages can be published and some can be acked and some can be Nacked.") {
-    val channel                               = StubChannels.publishTimeout[IO]
+    val channel = StubChannels.publishTimeout[IO]
     runAmqpTest(client(channel, Config.empty(10.seconds))) { client =>
       for {
         publish1      <- IO(client.publisher()(commandBuilder).unsafeToFuture())
@@ -115,8 +115,7 @@ class PublisherTest extends AnyFunSuite with IOAmqpClientTest with EitherValues 
         areCompleted1 <- IO(List(publish1.isCompleted, publish2.isCompleted, publish3.isCompleted, publish4.isCompleted))
         _             <- IO(channel.confirmListeners.foreach(_.handleAck(0, false))) // ack 0
         _             <- IO(channel.confirmListeners.foreach(_.handleNack(2, true))) //nack 1, 2
-        result <- IO.fromFuture(
-          IO(Future.sequence(List(publish1.attempt, publish2.attempt, publish3.attempt, publish4.attempt))))
+        result        <- IO.fromFuture(IO(Future.sequence(List(publish1.attempt, publish2.attempt, publish3.attempt, publish4.attempt))))
         areCompleted2 <- IO(List(publish1.isCompleted, publish2.isCompleted, publish3.isCompleted, publish4.isCompleted))
       } yield {
         println(result)

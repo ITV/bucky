@@ -4,8 +4,8 @@ import sbtrelease.ReleasePlugin.autoImport.ReleaseTransformations._
 
 name := "bucky"
 
-lazy val scala212 = "2.12.10"
-lazy val scala213 = "2.13.2"
+lazy val scala212 = "2.12.14"
+lazy val scala213 = "2.13.5"
 
 scalaVersion := scala212
 scalacOptions += "-Ypartial-unification"
@@ -145,12 +145,12 @@ lazy val core = project
   .settings(kernelSettings: _*)
   .settings(
     libraryDependencies ++= Seq(
-      "com.typesafe.scala-logging" %% "scala-logging"  % scalaLoggingVersion,
-      "org.scalatest"              %% "scalatest"      % scalaTestVersion % "test",
-      "org.typelevel"              %% "cats-effect"    % catsEffectVersion,
-      "com.rabbitmq"               % "amqp-client"     % amqpClientVersion,
-      "ch.qos.logback"             % "logback-classic" % logbackVersion % "test,it",
-      "org.scala-lang.modules" %% "scala-collection-compat" % "2.1.6"
+      "com.typesafe.scala-logging" %% "scala-logging"           % scalaLoggingVersion,
+      "org.scalatest"              %% "scalatest"               % scalaTestVersion % "test",
+      "org.typelevel"              %% "cats-effect"             % catsEffectVersion,
+      "com.rabbitmq"               % "amqp-client"              % amqpClientVersion,
+      "ch.qos.logback"             % "logback-classic"          % logbackVersion % "test,it",
+      "org.scala-lang.modules"     %% "scala-collection-compat" % "2.1.6"
     )
   )
   .configs(IntegrationTest)
@@ -245,11 +245,11 @@ lazy val kamon = project
   )
   .settings(
     libraryDependencies ++= Seq(
-      "com.typesafe.scala-logging" %% "scala-logging"   % scalaLoggingVersion,
-      "org.scalatest"              %% "scalatest"       % scalaTestVersion % "test, it",
-      "io.kamon"                   %% "kamon-bundle"      % kamonVersion,
-      "io.kamon"                   %% "kamon-testkit"   % kamonVersion % "test",
-      "ch.qos.logback"             % "logback-classic"  % logbackVersion % "test, it"
+      "com.typesafe.scala-logging" %% "scala-logging"  % scalaLoggingVersion,
+      "org.scalatest"              %% "scalatest"      % scalaTestVersion % "test, it",
+      "io.kamon"                   %% "kamon-bundle"   % kamonVersion,
+      "io.kamon"                   %% "kamon-testkit"  % kamonVersion % "test",
+      "ch.qos.logback"             % "logback-classic" % logbackVersion % "test, it"
     )
   )
 
