@@ -56,7 +56,17 @@ class Wiring[T](
   def publisherDeclarations: List[Declaration] =
     List(exchange)
   def consumerDeclarations: List[Declaration] =
-    List(exchangeWithBinding) ++ requeue.requeueDeclarations(queueName, dlxRoutingKey, Some(ExchangeName(s"${queueName.value}.dlx")), dlxType)
+    List(exchangeWithBinding) ++ requeue.requeueDeclarations(queueName,
+                                                             dlxRoutingKey,
+                                                             Some(ExchangeName(s"${queueName.value}.dlx")),
+                                                             dlxType,
+                                                             requeueRetryAfter)
+
+  //retain the default requeue ttl of 5 minutes, unless requeue policy requires a longer delay
+  private def requeueRetryAfter: FiniteDuration =
+    if (requeuePolicy.requeueAfter <= 5.minutes) 5.minutes
+    else requeuePolicy.requeueAfter
+
   def allDeclarations: List[Declaration] =
     (publisherDeclarations ++ consumerDeclarations).distinct
 
