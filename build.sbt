@@ -4,8 +4,8 @@ import sbtrelease.ReleasePlugin.autoImport.ReleaseTransformations._
 
 name := "bucky"
 
-lazy val scala212 = "2.12.10"
-lazy val scala213 = "2.13.2"
+lazy val scala212 = "2.12.14"
+lazy val scala213 = "2.13.5"
 
 scalaVersion := scala212
 scalacOptions += "-Ypartial-unification"

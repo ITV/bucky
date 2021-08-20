@@ -88,7 +88,6 @@ class WiringTest extends AnyFunSuite with StrictLogging {
   }
 
   test("it should set the requeue ttl to 5 minutes where the requeue policy has a wait time of lower than 5 minutes") {
-    pending
     val routingKey = RoutingKey("route")
     val queueName  = QueueName("queue")
 
