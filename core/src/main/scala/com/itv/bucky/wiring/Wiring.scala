@@ -133,7 +133,7 @@ class Wiring[T](
 
     for {
       _ <- Resource.make(runDeclarations)(_ => F.pure(()))
-      _ <- client.registerRequeueConsumerOf(queueName, handleMessage, requeuePolicy)(unmarshaller, F)
+      _ <- client.registerRequeueConsumerOf(queueName, handleMessage, requeuePolicy, prefetchCount = prefetchCount)(unmarshaller, F)
     } yield ()
   }
 
