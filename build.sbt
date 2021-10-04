@@ -4,23 +4,23 @@ import sbtrelease.ReleasePlugin.autoImport.ReleaseTransformations._
 
 name := "bucky"
 
-lazy val scala212 = "2.12.14"
-lazy val scala213 = "2.13.5"
+lazy val scala212 = "2.12.15"
+lazy val scala213 = "2.13.6"
 
 scalaVersion := scala212
 scalacOptions += "-Ypartial-unification"
 
-val amqpClientVersion   = "5.8.0"
-val scalaLoggingVersion = "3.9.2"
-val scalaTestVersion    = "3.1.2"
-val argonautVersion     = "6.2.3"
-val circeVersion        = "0.13.0"
-val typeSafeVersion     = "1.4.0"
-val catsEffectVersion   = "2.0.0"
-val scalaXmlVersion     = "1.2.0"
+val amqpClientVersion   = "5.13.1"
+val scalaLoggingVersion = "3.9.4"
+val scalaTestVersion    = "3.2.10"
+val argonautVersion     = "6.3.7"
+val circeVersion        = "0.14.1"
+val typeSafeVersion     = "1.4.1"
+val catsEffectVersion   = "3.2.9"
+val scalaXmlVersion     = "2.0.1"
 val scalaz              = "7.2.22"
-val logbackVersion      = "1.2.3"
-val kamonVersion        = "2.1.3"
+val logbackVersion      = "1.2.6"
+val kamonVersion        = "2.2.3"
 
 releaseProcess := Seq[ReleaseStep](
   checkSnapshotDependencies,
@@ -150,7 +150,7 @@ lazy val core = project
       "org.typelevel"              %% "cats-effect"             % catsEffectVersion,
       "com.rabbitmq"               % "amqp-client"              % amqpClientVersion,
       "ch.qos.logback"             % "logback-classic"          % logbackVersion % "test,it",
-      "org.scala-lang.modules"     %% "scala-collection-compat" % "2.1.6"
+      "org.scala-lang.modules"     %% "scala-collection-compat" % "2.5.0"
     )
   )
   .configs(IntegrationTest)

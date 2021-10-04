@@ -22,6 +22,7 @@ import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach}
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.util.Random
+import cats.effect.Spawn
 
 class KamonSupportTest extends AnyFunSuite with Matchers with Eventually with TestSpanReporter with BeforeAndAfterAll with BeforeAndAfterEach {
   val queue = Queue(QueueName("kamon-spec-test"))
@@ -130,11 +131,11 @@ class KamonSupportTest extends AnyFunSuite with Matchers with Eventually with Te
         .map(_.withKamonSupport(true))
         .use(client => {
           (for {
-            _ <- Resource.liftF(client.declare(declarations))
+            _ <- Resource.eval(client.declare(declarations))
             _ <- client.registerConsumerOf(queue.name, handler)
           } yield ()).use { _ =>
             for {
-              _ <- cs.shift
+              _ <- Spawn[IO].cede
               result <- test(reporter, client.publisherOf[String](exchange.name, rk)).attempt
             } yield result
           }
@@ -159,7 +160,7 @@ class KamonSupportTest extends AnyFunSuite with Matchers with Eventually with Te
         val result =
           (for {
             client <- clientResource
-            _      <- Resource.liftF(client.declare(declarations))
+            _      <- Resource.eval(client.declare(declarations))
             _      <- client.withKamonSupport(logging = false).registerConsumerOf(queue.name, handler)
           } yield ())
             .use { _ =>

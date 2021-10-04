@@ -2,7 +2,7 @@ package com.itv
 
 import java.nio.charset.{Charset, StandardCharsets}
 
-import cats.effect.{ConcurrentEffect, Resource, Sync}
+import cats.effect.{Resource, Sync}
 import cats.{Applicative, ApplicativeError}
 import com.itv.bucky.Unmarshaller.toDeliveryUnmarshaller
 import com.itv.bucky.consume._
@@ -144,12 +144,12 @@ package object bucky {
   }
 
   implicit class DeclareSugar[F[_]](amqpClient: AmqpClient[F])(implicit a: Applicative[F]) {
-    def declareR(declarations: Declaration*): Resource[F, Unit]          = Resource.liftF[F, Unit](amqpClient.declare(declarations))
-    def declareR(declarations: Iterable[Declaration]): Resource[F, Unit] = Resource.liftF[F, Unit](amqpClient.declare(declarations))
+    def declareR(declarations: Declaration*): Resource[F, Unit]          = Resource.eval[F, Unit](amqpClient.declare(declarations))
+    def declareR(declarations: Iterable[Declaration]): Resource[F, Unit] = Resource.eval[F, Unit](amqpClient.declare(declarations))
   }
 
   implicit class LoggingSyntax[F[_]](client: AmqpClient[F]) {
-    def withLogging(charset: Charset = StandardCharsets.UTF_8)(implicit F: ConcurrentEffect[F]): AmqpClient[F] = LoggingAmqpClient(client, charset)
+    def withLogging(charset: Charset = StandardCharsets.UTF_8)(implicit F: Sync[F]): AmqpClient[F] = LoggingAmqpClient(client, charset)
   }
 
   val defaultPreFetchCount: Int = 1

@@ -4,15 +4,17 @@ import cats._
 import cats.implicits._
 import cats.effect._
 import cats.effect.implicits._
-import cats.effect.concurrent.{Deferred, Ref}
+import cats.effect.std.Dispatcher
 import com.rabbitmq.client.ConfirmListener
 import com.typesafe.scalalogging.StrictLogging
+
 import scala.language.higherKinds
 import scala.collection.immutable.TreeMap
 import scala.collection.compat._
+import cats.effect.{Deferred, Ref}
 
-private[bucky] case class PendingConfirmListener[F[_]](pendingConfirmations: Ref[F, TreeMap[Long, Deferred[F, Boolean]]])(
-    implicit F: ConcurrentEffect[F])
+private[bucky] case class PendingConfirmListener[F[_]](pendingConfirmations: Ref[F, TreeMap[Long, Deferred[F, Boolean]]], dispatcher: Dispatcher[F])(
+    implicit F: Sync[F])
     extends ConfirmListener
     with StrictLogging {
 
@@ -27,18 +29,20 @@ private[bucky] case class PendingConfirmListener[F[_]](pendingConfirmations: Ref
     }
 
   override def handleAck(deliveryTag: Long, multiple: Boolean): Unit =
-    (for {
-      toComplete <- pop(deliveryTag, multiple)
-      _          <- F.delay(logger.info("Received ack for delivery tag: {} and multiple: {}", deliveryTag, multiple))
-      _          <- toComplete.traverse(_.complete(true))
-    } yield ()).toIO
-      .unsafeRunSync()
+    dispatcher.unsafeRunSync(
+      for {
+        toComplete <- pop(deliveryTag, multiple)
+        _          <- F.delay(logger.info("Received ack for delivery tag: {} and multiple: {}", deliveryTag, multiple))
+        _          <- toComplete.traverse(_.complete(true))
+      } yield ()
+    )
 
   override def handleNack(deliveryTag: Long, multiple: Boolean): Unit =
-    (for {
-      toComplete <- pop(deliveryTag, multiple)
-      _          <- F.delay(logger.error("Received Nack for delivery tag: {} and multiple: {}", deliveryTag, multiple))
-      _          <- toComplete.traverse(_.complete(false))
-    } yield ()).toIO
-      .unsafeRunSync()
+    dispatcher.unsafeRunSync(
+      for {
+        toComplete <- pop(deliveryTag, multiple)
+        _          <- F.delay(logger.error("Received Nack for delivery tag: {} and multiple: {}", deliveryTag, multiple))
+        _          <- toComplete.traverse(_.complete(false))
+      } yield ()
+    )
 }

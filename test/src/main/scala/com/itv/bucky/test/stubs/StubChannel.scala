@@ -176,8 +176,7 @@ abstract class StubChannel[F[_]](implicit F: ConcurrentEffect[F]) extends Channe
   override def registerConsumer(handler: Handler[F, Delivery],
                                 onHandlerException: ConsumeAction,
                                 queue: QueueName,
-                                consumerTag: ConsumerTag,
-                                cs: ContextShift[F]): F[Unit] =
+                                consumerTag: ConsumerTag): F[Unit] =
     F.delay(handlers.synchronized(handlers.put(queue, handler -> onHandlerException))).void
 
   override def addConfirmListener(listener: ConfirmListener): F[Unit] = F.delay(confirmListeners.synchronized(confirmListeners += listener))

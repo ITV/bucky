@@ -38,7 +38,7 @@ object CirceUnmarshalledConsumer extends IOApp with StrictLogging {
   override def run(args: List[String]): IO[ExitCode] =
     (for {
       client <- AmqpClient[IO](amqpClientConfig)
-      _      <- Resource.liftF(client.declare(Declarations.all))
+      _      <- Resource.eval(client.declare(Declarations.all))
       _      <- client.registerConsumerOf(Declarations.queue.name, personHandler)
     } yield ()).use(_ => IO.never *> IO(ExitCode.Success))
 

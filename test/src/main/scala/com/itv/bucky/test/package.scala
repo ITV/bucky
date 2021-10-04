@@ -1,6 +1,6 @@
 package com.itv.bucky
 
-import cats.effect.{ConcurrentEffect, ContextShift, Resource, Sync, Timer}
+import cats.effect.{ConcurrentEffect, Resource, Sync}
 import com.itv.bucky.consume._
 import com.itv.bucky.publish._
 import cats.implicits._
@@ -12,6 +12,7 @@ import com.itv.bucky.test.AmqpClientTest
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.higherKinds
+import cats.effect.Temporal
 
 package object test {
   object Config {
@@ -20,19 +21,19 @@ package object test {
   }
 
   object StubChannels {
-    def forgiving[F[_]](implicit F: ConcurrentEffect[F], t: Timer[F], cs: ContextShift[F]): StubChannel[F] =
+    def forgiving[F[_]](implicit F: ConcurrentEffect[F], t: Temporal[F]): StubChannel[F] =
       new StubChannel[F] {
         override def handlePublishHandlersResult(result: Either[Throwable, List[consume.ConsumeAction]]): F[Unit] =
           F.unit
       }
 
-    def strict[F[_]](implicit F: ConcurrentEffect[F], t: Timer[F], cs: ContextShift[F]): StubChannel[F] =
+    def strict[F[_]](implicit F: ConcurrentEffect[F], t: Temporal[F]): StubChannel[F] =
       new StubChannel[F]() {
         override def handlePublishHandlersResult(result: Either[Throwable, List[consume.ConsumeAction]]): F[Unit] =
           F.map(F.fromEither(result))(_ => ())
       }
 
-    def publishTimeout[F[_]](implicit F: ConcurrentEffect[F], t: Timer[F], cs: ContextShift[F]): StubChannel[F] =
+    def publishTimeout[F[_]](implicit F: ConcurrentEffect[F], t: Temporal[F]): StubChannel[F] =
       new StubChannel[F]() {
         override def publish(sequenceNumber: Long, cmd: PublishCommand): F[Unit] = F.delay {
           pubSeqLock.synchronized {
@@ -43,7 +44,7 @@ package object test {
           F.map(F.fromEither(result))(_ => ())
       }
 
-    def allShallAck[F[_]](implicit F: ConcurrentEffect[F], t: Timer[F], cs: ContextShift[F]): StubChannel[F] =
+    def allShallAck[F[_]](implicit F: ConcurrentEffect[F], t: Temporal[F]): StubChannel[F] =
       new StubChannel[F]() {
         override def handlePublishHandlersResult(result: Either[Throwable, List[consume.ConsumeAction]]): F[Unit] =
           F.fromEither(result)
@@ -55,10 +56,10 @@ package object test {
   }
 
   object IOAmqpClientTest {
-    def apply(executionContext: ExecutionContext, t: Timer[IO], cs: ContextShift[IO]): AmqpClientTest[IO] =
+    def apply(executionContext: ExecutionContext, t: Temporal[IO]): AmqpClientTest[IO] =
       new AmqpClientTest[IO] {
         implicit val ec: ExecutionContext = executionContext
-        override implicit val timer: Timer[IO] = IO.timer(executionContext)
+        override implicit val timer: Temporal[IO] = IO.timer(executionContext)
         override implicit val contextShift: ContextShift[IO] = IO.contextShift(executionContext)
         override implicit val F: ConcurrentEffect[IO] = IO.ioConcurrentEffect(contextShift)
       }
@@ -67,16 +68,16 @@ package object test {
   trait IOAmqpClientTest extends AmqpClientTest[IO] {
     val globalExecutionContext: ExecutionContext = ExecutionContext.Implicits.global
     override implicit val ec: ExecutionContext = globalExecutionContext
-    override implicit val timer: Timer[IO] = IO.timer(globalExecutionContext)
+    override implicit val timer: Temporal[IO] = IO.timer(globalExecutionContext)
     override implicit val contextShift: ContextShift[IO] = IO.contextShift(globalExecutionContext)
     override implicit val F: ConcurrentEffect[IO] = IO.ioConcurrentEffect(contextShift)
   }
 
   object AmqpClientTest {
-    def apply[F[_]](implicit concurrentEffect: ConcurrentEffect[F], t: Timer[F], cs: ContextShift[F], executionContext: ExecutionContext): AmqpClientTest[F] =
+    def apply[F[_]](implicit concurrentEffect: ConcurrentEffect[F], t: Temporal[F], executionContext: ExecutionContext): AmqpClientTest[F] =
       new AmqpClientTest[F]() {
         override implicit val F: ConcurrentEffect[F] = concurrentEffect
-        override implicit val timer: Timer[F] = t
+        override implicit val timer: Temporal[F] = t
         override implicit val contextShift: ContextShift[F] = cs
         override implicit val ec: ExecutionContext = executionContext
       }
@@ -85,7 +86,7 @@ package object test {
   trait AmqpClientTest[F[_]] {
 
     implicit val F: ConcurrentEffect[F]
-    implicit val timer: Timer[F]
+    implicit val timer: Temporal[F]
     implicit val contextShift: ContextShift[F]
     implicit val ec: ExecutionContext
 

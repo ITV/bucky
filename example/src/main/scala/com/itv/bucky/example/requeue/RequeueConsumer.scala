@@ -41,7 +41,7 @@ object RequeueConsumer extends IOApp with StrictLogging {
   override def run(args: List[String]): IO[ExitCode] =
     (for {
         amqpClient <- AmqpClient[IO](amqpClientConfig)
-        _ <- Resource.liftF(amqpClient.declare(Declarations.all))
+        _ <- Resource.eval(amqpClient.declare(Declarations.all))
         _ <- amqpClient.registerRequeueConsumerOf(Declarations.queue.name,
           stringToLogRequeueHandler)
       } yield ()).use(_ => IO.never *> IO(ExitCode.Success))

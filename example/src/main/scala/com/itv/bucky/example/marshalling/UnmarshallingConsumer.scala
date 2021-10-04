@@ -56,7 +56,7 @@ object UnmarshallingConsumer extends IOApp with StrictLogging {
   override def run(args: List[String]): IO[ExitCode] =
       (for {
         amqpClient <- AmqpClient[IO](amqpClientConfig)
-        _ <- Resource.liftF(amqpClient.declare(Declarations.all))
+        _ <- Resource.eval(amqpClient.declare(Declarations.all))
         _ <- amqpClient.registerConsumerOf(Declarations.queue.name, personHandler)
       } yield ()).use(_ => IO.never *> IO.delay(ExitCode.Success))
   //end snippet 4
