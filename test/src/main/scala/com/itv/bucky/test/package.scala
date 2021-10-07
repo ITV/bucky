@@ -8,6 +8,7 @@ import cats.effect._
 import com.itv.bucky.test.stubs.{RecordingHandler, RecordingRequeueHandler, StubChannel, StubPublisher}
 import cats.effect.implicits._
 import com.itv.bucky.test.AmqpClientTest
+import com.rabbitmq.client.ReturnListener
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -57,28 +58,31 @@ package object test {
   object IOAmqpClientTest {
     def apply(executionContext: ExecutionContext, t: Timer[IO], cs: ContextShift[IO]): AmqpClientTest[IO] =
       new AmqpClientTest[IO] {
-        implicit val ec: ExecutionContext = executionContext
-        override implicit val timer: Timer[IO] = IO.timer(executionContext)
+        implicit val ec: ExecutionContext                    = executionContext
+        override implicit val timer: Timer[IO]               = IO.timer(executionContext)
         override implicit val contextShift: ContextShift[IO] = IO.contextShift(executionContext)
-        override implicit val F: ConcurrentEffect[IO] = IO.ioConcurrentEffect(contextShift)
+        override implicit val F: ConcurrentEffect[IO]        = IO.ioConcurrentEffect(contextShift)
       }
   }
 
   trait IOAmqpClientTest extends AmqpClientTest[IO] {
-    val globalExecutionContext: ExecutionContext = ExecutionContext.Implicits.global
-    override implicit val ec: ExecutionContext = globalExecutionContext
-    override implicit val timer: Timer[IO] = IO.timer(globalExecutionContext)
+    val globalExecutionContext: ExecutionContext         = ExecutionContext.Implicits.global
+    override implicit val ec: ExecutionContext           = globalExecutionContext
+    override implicit val timer: Timer[IO]               = IO.timer(globalExecutionContext)
     override implicit val contextShift: ContextShift[IO] = IO.contextShift(globalExecutionContext)
-    override implicit val F: ConcurrentEffect[IO] = IO.ioConcurrentEffect(contextShift)
+    override implicit val F: ConcurrentEffect[IO]        = IO.ioConcurrentEffect(contextShift)
   }
 
   object AmqpClientTest {
-    def apply[F[_]](implicit concurrentEffect: ConcurrentEffect[F], t: Timer[F], cs: ContextShift[F], executionContext: ExecutionContext): AmqpClientTest[F] =
+    def apply[F[_]](implicit concurrentEffect: ConcurrentEffect[F],
+                    t: Timer[F],
+                    cs: ContextShift[F],
+                    executionContext: ExecutionContext): AmqpClientTest[F] =
       new AmqpClientTest[F]() {
-        override implicit val F: ConcurrentEffect[F] = concurrentEffect
-        override implicit val timer: Timer[F] = t
+        override implicit val F: ConcurrentEffect[F]        = concurrentEffect
+        override implicit val timer: Timer[F]               = t
         override implicit val contextShift: ContextShift[F] = cs
-        override implicit val ec: ExecutionContext = executionContext
+        override implicit val ec: ExecutionContext          = executionContext
       }
   }
 
