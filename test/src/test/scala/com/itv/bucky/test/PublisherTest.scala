@@ -39,6 +39,23 @@ class PublisherTest extends AnyFunSuite with IOAmqpClientTest with EitherValues 
     }
   }
 
+  test("A message publishing should only complete when an ack is returned.") {
+    val channel = StubChannels.publishTimeout[IO]
+    runAmqpTest(client(channel, Config.empty(10.seconds))) { client =>
+      for {
+        pubSeq       <- IO(channel.publishSeq)
+        future       <- IO(client.publisher()(commandBuilder).unsafeToFuture())
+        _            <- IO.sleep(3.seconds)
+        isCompleted1 <- IO(future.isCompleted)
+        _            <- IO(channel.returnListeners.foreach(_.handleReturn(???)))
+        _            <- IO(channel.confirmListeners.foreach(_.handleAck(pubSeq, false)))
+        _            <- IO.fromFuture(IO(future)).timeout(3.seconds) //no point waiting for the initial timeout
+      } yield {
+        isCompleted1 shouldBe false
+      }
+    }
+  }
+
   test("A message publishing should timeout if no ack is ever received.") {
     val channel = StubChannels.publishTimeout[IO]
     runAmqpTest(client(channel, Config.empty(1.second))) { client =>

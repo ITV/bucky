@@ -1,7 +1,6 @@
 package com.itv.bucky
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.Executors
-
 import cats.effect.{ConcurrentEffect, ContextShift, IO, Sync}
 import cats.effect.implicits._
 import cats.implicits._
@@ -10,7 +9,7 @@ import com.itv.bucky.decl.{Binding, Declaration, Exchange, ExchangeBinding, Queu
 import com.itv.bucky.publish.PublishCommand
 import com.rabbitmq.client.AMQP.BasicProperties
 import com.rabbitmq.client.impl.recovery.AutorecoveringConnection
-import com.rabbitmq.client.{ConfirmListener, DefaultConsumer, Channel => RabbitChannel, Envelope => RabbitMQEnvelope}
+import com.rabbitmq.client.{ConfirmListener, DefaultConsumer, ReturnListener, Channel => RabbitChannel, Envelope => RabbitMQEnvelope}
 import com.typesafe.scalalogging.StrictLogging
 
 import scala.concurrent.ExecutionContext
@@ -24,6 +23,7 @@ trait Channel[F[_]] {
   def basicQos(prefetchCount: Int): F[Unit]
   def confirmSelect: F[Unit]
   def addConfirmListener(listener: ConfirmListener): F[Unit]
+  def addReturnListener(listener: ReturnListener): F[Unit]
   def getNextPublishSeqNo: F[Long]
   def publish(sequenceNumber: Long, cmd: PublishCommand): F[Unit]
   def sendAction(action: ConsumeAction)(envelope: Envelope): F[Unit]
@@ -66,6 +66,7 @@ object Channel {
     override def basicQos(prefetchCount: Int): F[Unit]                  = F.delay(channel.basicQos(prefetchCount)).void
     override def confirmSelect: F[Unit]                                 = F.delay(channel.confirmSelect)
     override def addConfirmListener(listener: ConfirmListener): F[Unit] = F.delay(channel.addConfirmListener(listener))
+    override def addReturnListener(listener: ReturnListener): F[Unit]   = F.delay(channel.addReturnListener(listener))
     override def getNextPublishSeqNo: F[Long]                           = F.delay(channel.getNextPublishSeqNo)
 
     override def publish(sequenceNumber: Long, cmd: PublishCommand): F[Unit] =

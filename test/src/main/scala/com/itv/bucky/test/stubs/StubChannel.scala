@@ -2,13 +2,12 @@ package com.itv.bucky.test.stubs
 
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicLong
-
 import com.itv.bucky
 import com.itv.bucky.consume._
 import com.itv.bucky.publish._
 import com.itv.bucky.{Channel, Envelope, ExchangeName, Handler, QueueName, RoutingKey}
 import com.itv.bucky.decl.{Binding, Direct, Exchange, ExchangeBinding, ExchangeType, Headers, Queue, Topic}
-import com.rabbitmq.client.ConfirmListener
+import com.rabbitmq.client.{ConfirmListener, ReturnListener}
 import cats._
 import cats.effect._
 import cats.effect.ConcurrentEffect
@@ -19,6 +18,7 @@ import scala.language.higherKinds
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import com.itv.bucky.decl.Fanout
+
 import scala.collection.compat._
 
 abstract class StubChannel[F[_]](implicit F: ConcurrentEffect[F]) extends Channel[F] with StrictLogging {
@@ -30,6 +30,7 @@ abstract class StubChannel[F[_]](implicit F: ConcurrentEffect[F]) extends Channe
   val exchangeBindings: ListBuffer[ExchangeBinding]                           = ListBuffer.empty
   val handlers: mutable.Map[QueueName, (Handler[F, Delivery], ConsumeAction)] = mutable.Map.empty
   val confirmListeners: ListBuffer[ConfirmListener]                           = ListBuffer.empty
+  val returnListeners: ListBuffer[ReturnListener]                             = ListBuffer.empty
 
   override def close(): F[Unit]                      = F.unit
   override def purgeQueue(name: QueueName): F[Unit]  = F.unit
@@ -63,9 +64,9 @@ abstract class StubChannel[F[_]](implicit F: ConcurrentEffect[F]) extends Channe
       case Some(Topic) if decRk == publishedRk || decRk == RoutingKey("#") => true
       case Some(Topic) if decRk.value.count(_ == '#') == 1 && decRk.value.endsWith(".#") =>
         publishedRk.value.startsWith(decRk.value.replace(".#", ""))
-      case Some(Topic) if decRk.value.contains("#")                        => throw new RuntimeException("Partial routing key matching not supported by bucky-test")
-      case Some(_)                                                         => decRk == publishedRk
-      case None                                                            => false
+      case Some(Topic) if decRk.value.contains("#") => throw new RuntimeException("Partial routing key matching not supported by bucky-test")
+      case Some(_)                                  => decRk == publishedRk
+      case None                                     => false
     }
 
   private def lookupQueuesForRoutingKeyExchange(publishCommand: PublishCommand): List[QueueName] = {
@@ -129,17 +130,15 @@ abstract class StubChannel[F[_]](implicit F: ConcurrentEffect[F]) extends Channe
       .toList)
   }
 
-  private def lookupQueuesForFanoutExchange(publishCommand: PublishCommand): List[QueueName] = {
+  private def lookupQueuesForFanoutExchange(publishCommand: PublishCommand): List[QueueName] =
     (bindings
       .filter(binding => binding.exchangeName == publishCommand.exchange)
       .map(_.queueName)
       .toList)
-  }
 
   override def publish(sequenceNumber: Long, cmd: PublishCommand): F[Unit] = {
     val queues = lookupQueues(cmd)
-    val subscribedHandlers = handlers
-      .view
+    val subscribedHandlers = handlers.view
       .filterKeys(queues.contains)
       .mapValues {
         case (handler, _) => handler
@@ -181,6 +180,7 @@ abstract class StubChannel[F[_]](implicit F: ConcurrentEffect[F]) extends Channe
     F.delay(handlers.synchronized(handlers.put(queue, handler -> onHandlerException))).void
 
   override def addConfirmListener(listener: ConfirmListener): F[Unit] = F.delay(confirmListeners.synchronized(confirmListeners += listener))
+  override def addReturnListener(listener: ReturnListener): F[Unit]   = F.delay(returnListeners.synchronized(returnListeners += listener))
   override def declareExchange(exchange: Exchange): F[Unit]           = F.delay(exchanges.synchronized(exchanges += exchange)).void
   override def declareQueue(queue: Queue): F[Unit]                    = F.delay(queues.synchronized(queues += queue)).void
   override def declareBinding(binding: Binding): F[Unit] = {
