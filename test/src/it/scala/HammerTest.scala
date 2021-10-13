@@ -55,7 +55,7 @@ class HammerTest extends AnyFunSuite with Eventually with IntegrationPatience wi
     AmqpClient[IO](config).use { client =>
       val handler = StubHandlers.ackHandler[IO, String]
       val handlerResource =
-        Resource.liftF(client.declare(declarations)).flatMap(_ => client.registerConsumerOf(queueName, handler))
+        Resource.eval(client.declare(declarations)).flatMap(_ => client.registerConsumerOf(queueName, handler))
 
       handlerResource.use { _ =>
         val pub = client.publisherOf[String] (exchangeName, routingKey)
@@ -138,7 +138,7 @@ class HammerTest extends AnyFunSuite with Eventually with IntegrationPatience wi
           yield ()
 
       val handlersResource =
-        Resource.liftF(testFixture.client.declare(declarations)).flatMap(_ => handlers)
+        Resource.eval(testFixture.client.declare(declarations)).flatMap(_ => handlers)
 
       handlersResource.use { _ =>
         for {

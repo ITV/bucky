@@ -64,7 +64,7 @@ class RequeueWithExpiryActionIntegrationTest extends AnyFunSuite with Eventually
       val handler = new RecordingRequeueHandler[IO, String](Kleisli(handlerAction).andThen(_ => IO(Requeue)).run)
       val dlqHandler = StubHandlers.ackHandler[IO, String]
 
-      Resource.liftF(client.declare(declarations)).flatMap(_ =>
+      Resource.eval(client.declare(declarations)).flatMap(_ =>
         for {
           _ <-  client.registerRequeueConsumerOf[String](
             queueName = queueName,

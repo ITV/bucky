@@ -57,7 +57,7 @@ class RequeueIntegrationTest extends AnyFunSuite with Eventually with Integratio
       val handler = StubHandlers.requeueRequeueHandler[IO, Delivery]
       val dlqHandler = StubHandlers.ackHandler[IO, Delivery]
 
-      Resource.liftF(client.declare(declarations)).flatMap(_ =>
+      Resource.eval(client.declare(declarations)).flatMap(_ =>
         for {
           _ <-  client.registerRequeueConsumer(queueName, handler, requeuePolicy)
           _ <- client.registerConsumer(deadletterQueueName, dlqHandler)

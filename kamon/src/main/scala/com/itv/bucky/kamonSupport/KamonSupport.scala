@@ -1,7 +1,6 @@
 package com.itv.bucky.kamonSupport
 import java.nio.charset.Charset
-
-import cats.effect.{ConcurrentEffect, Resource}
+import cats.effect.{Async, Resource}
 import cats.implicits._
 import com.itv.bucky.LoggingAmqpClient.{logFailedHandler, logFailedPublishMessage, logSuccessfulHandler, logSuccessfullPublishMessage}
 import com.itv.bucky.consume._
@@ -19,7 +18,7 @@ import scala.util.Try
 
 object KamonSupport {
 
-  def apply[F[_]](amqpClient: AmqpClient[F], logging: Boolean, charset: Charset)(implicit F: ConcurrentEffect[F]): AmqpClient[F] =
+  def apply[F[_]](amqpClient: AmqpClient[F], logging: Boolean, charset: Charset)(implicit F: Async[F]): AmqpClient[F] =
     new AmqpClient[F] {
       private val config            = Kamon.config()
       private val includePublishRK  = Try { config.getBoolean("kamon.bucky.publish.add-routing-key-as-metric-tag") }.getOrElse(true)

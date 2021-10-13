@@ -1,6 +1,8 @@
 package com.itv.bucky.test
 
 import cats.effect.IO
+import cats.effect.std.Dispatcher
+import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.implicits._
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.publish._
@@ -9,10 +11,10 @@ import org.scalatest.EitherValues
 
 import scala.concurrent.duration._
 import scala.concurrent.{Future, TimeoutException}
-import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.funsuite.{AnyFunSuite, AsyncFunSuite}
 import org.scalatest.matchers.should.Matchers._
 
-class PublisherTest extends AnyFunSuite with IOAmqpClientTest with EitherValues {
+class PublisherTest extends AsyncFunSuite with AsyncIOSpec with IOAmqpClientTest with EitherValues {
   val exchange = ExchangeName("anexchange")
   val queue    = QueueName("aqueue")
   val rk       = RoutingKey("ark")
@@ -25,32 +27,36 @@ class PublisherTest extends AnyFunSuite with IOAmqpClientTest with EitherValues 
 
   test("A message publishing should only complete when an ack is returned.") {
     val channel = StubChannels.publishTimeout[IO]
-    runAmqpTest(client(channel, Config.empty(10.seconds))) { client =>
-      for {
-        pubSeq       <- IO(channel.publishSeq)
-        future       <- IO(client.publisher()(commandBuilder).unsafeToFuture())
-        _            <- IO.sleep(3.seconds)
-        isCompleted1 <- IO(future.isCompleted)
-        _            <- IO(channel.confirmListeners.foreach(_.handleAck(pubSeq, false)))
-        _            <- IO.fromFuture(IO(future)).timeout(3.seconds) //no point waiting for the initial timeout
-      } yield {
-        isCompleted1 shouldBe false
+    Dispatcher[IO].use { dispatcher =>
+      runAmqpTest(client(channel, Config.empty(10.seconds))) { client =>
+        for {
+          pubSeq       <- IO(channel.publishSeq)
+          future       <- IO(dispatcher.unsafeToFuture(client.publisher()(commandBuilder)))
+          _            <- IO.sleep(3.seconds)
+          isCompleted1 <- IO(future.isCompleted)
+          _            <- IO(channel.confirmListeners.foreach(_.handleAck(pubSeq, false)))
+          _            <- IO.fromFuture(IO(future)).timeout(3.seconds) //no point waiting for the initial timeout
+        } yield {
+          isCompleted1 shouldBe false
+        }
       }
     }
   }
 
   test("A message publishing should timeout if no ack is ever received.") {
     val channel = StubChannels.publishTimeout[IO]
-    runAmqpTest(client(channel, Config.empty(1.second))) { client =>
-      for {
-        future      <- IO(client.publisher()(commandBuilder).unsafeToFuture())
-        result      <- IO.fromFuture(IO(future)).attempt
-        listeners   <- IO(channel.confirmListeners.map(_.asInstanceOf[PendingConfirmListener[IO]]))
-        pendingConf <- listeners.toList.map(_.pendingConfirmations.get).sequence
-      } yield {
-        result.left.value shouldBe a[TimeoutException]
-        withClue("Confirm listeners should be popped") {
-          pendingConf.flatMap(_.values) shouldBe empty
+    Dispatcher[IO].use { dispatcher =>
+      runAmqpTest(client(channel, Config.empty(1.second))) { client =>
+        for {
+          future <- IO(dispatcher.unsafeToFuture(client.publisher()(commandBuilder)))
+          result <- IO.fromFuture(IO(future)).attempt
+          listeners <- IO(channel.confirmListeners.map(_.asInstanceOf[PendingConfirmListener[IO]]))
+          pendingConf <- listeners.toList.map(_.pendingConfirmations.get).sequence
+        } yield {
+          result.left.value shouldBe a[TimeoutException]
+          withClue("Confirm listeners should be popped") {
+            pendingConf.flatMap(_.values) shouldBe empty
+          }
         }
       }
     }
@@ -58,73 +64,79 @@ class PublisherTest extends AnyFunSuite with IOAmqpClientTest with EitherValues 
 
   test("Multiple messages can be ack when the channel acks multiple messages") {
     val channel = StubChannels.publishTimeout[IO]
-    runAmqpTest(client(channel, Config.empty(30.seconds))) { client =>
-      for {
-        publish1      <- IO(client.publisher()(commandBuilder).unsafeToFuture())
-        publish2      <- IO(client.publisher()(commandBuilder).unsafeToFuture())
-        publish3      <- IO(client.publisher()(commandBuilder).unsafeToFuture())
-        _             <- IO.sleep(5.seconds)
-        pubSeq        <- IO(channel.publishSeq)
-        areCompleted1 <- IO(List(publish1.isCompleted, publish2.isCompleted, publish3.isCompleted))
-        _             <- IO(channel.confirmListeners.foreach(_.handleAck(pubSeq - 1, true)))
-        _             <- IO.fromFuture(IO(Future.sequence(List(publish1, publish2, publish3)))).timeout(3.seconds) //no point waiting for the initial timeout
-        areCompleted2 <- IO(List(publish1.isCompleted, publish2.isCompleted, publish3.isCompleted))
-      } yield {
-        areCompleted1 shouldBe List(false, false, false)
-        areCompleted2 shouldBe List(true, true, true)
+    Dispatcher[IO].use { dispatcher =>
+      runAmqpTest(client(channel, Config.empty(30.seconds))) { client =>
+        for {
+          publish1 <- IO(dispatcher.unsafeToFuture(client.publisher()(commandBuilder)))
+          publish2 <- IO(dispatcher.unsafeToFuture(client.publisher()(commandBuilder)))
+          publish3 <- IO(dispatcher.unsafeToFuture(client.publisher()(commandBuilder)))
+          _ <- IO.sleep(5.seconds)
+          pubSeq <- IO(channel.publishSeq)
+          areCompleted1 <- IO(List(publish1.isCompleted, publish2.isCompleted, publish3.isCompleted))
+          _ <- IO(channel.confirmListeners.foreach(_.handleAck(pubSeq - 1, true)))
+          _ <- List(publish1, publish2, publish3).map(f => IO.fromFuture(IO(f))).sequence_.timeout(3.seconds) //no point waiting for the initial timeout
+          areCompleted2 <- IO(List(publish1.isCompleted, publish2.isCompleted, publish3.isCompleted))
+        } yield {
+          areCompleted1 shouldBe List(false, false, false)
+          areCompleted2 shouldBe List(true, true, true)
+        }
       }
     }
   }
 
   test("Multiple messages can be Nack when the channel Nacks multiple messages") {
     val channel = StubChannels.publishTimeout[IO]
-    runAmqpTest(client(channel, Config.empty(30.seconds))) { client =>
-      for {
-        publish1      <- IO(client.publisher()(commandBuilder).unsafeToFuture())
-        publish2      <- IO(client.publisher()(commandBuilder).unsafeToFuture())
-        publish3      <- IO(client.publisher()(commandBuilder).unsafeToFuture())
-        _             <- IO.sleep(5.seconds)
-        pubSeq        <- IO(channel.publishSeq)
-        areCompleted1 <- IO(List(publish1.isCompleted, publish2.isCompleted, publish3.isCompleted))
-        _             <- IO(channel.confirmListeners.foreach(_.handleNack(pubSeq - 1, true)))
-        result        <- IO.fromFuture(IO(Future.sequence(List(publish1.attempt, publish2.attempt, publish3.attempt))))
-        areCompleted2 <- IO(List(publish1.isCompleted, publish2.isCompleted, publish3.isCompleted))
-      } yield {
-        areCompleted1 shouldBe List(false, false, false)
-        areCompleted2 shouldBe List(true, true, true)
-        val result1 :: result2 :: result3 :: Nil = result
+    Dispatcher[IO].use { dispatcher =>
+      runAmqpTest(client(channel, Config.empty(30.seconds))) { client =>
+        for {
+          publish1 <- IO(dispatcher.unsafeToFuture(client.publisher()(commandBuilder)))
+          publish2 <- IO(dispatcher.unsafeToFuture(client.publisher()(commandBuilder)))
+          publish3 <- IO(dispatcher.unsafeToFuture(client.publisher()(commandBuilder)))
+          _ <- IO.sleep(5.seconds)
+          pubSeq <- IO(channel.publishSeq)
+          areCompleted1 <- IO(List(publish1.isCompleted, publish2.isCompleted, publish3.isCompleted))
+          _ <- IO(channel.confirmListeners.foreach(_.handleNack(pubSeq - 1, true)))
+          result <- List(publish1, publish2, publish3).map(f => IO.fromFuture(IO(f)).attempt).sequence
+          areCompleted2 <- IO(List(publish1.isCompleted, publish2.isCompleted, publish3.isCompleted))
+        } yield {
+          areCompleted1 shouldBe List(false, false, false)
+          areCompleted2 shouldBe List(true, true, true)
+          val result1 :: result2 :: result3 :: Nil = result
 
-        result1.left.value shouldBe a[RuntimeException]
+          result1.left.value shouldBe a[RuntimeException]
 
-        result2.left.value shouldBe a[RuntimeException]
+          result2.left.value shouldBe a[RuntimeException]
 
-        result3.left.value shouldBe a[RuntimeException]
+          result3.left.value shouldBe a[RuntimeException]
+        }
       }
     }
   }
 
   test("Multiple messages can be published and some can be acked and some can be Nacked.") {
     val channel = StubChannels.publishTimeout[IO]
-    runAmqpTest(client(channel, Config.empty(10.seconds))) { client =>
-      for {
-        publish1      <- IO(client.publisher()(commandBuilder).unsafeToFuture())
-        publish2      <- IO(client.publisher()(commandBuilder).unsafeToFuture())
-        publish3      <- IO(client.publisher()(commandBuilder).unsafeToFuture())
-        publish4      <- IO(client.publisher()(commandBuilder).unsafeToFuture())
-        _             <- IO.sleep(3.seconds)
-        areCompleted1 <- IO(List(publish1.isCompleted, publish2.isCompleted, publish3.isCompleted, publish4.isCompleted))
-        _             <- IO(channel.confirmListeners.foreach(_.handleAck(0, false))) // ack 0
-        _             <- IO(channel.confirmListeners.foreach(_.handleNack(2, true))) //nack 1, 2
-        result        <- IO.fromFuture(IO(Future.sequence(List(publish1.attempt, publish2.attempt, publish3.attempt, publish4.attempt))))
-        areCompleted2 <- IO(List(publish1.isCompleted, publish2.isCompleted, publish3.isCompleted, publish4.isCompleted))
-      } yield {
-        println(result)
-        areCompleted1 shouldBe List(false, false, false, false)
-        areCompleted2 shouldBe List(true, true, true, true)
+    Dispatcher[IO].use { dispatcher =>
+      runAmqpTest(client(channel, Config.empty(10.seconds))) { client =>
+        for {
+          publish1 <- IO(dispatcher.unsafeToFuture(client.publisher()(commandBuilder)))
+          publish2 <- IO(dispatcher.unsafeToFuture(client.publisher()(commandBuilder)))
+          publish3 <- IO(dispatcher.unsafeToFuture(client.publisher()(commandBuilder)))
+          publish4 <- IO(dispatcher.unsafeToFuture(client.publisher()(commandBuilder)))
+          _ <- IO.sleep(3.seconds)
+          areCompleted1 <- IO(List(publish1.isCompleted, publish2.isCompleted, publish3.isCompleted, publish4.isCompleted))
+          _ <- IO(channel.confirmListeners.foreach(_.handleAck(0, false))) // ack 0
+          _ <- IO(channel.confirmListeners.foreach(_.handleNack(2, true))) //nack 1, 2
+          result <- List(publish1, publish2, publish3, publish4).map(f => IO.fromFuture(IO(f)).attempt).sequence
+          areCompleted2 <- IO(List(publish1.isCompleted, publish2.isCompleted, publish3.isCompleted, publish4.isCompleted))
+        } yield {
+          println(result)
+          areCompleted1 shouldBe List(false, false, false, false)
+          areCompleted2 shouldBe List(true, true, true, true)
 
-        result.filter(_.isRight) should have size 1
-        result.filter(r => r.isLeft && r.left.value.isInstanceOf[RuntimeException]) should have size 2
-        result.filter(r => r.isLeft && r.left.value.isInstanceOf[TimeoutException]) should have size 1
+          result.filter(_.isRight) should have size 1
+          result.filter(r => r.isLeft && r.left.value.isInstanceOf[RuntimeException]) should have size 2
+          result.filter(r => r.isLeft && r.left.value.isInstanceOf[TimeoutException]) should have size 1
+        }
       }
     }
   }

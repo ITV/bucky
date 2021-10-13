@@ -11,7 +11,6 @@ import com.itv.bucky.decl.{Binding, Direct, Exchange, ExchangeBinding, ExchangeT
 import com.rabbitmq.client.ConfirmListener
 import cats._
 import cats.effect._
-import cats.effect.ConcurrentEffect
 import cats.implicits._
 import com.typesafe.scalalogging.StrictLogging
 
@@ -21,7 +20,7 @@ import scala.collection.mutable.ListBuffer
 import com.itv.bucky.decl.Fanout
 import scala.collection.compat._
 
-abstract class StubChannel[F[_]](implicit F: ConcurrentEffect[F]) extends Channel[F] with StrictLogging {
+abstract class StubChannel[F[_]](implicit F: Async[F]) extends Channel[F] with StrictLogging {
   var publishSeq: Long                                                        = 0L
   val pubSeqLock: Object                                                      = new Object
   val exchanges: ListBuffer[Exchange]                                         = ListBuffer.empty
