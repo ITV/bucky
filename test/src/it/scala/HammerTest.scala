@@ -1,38 +1,34 @@
-import java.util.UUID
-import java.util.concurrent.Executors
-
-import cats.effect.concurrent.{Deferred, Ref}
-import cats.effect.{ContextShift, IO, Resource, Timer}
+import cats.effect.kernel.Deferred
+import cats.effect.testing.scalatest.AsyncIOSpec
+import cats.effect.{IO, Ref, Resource}
 import cats.implicits._
-import com.itv.bucky._
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
+import com.itv.bucky._
 import com.itv.bucky.consume.Ack
 import com.itv.bucky.decl.{Exchange, Queue}
 import com.itv.bucky.test.StubHandlers
 import com.itv.bucky.test.stubs.RecordingHandler
 import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.StrictLogging
-
-import org.scalatest.funsuite.AnyFunSuite
-import org.scalatest.matchers.should.Matchers._
-
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
+import org.scalatest.funsuite.AsyncFunSuite
+import org.scalatest.matchers.should.Matchers
 
+import java.util.UUID
+import java.util.concurrent.Executors
 import scala.collection.immutable.TreeSet
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.higherKinds
 
-class HammerTest extends AnyFunSuite with Eventually with IntegrationPatience with StrictLogging {
+class HammerTest extends AsyncFunSuite with AsyncIOSpec with Eventually with IntegrationPatience with StrictLogging with Matchers {
 
   case class TestFixture(stubHandler: RecordingHandler[IO, String], publisher: Publisher[IO, String], client: AmqpClient[IO])
 
   implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(300))
-  implicit val cs: ContextShift[IO] = IO.contextShift(ec)
-  implicit val timer: Timer[IO]     = IO.timer(ec)
 
-  def withTestFixture(test: TestFixture => IO[Unit]): Unit = {
+  def withTestFixture(test: TestFixture => IO[Unit]): IO[Unit] = {
     val rawConfig = ConfigFactory.load("bucky")
     val config =
       AmqpClientConfig(
@@ -62,7 +58,7 @@ class HammerTest extends AnyFunSuite with Eventually with IntegrationPatience wi
         val fixture = TestFixture(handler, pub, client)
         test(fixture)
       }
-    }.unsafeRunSync()
+    }
   }
 
   test("can handle concurrency") {
@@ -76,11 +72,10 @@ class HammerTest extends AnyFunSuite with Eventually with IntegrationPatience wi
           .toList
           .flatTraverse(group => {
             group.toList.parTraverse { i =>
-              val deferred = Deferred[IO, Option[Throwable]].unsafeRunSync()
-              testFixture.publisher(s"hello$i").runAsync {
-                case Right(_) => deferred.complete(None)
-                case Left(error) => deferred.complete(Some(error))
-              }.toIO.flatMap(_ => deferred.get)
+              testFixture.publisher(s"hello$i").attempt.map {
+                case Right(_) => None
+                case Left(error) => Some(error)
+              }
             }.map(_.flatten)
           })
 

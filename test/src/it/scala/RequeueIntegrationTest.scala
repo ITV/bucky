@@ -1,27 +1,27 @@
-import java.util.UUID
-import java.util.concurrent.Executors
-
-import cats.effect.{ContextShift, IO, Resource, Sync, Timer}
-import com.itv.bucky._
+import cats.effect.testing.scalatest.AsyncIOSpec
+import cats.effect.{IO, Resource}
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
+import com.itv.bucky._
 import com.itv.bucky.consume._
-import com.itv.bucky.publish._
-import com.itv.bucky.decl.{Exchange, Queue}
+import com.itv.bucky.decl.Exchange
 import com.itv.bucky.pattern.requeue
 import com.itv.bucky.pattern.requeue.RequeuePolicy
+import com.itv.bucky.publish._
 import com.itv.bucky.test.StubHandlers
 import com.itv.bucky.test.stubs.{RecordingHandler, RecordingRequeueHandler}
 import com.typesafe.config.ConfigFactory
-import org.scalatest.funsuite.AnyFunSuite
-import org.scalatest.matchers.should.Matchers._
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
+import org.scalatest.funsuite.AsyncFunSuite
+import org.scalatest.matchers.should.Matchers._
 
-import scala.concurrent.duration._
+import java.util.UUID
+import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
+import scala.concurrent.duration._
 import scala.language.higherKinds
 
-class RequeueIntegrationTest extends AnyFunSuite with Eventually with IntegrationPatience {
+class RequeueIntegrationTest extends AsyncFunSuite with AsyncIOSpec with Eventually with IntegrationPatience {
 
   case class TestFixture(
                           stubHandler: RecordingRequeueHandler[IO, Delivery],
@@ -29,11 +29,9 @@ class RequeueIntegrationTest extends AnyFunSuite with Eventually with Integratio
                           publishCommandBuilder: PublishCommandBuilder.Builder[String], publisher: Publisher[IO, PublishCommand])
 
   implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(300))
-  implicit val cs: ContextShift[IO] = IO.contextShift(ec)
-  implicit val timer: Timer[IO]     = IO.timer(ec)
   val requeuePolicy = RequeuePolicy(maximumProcessAttempts = 5, requeueAfter = 2.seconds)
 
-  def withTestFixture(test: TestFixture => IO[Unit]): Unit = {
+  def withTestFixture(test: TestFixture => IO[Unit]): IO[Unit] = {
     val rawConfig = ConfigFactory.load("bucky")
     val config =
       AmqpClientConfig(
@@ -69,7 +67,7 @@ class RequeueIntegrationTest extends AnyFunSuite with Eventually with Integratio
         val fixture = TestFixture(handler, dlqHandler, pcb, pub)
         test(fixture)
       }
-    }.unsafeRunSync()
+    }
   }
 
   test("Should retain payload, custom headers and properties when republishing") {

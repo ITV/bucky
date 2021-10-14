@@ -1,30 +1,30 @@
 package com.itv.bucky.kamonSupport
 
-import java.util.concurrent.{ExecutorService, Executors}
-
-import cats.effect.{IO, Resource}
+import cats.effect.std.Dispatcher
+import cats.effect.testing.scalatest.AsyncIOSpec
+import cats.effect.{IO, Resource, Spawn}
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
+import com.itv.bucky._
 import com.itv.bucky.consume.{Ack, ConsumeAction, DeadLetter}
 import com.itv.bucky.decl.{Exchange, Queue}
 import com.itv.bucky.publish.PublishCommandBuilder
 import com.itv.bucky.test._
-import com.itv.bucky._
 import kamon.instrumentation.executor.ExecutorInstrumentation
 import kamon.tag.{Tag, TagSet}
 import kamon.testkit.TestSpanReporter
 import kamon.testkit.TestSpanReporter.BufferingSpanReporter
 import kamon.trace.Identifier
 import org.scalatest.concurrent.Eventually
-import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.funsuite.AsyncFunSuite
 import org.scalatest.matchers.should._
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach}
 
+import java.util.concurrent.{ExecutorService, Executors}
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.util.Random
-import cats.effect.Spawn
 
-class KamonSupportTest extends AnyFunSuite with Matchers with Eventually with TestSpanReporter with BeforeAndAfterAll with BeforeAndAfterEach {
+class KamonSupportTest extends AsyncFunSuite with AsyncIOSpec with Matchers with Eventually with TestSpanReporter with BeforeAndAfterAll with BeforeAndAfterEach {
   val queue = Queue(QueueName("kamon-spec-test"))
   val rk    = RoutingKey("kamon-spec-rk")
   val exchange = Exchange(ExchangeName("kamon-spec-exchange"))
@@ -119,14 +119,12 @@ class KamonSupportTest extends AnyFunSuite with Matchers with Eventually with Te
   }
 
   def withPreDeclaredConsumer(consumeAction: ConsumeAction = Ack)(
-      test: (BufferingSpanReporter, Publisher[IO, String]) => IO[Unit]): Unit = {
+      test: (BufferingSpanReporter, Publisher[IO, String]) => IO[Unit]): IO[Unit] = {
       val handler = StubHandlers.recordingHandler[IO, String](_ => IO.delay(consumeAction))
       val declarations = List(queue, exchange) ++ exchange.bindings
       val executor = instrument(Executors.newFixedThreadPool(10))
       implicit val ec = ExecutionContext.fromExecutor(executor)
-      implicit val timer = IO.timer(ec)
-      implicit val cs = IO.contextShift(ec)
-      val result = IOAmqpClientTest(ec, timer, cs)
+      val result = IOAmqpClientTest(ec)
         .clientForgiving()
         .map(_.withKamonSupport(true))
         .use(client => {
@@ -141,7 +139,7 @@ class KamonSupportTest extends AnyFunSuite with Matchers with Eventually with Te
           }
         })
         .unsafeRunSync()
-      IO.fromEither(result).unsafeRunSync()
+      IO.fromEither(result)
     }
 
   def withChannel(test: (BufferingSpanReporter, Channel[IO]) => IO[Unit]) =
@@ -150,12 +148,13 @@ class KamonSupportTest extends AnyFunSuite with Matchers with Eventually with Te
         val declarations   = List(queue, exchange) ++ exchange.bindings
         val executor       = instrument(Executors.newFixedThreadPool(10))
         implicit val ec    = ExecutionContext.fromExecutor(executor)
-        implicit val timer = IO.timer(ec)
-        implicit val cs    = IO.contextShift(ec)
         val actualChannel  = StubChannels.forgiving[IO]
         val channel        = Resource.make(IO(actualChannel))(_.close())
-        val clientResource =
-          AmqpClient.apply[IO](Config.empty(3.seconds), () => channel.map(_.asInstanceOf[Channel[IO]]), channel.map(_.asInstanceOf[Channel[IO]]))
+        val clientResource = {
+          Dispatcher[IO].flatMap { dispatcher =>
+            AmqpClient.apply[IO](Config.empty(3.seconds), () => channel.map(_.asInstanceOf[Channel[IO]]), channel.map(_.asInstanceOf[Channel[IO]]), dispatcher)
+          }
+        }
 
         val result =
           (for {
@@ -168,7 +167,7 @@ class KamonSupportTest extends AnyFunSuite with Matchers with Eventually with Te
             }
             .unsafeRunSync()
 
-        IO.fromEither(result).unsafeRunSync()
+        IO.fromEither(result)
       }
 
 

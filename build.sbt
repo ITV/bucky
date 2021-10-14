@@ -188,7 +188,7 @@ lazy val example = project
       "io.argonaut"                %% "argonaut"                      % argonautVersion,
       "com.typesafe.scala-logging" %% "scala-logging"                 % scalaLoggingVersion,
       "org.scalatest"              %% "scalatest"                     % scalaTestVersion,
-      "org.typelevel"              %% "cats-effect-testing-scalatest" % catsEffectScalaTestVersion % "test,it",
+      "org.typelevel"              %% "cats-effect-testing-scalatest" % catsEffectScalaTestVersion % "test",
       "com.typesafe"               % "config"                         % typeSafeVersion
     )
   )
