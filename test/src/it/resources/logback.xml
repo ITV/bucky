@@ -15,7 +15,7 @@
     <logger name="ch.qos.logback" level="WARN"/>
     <logger name="com.itv" level="ERROR"/>
 
-    <root level="ERROR">
+    <root level="INFO">
         <appender-ref ref="STDOUT"/>
         <appender-ref ref="ITVSYSLOG"/>
     </root>

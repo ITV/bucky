@@ -2,15 +2,19 @@ package com.itv.bucky.test
 
 import cats.effect.IO
 import cats.implicits._
+import cats.instances.byte
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.publish._
 import com.itv.bucky.{ExchangeName, QueueName, RoutingKey, consume}
+import com.rabbitmq.client.AMQP.BasicProperties
 import org.scalatest.EitherValues
 
 import scala.concurrent.duration._
 import scala.concurrent.{Future, TimeoutException}
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers._
+
+import java.util.Date
 
 class PublisherTest extends AnyFunSuite with IOAmqpClientTest with EitherValues {
   val exchange = ExchangeName("anexchange")
@@ -24,7 +28,7 @@ class PublisherTest extends AnyFunSuite with IOAmqpClientTest with EitherValues 
     .toPublishCommand(message)
 
   test("A message publishing should only complete when an ack is returned.") {
-    val channel = StubChannels.publishTimeout[IO]
+    val channel = StubChannels.publishNoAck[IO]
     runAmqpTest(client(channel, Config.empty(10.seconds))) { client =>
       for {
         pubSeq       <- IO(channel.publishSeq)
@@ -39,8 +43,25 @@ class PublisherTest extends AnyFunSuite with IOAmqpClientTest with EitherValues 
     }
   }
 
+  test("A message publishing should error when a return is returned.") {
+    val channel = StubChannels.publishNoAck[IO]
+    runAmqpTest(client(channel, Config.empty(10.seconds))) { client =>
+      for {
+        pubSeq <- IO(channel.publishSeq)
+        future <- IO(client.publisher()(commandBuilder).unsafeToFuture())
+        properties = new BasicProperties
+        _          = properties.builder().build()
+        _      <- IO(channel.returnListeners.foreach(_.handleReturn(400, "reply", exchange.value, rk.value, properties, message.getBytes)))
+        _      <- IO(channel.confirmListeners.foreach(_.handleAck(pubSeq, false)))
+        result <- IO.fromFuture(IO(future)).attempt
+      } yield {
+        result shouldBe 'left
+      }
+    }
+  }
+
   test("A message publishing should timeout if no ack is ever received.") {
-    val channel = StubChannels.publishTimeout[IO]
+    val channel = StubChannels.publishNoAck[IO]
     runAmqpTest(client(channel, Config.empty(1.second))) { client =>
       for {
         future      <- IO(client.publisher()(commandBuilder).unsafeToFuture())
@@ -57,7 +78,7 @@ class PublisherTest extends AnyFunSuite with IOAmqpClientTest with EitherValues 
   }
 
   test("Multiple messages can be ack when the channel acks multiple messages") {
-    val channel = StubChannels.publishTimeout[IO]
+    val channel = StubChannels.publishNoAck[IO]
     runAmqpTest(client(channel, Config.empty(30.seconds))) { client =>
       for {
         publish1      <- IO(client.publisher()(commandBuilder).unsafeToFuture())
@@ -77,7 +98,7 @@ class PublisherTest extends AnyFunSuite with IOAmqpClientTest with EitherValues 
   }
 
   test("Multiple messages can be Nack when the channel Nacks multiple messages") {
-    val channel = StubChannels.publishTimeout[IO]
+    val channel = StubChannels.publishNoAck[IO]
     runAmqpTest(client(channel, Config.empty(30.seconds))) { client =>
       for {
         publish1      <- IO(client.publisher()(commandBuilder).unsafeToFuture())
@@ -104,7 +125,7 @@ class PublisherTest extends AnyFunSuite with IOAmqpClientTest with EitherValues 
   }
 
   test("Multiple messages can be published and some can be acked and some can be Nacked.") {
-    val channel = StubChannels.publishTimeout[IO]
+    val channel = StubChannels.publishNoAck[IO]
     runAmqpTest(client(channel, Config.empty(10.seconds))) { client =>
       for {
         publish1      <- IO(client.publisher()(commandBuilder).unsafeToFuture())
