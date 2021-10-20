@@ -55,6 +55,12 @@ trait Channel[F[_]] {
                        queue: QueueName,
                        consumerTag: ConsumerTag,
                        cs: ContextShift[F]): F[Unit]
+
+  def registerAsyncConsumer(handler: AsyncHandler[F, Delivery],
+                       onHandlerException: ConsumeAction,
+                       queue: QueueName,
+                       consumerTag: ConsumerTag,
+                       cs: ContextShift[F]): F[Unit]
 }
 
 object Channel {
@@ -147,6 +153,51 @@ object Channel {
                 F.delay(logger.debug(s"Handler failure with {} will recover to: {}", e.getMessage, onHandlerException)) *> F.delay(onHandlerException)
             }
             .flatMap(sendAction(_)(Envelope.fromEnvelope(envelope)))
+            .toIO
+            .unsafeRunAsyncAndForget()
+        }
+      }
+      F.delay(channel.basicConsume(queue.value, false, consumerTag.value, deliveryCallback)).void
+    }
+
+    override def registerAsyncConsumer(handler: AsyncHandler[F, Delivery],
+                                  onHandlerException: ConsumeAction,
+                                  queue: QueueName,
+                                  consumerTag: ConsumerTag,
+                                  cs: ContextShift[F]): F[Unit] = {
+
+      val deliveryCallback = new DefaultConsumer(channel) {
+        override def handleDelivery(consumerTag: String, envelope: RabbitMQEnvelope, properties: BasicProperties, body: Array[Byte]): Unit = {
+          val delivery = Consumer.deliveryFrom(consumerTag, envelope, properties, body)
+          (for {
+            _      <- cs.shift
+            _      <- F.delay(logger.debug("Received delivery with rk:{} on exchange: {}", delivery.envelope.routingKey, delivery.envelope.exchangeName))
+            // This facilitates message acknowledgement on a different thread, which is thread safe as long as only
+            // a single message is acknowledge at a time
+            // https://www.rabbitmq.com/api-guide.html
+            // When manual acknowledgements are used, it is important to consider what thread does the acknowledgement.
+            // If it's different from the thread that received the delivery (e.g. Consumer#handleDelivery delegated delivery handling to a different thread),
+            // acknowledging with the multiple parameter set to true is unsafe and will result in double-acknowledgements,
+            // and therefore a channel-level protocol exception that closes the channel.
+            // Acknowledging a single message at a time can be safe.
+            action <- handler(delivery, consumeAction => sendAction(consumeAction)(Envelope.fromEnvelope(envelope)))
+            _      <- F.delay(logger.info("Responding with {} to {} on {}", action, delivery, queue))
+          } yield action).attempt
+            .flatTap {
+              case Left(e) =>
+                F.point {
+                  logger.error(s"Handler exception whilst processing delivery: $delivery on $queue", e)
+                }
+              case Right(_) =>
+                F.point {
+                  logger.debug("Processed message with dl {}", envelope.getDeliveryTag)
+                }
+            }
+            .flatMap {
+              case Right(r) => F.delay(r)
+              case Left(e) =>
+                F.delay(logger.debug(s"Handler failure with {} will recover to: {}", e.getMessage, onHandlerException)) *> F.delay(onHandlerException)
+            }
             .toIO
             .unsafeRunAsyncAndForget()
         }

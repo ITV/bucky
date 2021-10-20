@@ -18,6 +18,7 @@ package object bucky {
   type Publisher[F[_], -T]            = T => F[Unit]
   type PublisherWithHeaders[F[_], -T] = (T, Map[String, AnyRef]) => F[Unit]
   type Handler[F[_], -T]              = T => F[ConsumeAction]
+  type AsyncHandler[F[_], -T]         = (T, ConsumeAction => F[Unit]) => F[Unit]
   type RequeueHandler[F[_], -T]       = T => F[RequeueConsumeAction]
   type Bindings                       = PartialFunction[RoutingKey, QueueName]
   type PayloadUnmarshaller[T]         = Unmarshaller[Payload, T]
