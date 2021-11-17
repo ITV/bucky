@@ -41,7 +41,7 @@ private[bucky] case class AmqpClientConnectionManager[F[_]](
             _              <- publishChannel.publish(nextPublishSeq, cmd)
           } yield ()
         }
-        _ <- signal.get.ifM(F.unit, F.raiseError[Unit](new RuntimeException("Failed to publish msg.")))
+        _ <- signal.get.ifM(F.unit, F.raiseError[Unit](new RuntimeException(s"Failed to publish msg: ${cmd}")))
       } yield ())
         .timeout(amqpConfig.publishingTimeout)
         .recoverWith {
