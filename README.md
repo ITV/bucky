@@ -28,3 +28,8 @@ passed into the `x-message-ttl` parameter of the requeue queue, which previously
 This means that the `retryAfter` value being declared will be respected.
 In this scenario, as the queue policy is being changed, it may need to the requeue queue to be manually deleted so that the application can recreate it. The application may fail to start up otherwise.
 
+# Releasing a new version
+
+1. Merge your change into master
+2. perform an `sbt release` setting the new version when prompted
+3. Release in sonatype
