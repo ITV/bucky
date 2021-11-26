@@ -81,7 +81,7 @@ private[bucky] object AmqpClientConnectionManager extends StrictLogging {
     for {
       pendingConfirmations <- Ref.of[F, TreeMap[Long, Deferred[F, Boolean]]](TreeMap.empty)
       _                    <- publishChannel.confirmSelect
-      confirmListener      <- F.delay(publish.PendingConfirmListener(pendingConfirmations, dispatcher))
+      confirmListener      <- F.blocking(publish.PendingConfirmListener(pendingConfirmations, dispatcher))
       _                    <- publishChannel.addConfirmListener(confirmListener)
     } yield AmqpClientConnectionManager(config, publishChannel, confirmListener, dispatcher)
 }

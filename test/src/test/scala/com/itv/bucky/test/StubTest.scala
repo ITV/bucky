@@ -8,6 +8,7 @@ import com.itv.bucky.decl.{Exchange, Queue}
 import com.itv.bucky.{ExchangeName, QueueName, RoutingKey, consume, _}
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers._
+import cats.effect.unsafe.IORuntime
 
 class StubTest extends AnyFunSuite with IOAmqpClientTest {
   val exchange     = ExchangeName("anexchange")

@@ -31,3 +31,11 @@ lib/
 *.iml
 *.bk
 .bsp
+
+**/.bloop
+.bsp/
+project/metals.sbt
+project/project/*
+
+.vscode
+.metals/*

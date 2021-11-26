@@ -56,17 +56,17 @@ object Channel {
   def apply[F[_]](channel: RabbitChannel, dispatcher: Dispatcher[F])(implicit F: Sync[F]): Channel[F] = new Channel[F] with StrictLogging {
     import scala.jdk.CollectionConverters._
 
-    override def close(): F[Unit]                                       = F.delay(channel.close())
-    override def purgeQueue(name: QueueName): F[Unit]                   = F.delay { channel.queuePurge(name.value) }
-    override def basicQos(prefetchCount: Int): F[Unit]                  = F.delay(channel.basicQos(prefetchCount)).void
-    override def confirmSelect: F[Unit]                                 = F.delay(channel.confirmSelect)
-    override def addConfirmListener(listener: ConfirmListener): F[Unit] = F.delay(channel.addConfirmListener(listener))
-    override def getNextPublishSeqNo: F[Long]                           = F.delay(channel.getNextPublishSeqNo)
+    override def close(): F[Unit]                                       = F.blocking(channel.close())
+    override def purgeQueue(name: QueueName): F[Unit]                   = F.blocking { channel.queuePurge(name.value) }
+    override def basicQos(prefetchCount: Int): F[Unit]                  = F.blocking(channel.basicQos(prefetchCount)).void
+    override def confirmSelect: F[Unit]                                 = F.blocking(channel.confirmSelect)
+    override def addConfirmListener(listener: ConfirmListener): F[Unit] = F.blocking(channel.addConfirmListener(listener))
+    override def getNextPublishSeqNo: F[Long]                           = F.blocking(channel.getNextPublishSeqNo)
 
     override def publish(sequenceNumber: Long, cmd: PublishCommand): F[Unit] =
       for {
         _ <- F.delay(logger.debug("Publishing command with exchange:{} rk: {}.", cmd.exchange, cmd.routingKey))
-        _ <- F.delay(
+        _ <- F.blocking(
           channel
             .basicPublish(cmd.exchange.value, cmd.routingKey.value, false, false, MessagePropertiesConverters(cmd.basicProperties), cmd.body.value)
         )
@@ -74,13 +74,13 @@ object Channel {
       } yield ()
 
     override def sendAction(action: ConsumeAction)(envelope: Envelope): F[Unit] = action match {
-      case Ack                => F.delay(channel.basicAck(envelope.deliveryTag, false))
-      case DeadLetter         => F.delay(channel.basicNack(envelope.deliveryTag, false, false))
-      case RequeueImmediately => F.delay(channel.basicNack(envelope.deliveryTag, false, true))
+      case Ack                => F.blocking(channel.basicAck(envelope.deliveryTag, false))
+      case DeadLetter         => F.blocking(channel.basicNack(envelope.deliveryTag, false, false))
+      case RequeueImmediately => F.blocking(channel.basicNack(envelope.deliveryTag, false, true))
     }
 
     def declareExchange(exchange: Exchange): F[Unit] =
-      F.delay {
+      F.blocking {
         channel.exchangeDeclare(exchange.name.value,
                                 exchange.exchangeType.value,
                                 exchange.isDurable,
@@ -90,17 +90,17 @@ object Channel {
       }.void
 
     override def declareQueue(queue: Queue): F[Unit] =
-      F.delay {
+      F.blocking {
         channel.queueDeclare(queue.name.value, queue.isDurable, queue.isExclusive, queue.shouldAutoDelete, queue.arguments.asJava)
       }.void
 
     override def declareBinding(binding: Binding): F[Unit] =
-      F.delay {
+      F.blocking {
         channel.queueBind(binding.queueName.value, binding.exchangeName.value, binding.routingKey.value, binding.arguments.asJava)
       }.void
 
     override def declareExchangeBinding(binding: ExchangeBinding): F[Unit] =
-      F.delay {
+      F.blocking {
         channel
           .exchangeBind(
             binding.destinationExchangeName.value,
@@ -135,7 +135,7 @@ object Channel {
                   }
               }
               .flatMap {
-                case Right(r) => F.delay(r)
+                case Right(r) => F.pure(r)
                 case Left(e) =>
                   F.delay(logger.debug(s"Handler failure with {} will recover to: {}", e.getMessage, onHandlerException)) *> F.delay(onHandlerException)
               }
@@ -143,12 +143,12 @@ object Channel {
           )
         }
       }
-      F.delay(channel.basicConsume(queue.value, false, consumerTag.value, deliveryCallback)).void
+      F.blocking(channel.basicConsume(queue.value, false, consumerTag.value, deliveryCallback)).void
     }
 
     override def synchroniseIfNeeded[T](f: => T): T = this.synchronized(f)
 
-    override def isConnectionOpen: F[Boolean] = F.delay(channel.getConnection.isOpen)
+    override def isConnectionOpen: F[Boolean] = F.blocking(channel.getConnection.isOpen)
   }
 
 }

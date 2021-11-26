@@ -1,4 +1,3 @@
-import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.effect.{IO, Resource}
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
@@ -20,16 +19,19 @@ import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.higherKinds
+import com.itv.bucky.test.GlobalAsyncIOSpec
 
-class RequeueIntegrationTest extends AsyncFunSuite with AsyncIOSpec with Eventually with IntegrationPatience {
+class RequeueIntegrationTest extends AsyncFunSuite with GlobalAsyncIOSpec with Eventually with IntegrationPatience {
 
   case class TestFixture(
-                          stubHandler: RecordingRequeueHandler[IO, Delivery],
-                          dlqHandler: RecordingHandler[IO, Delivery],
-                          publishCommandBuilder: PublishCommandBuilder.Builder[String], publisher: Publisher[IO, PublishCommand])
+      stubHandler: RecordingRequeueHandler[IO, Delivery],
+      dlqHandler: RecordingHandler[IO, Delivery],
+      publishCommandBuilder: PublishCommandBuilder.Builder[String],
+      publisher: Publisher[IO, PublishCommand]
+  )
 
   implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(300))
-  val requeuePolicy = RequeuePolicy(maximumProcessAttempts = 5, requeueAfter = 2.seconds)
+  val requeuePolicy                 = RequeuePolicy(maximumProcessAttempts = 5, requeueAfter = 2.seconds)
 
   def withTestFixture(test: TestFixture => IO[Unit]): IO[Unit] = {
     val rawConfig = ConfigFactory.load("bucky")
@@ -38,13 +40,14 @@ class RequeueIntegrationTest extends AsyncFunSuite with AsyncIOSpec with Eventua
         rawConfig.getString("rmq.host"),
         rawConfig.getInt("rmq.port"),
         rawConfig.getString("rmq.username"),
-        rawConfig.getString("rmq.password"))
-    implicit val payloadMarshaller: PayloadMarshaller[String] = StringPayloadMarshaller
+        rawConfig.getString("rmq.password")
+      )
+    implicit val payloadMarshaller: PayloadMarshaller[String]     = StringPayloadMarshaller
     implicit val payloadUnmarshaller: PayloadUnmarshaller[String] = StringPayloadUnmarshaller
 
-    val exchangeName = ExchangeName(UUID.randomUUID().toString)
-    val routingKey = RoutingKey(UUID.randomUUID().toString)
-    val queueName = QueueName(UUID.randomUUID().toString)
+    val exchangeName        = ExchangeName(UUID.randomUUID().toString)
+    val routingKey          = RoutingKey(UUID.randomUUID().toString)
+    val queueName           = QueueName(UUID.randomUUID().toString)
     val deadletterQueueName = QueueName(s"${queueName.value}.dlq")
 
     val declarations = List(
@@ -52,21 +55,23 @@ class RequeueIntegrationTest extends AsyncFunSuite with AsyncIOSpec with Eventua
     ) ++ requeue.requeueDeclarations(queueName, routingKey)
 
     AmqpClient[IO](config).use { client =>
-      val handler = StubHandlers.requeueRequeueHandler[IO, Delivery]
+      val handler    = StubHandlers.requeueRequeueHandler[IO, Delivery]
       val dlqHandler = StubHandlers.ackHandler[IO, Delivery]
 
-      Resource.eval(client.declare(declarations)).flatMap(_ =>
-        for {
-          _ <-  client.registerRequeueConsumer(queueName, handler, requeuePolicy)
-          _ <- client.registerConsumer(deadletterQueueName, dlqHandler)
+      Resource
+        .eval(client.declare(declarations))
+        .flatMap(_ =>
+          for {
+            _ <- client.registerRequeueConsumer(queueName, handler, requeuePolicy)
+            _ <- client.registerConsumer(deadletterQueueName, dlqHandler)
+          } yield ()
+        )
+        .use { _ =>
+          val pub     = client.publisher()
+          val pcb     = publishCommandBuilder[String](implicitly).using(exchangeName).using(routingKey)
+          val fixture = TestFixture(handler, dlqHandler, pcb, pub)
+          test(fixture)
         }
-          yield ()
-      ).use { _ =>
-      val pub = client.publisher()
-        val pcb = publishCommandBuilder[String](implicitly).using(exchangeName).using(routingKey)
-        val fixture = TestFixture(handler, dlqHandler, pcb, pub)
-        test(fixture)
-      }
     }
   }
 
@@ -84,18 +89,17 @@ class RequeueIntegrationTest extends AsyncFunSuite with AsyncIOSpec with Eventua
 
       for {
         _ <- testFixture.publisher(publishCommand)
-      }
-        yield eventually {
-          testFixture.stubHandler.receivedMessages.size should be > 1
-          testFixture.stubHandler.receivedMessages.map(_.properties).foreach { properties =>
-            properties.headers("foo").toString shouldBe "bar"
-            properties.correlationId shouldBe expectedCorrelationId
-          }
-          testFixture.stubHandler.receivedMessages.map(_.body.unmarshal(StringPayloadUnmarshaller)).foreach {
-            case Right(value) => value shouldBe message
-            case _ => fail("could not unmarsal")
-          }
+      } yield eventually {
+        testFixture.stubHandler.receivedMessages.size should be > 1
+        testFixture.stubHandler.receivedMessages.map(_.properties).foreach { properties =>
+          properties.headers("foo").toString shouldBe "bar"
+          properties.correlationId shouldBe expectedCorrelationId
         }
+        testFixture.stubHandler.receivedMessages.map(_.body.unmarshal(StringPayloadUnmarshaller)).foreach {
+          case Right(value) => value shouldBe message
+          case _            => fail("could not unmarsal")
+        }
+      }
     }
   }
 
@@ -106,11 +110,10 @@ class RequeueIntegrationTest extends AsyncFunSuite with AsyncIOSpec with Eventua
 
       for {
         _ <- testFixture.publisher(publishCommand)
+      } yield eventually {
+        testFixture.stubHandler.receivedMessages.size should be(requeuePolicy.maximumProcessAttempts)
+        testFixture.dlqHandler.receivedMessages.size shouldBe 1
       }
-        yield eventually {
-          testFixture.stubHandler.receivedMessages.size should be (requeuePolicy.maximumProcessAttempts)
-          testFixture.dlqHandler.receivedMessages.size shouldBe 1
-        }
     }
   }
 

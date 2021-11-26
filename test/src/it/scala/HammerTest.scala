@@ -21,12 +21,34 @@ import scala.collection.immutable.TreeSet
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.higherKinds
+import java.util.concurrent.ScheduledThreadPoolExecutor
+import cats.effect.unsafe.Scheduler
+import cats.effect.unsafe.IORuntime
+import cats.effect.unsafe.IORuntimeConfig
 
-class HammerTest extends AsyncFunSuite with AsyncIOSpec with Eventually with IntegrationPatience with StrictLogging with Matchers {
+class HammerTest extends AsyncFunSuite with Eventually with IntegrationPatience with StrictLogging with Matchers {
 
   case class TestFixture(stubHandler: RecordingHandler[IO, String], publisher: Publisher[IO, String], client: AmqpClient[IO])
 
-  implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(300))
+  val schedulerExecutor = new ScheduledThreadPoolExecutor(
+    1,
+    { r =>
+      val t = new Thread(r)
+      t.setName("s")
+      t.setDaemon(true)
+      t.setPriority(Thread.MAX_PRIORITY)
+      t
+    }
+  )
+  schedulerExecutor.setRemoveOnCancelPolicy(true)
+  val scheduler = Scheduler.fromScheduledExecutor(schedulerExecutor)
+  implicit val ioRuntime: IORuntime = IORuntime.apply(
+    ExecutionContext.fromExecutor(Executors.newFixedThreadPool(300)),
+    ExecutionContext.fromExecutor(Executors.newFixedThreadPool(300)),
+    scheduler,
+    () => (),
+    IORuntimeConfig()
+  )
 
   def withTestFixture(test: TestFixture => IO[Unit]): IO[Unit] = {
     val rawConfig = ConfigFactory.load("bucky")

@@ -1,4 +1,3 @@
-import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.effect.{IO, Resource}
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
@@ -21,13 +20,16 @@ import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.higherKinds
+import com.itv.bucky.test.GlobalAsyncIOSpec
 
-class ShutdownTimeoutTest extends AsyncFunSuite with AsyncIOSpec with Eventually with IntegrationPatience {
+class ShutdownTimeoutTest extends AsyncFunSuite with GlobalAsyncIOSpec with Eventually with IntegrationPatience {
 
-  case class TestFixture(stubHandler: RecordingRequeueHandler[IO, Delivery],
-                         dlqHandler: RecordingHandler[IO, Delivery],
-                         publishCommandBuilder: PublishCommandBuilder.Builder[String],
-                         publisher: Publisher[IO, PublishCommand])
+  case class TestFixture(
+      stubHandler: RecordingRequeueHandler[IO, Delivery],
+      dlqHandler: RecordingHandler[IO, Delivery],
+      publishCommandBuilder: PublishCommandBuilder.Builder[String],
+      publisher: Publisher[IO, PublishCommand]
+  )
 
   implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(300))
   val requeuePolicy                 = RequeuePolicy(maximumProcessAttempts = 5, requeueAfter = 2.seconds)
@@ -35,16 +37,18 @@ class ShutdownTimeoutTest extends AsyncFunSuite with AsyncIOSpec with Eventually
   def runTest[A](test: IO[A]): IO[A] = {
     val rawConfig = ConfigFactory.load("bucky")
     val config =
-      AmqpClientConfig(rawConfig.getString("rmq.host"),
-                       rawConfig.getInt("rmq.port"),
-                       rawConfig.getString("rmq.username"),
-                       rawConfig.getString("rmq.password"))
+      AmqpClientConfig(
+        rawConfig.getString("rmq.host"),
+        rawConfig.getInt("rmq.port"),
+        rawConfig.getString("rmq.username"),
+        rawConfig.getString("rmq.password")
+      )
     implicit val payloadMarshaller: PayloadMarshaller[String]     = StringPayloadMarshaller
     implicit val payloadUnmarshaller: PayloadUnmarshaller[String] = StringPayloadUnmarshaller
     val exchangeName                                              = ExchangeName(UUID.randomUUID().toString)
     val routingKey                                                = RoutingKey(UUID.randomUUID().toString)
     val queueName                                                 = QueueName(UUID.randomUUID().toString)
-    val declarations                                              = List(Exchange(exchangeName).binding(routingKey -> queueName)) ++ requeue.requeueDeclarations(queueName, routingKey)
+    val declarations = List(Exchange(exchangeName).binding(routingKey -> queueName)) ++ requeue.requeueDeclarations(queueName, routingKey)
 
     AmqpClient[IO](config)
       .use { client =>
@@ -54,7 +58,8 @@ class ShutdownTimeoutTest extends AsyncFunSuite with AsyncIOSpec with Eventually
           .flatMap(_ =>
             for {
               _ <- client.registerConsumer(queueName, handler)
-            } yield ())
+            } yield ()
+          )
           .use { _ =>
             val pcb = publishCommandBuilder[String](implicitly).using(exchangeName).using(routingKey)
             client.publisher()(pcb.toPublishCommand("a message")).flatMap(_ => test)
@@ -63,8 +68,8 @@ class ShutdownTimeoutTest extends AsyncFunSuite with AsyncIOSpec with Eventually
   }
 
   test("Should wait until a handler finishes executing before shuttind down") {
-    val clock  = Clock.systemUTC()
-    val start  = Instant.now(clock)
+    val clock = Clock.systemUTC()
+    val start = Instant.now(clock)
     runTest[Instant](IO.delay(Instant.now())).map { result =>
       val after = Instant.now(clock)
       println(LocalDateTime.ofInstant(start, ZoneOffset.UTC))

@@ -35,7 +35,7 @@ object AmqpClient extends StrictLogging {
 
   private def createChannel[F[_]](connection: RabbitConnection)(implicit F: Async[F]): Resource[F, RabbitChannel] = {
     val make =
-      F.delay {
+      F.blocking {
           logger.info(s"Starting Channel")
           val channel = connection.createChannel()
           channel.addShutdownListener(new ShutdownListener {
@@ -56,13 +56,13 @@ object AmqpClient extends StrictLogging {
         }
         .rethrow
 
-    Resource.make(Spawn[F].cede.flatMap(_ => make))(channel => F.delay(channel.close()))
+    Resource.make(Spawn[F].cede.flatMap(_ => make))(channel => F.blocking(channel.close()))
   }
 
   private def createConnection[F[_]](
       config: AmqpClientConfig)(implicit F: Async[F], executionContext: ExecutionContext): Resource[F, RabbitConnection] = {
     val make =
-      F.delay {
+      F.blocking {
           logger.info(s"Starting AmqpClient")
           val connectionFactory = new ConnectionFactory()
           connectionFactory.setHost(config.host)
@@ -98,7 +98,7 @@ object AmqpClient extends StrictLogging {
         }
         .rethrow
 
-    Resource.make(Spawn[F].cede.flatMap(_ => make))(connection => F.delay(connection.close()))
+    Resource.make(Spawn[F].cede.flatMap(_ => make))(connection => F.blocking(connection.close()))
   }
 
   def apply[F[_]](config: AmqpClientConfig)(implicit F: Async[F],
@@ -153,7 +153,7 @@ object AmqpClient extends StrictLogging {
         for {
           channel <- buildChannel()
           handling <- Resource.make(Ref.of[F, Set[UUID]](Set.empty))(set =>
-            repeatUntil(F.delay(logger.debug("Verifying running handlers.")) *> set.get)(_.isEmpty)(shutdownRetry).timeout(shutdownTimeout))
+            repeatUntil(F.blocking(logger.debug("Verifying running handlers.")) *> set.get)(_.isEmpty)(shutdownRetry).timeout(shutdownTimeout))
           newHandler = (delivery: Delivery) =>
             for {
               id            <- F.delay(UUID.randomUUID())

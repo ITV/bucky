@@ -16,8 +16,17 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.matchers.should.Matchers._
 
 import scala.language.reflectiveCalls
+import cats.effect.unsafe.IORuntime
 
-class PublishConsumeTest extends AsyncFunSuite with AsyncIOSpec with IOAmqpClientTest with Eventually with IntegrationPatience with ScalaFutures with EitherValues with Matchers {
+class PublishConsumeTest
+    extends AsyncFunSuite
+    with GlobalAsyncIOSpec
+    with IOAmqpClientTest
+    with Eventually
+    with IntegrationPatience
+    with ScalaFutures
+    with EitherValues
+    with Matchers {
 
   test("A message can be published and consumed") {
     runAmqpTest { client =>
@@ -36,9 +45,7 @@ class PublishConsumeTest extends AsyncFunSuite with AsyncIOSpec with IOAmqpClien
       Resource.eval(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
         for {
           _ <- client.publisher()(commandBuilder)
-        } yield {
-          handler.receivedMessages should have size 1
-        }
+        } yield handler.receivedMessages should have size 1
       }
     }
   }
@@ -60,21 +67,21 @@ class PublishConsumeTest extends AsyncFunSuite with AsyncIOSpec with IOAmqpClien
       Resource.eval(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
         for {
           _ <- client.publisher()(commandBuilder)
-        } yield {
-          handler.receivedMessages should have size 1
-        }
+        } yield handler.receivedMessages should have size 1
       }
     }
   }
 
-  test("A message can be published to a Topic exchange and consumed from a queue bound with wildcard suffix routing key" +
-    "which matches more than 0 words") {
+  test(
+    "A message can be published to a Topic exchange and consumed from a queue bound with wildcard suffix routing key" +
+      "which matches more than 0 words"
+  ) {
     runAmqpTest { client =>
-      val exchange = ExchangeName("anexchange")
-      val queue    = QueueName("aqueue")
-      val rkRouted       = RoutingKey("ar.k")
-      val rkUnrouted       = RoutingKey("ask")
-      val message  = "Hello"
+      val exchange   = ExchangeName("anexchange")
+      val queue      = QueueName("aqueue")
+      val rkRouted   = RoutingKey("ar.k")
+      val rkUnrouted = RoutingKey("ask")
+      val message    = "Hello"
       val commandBuilder = PublishCommandBuilder
         .publishCommandBuilder[String](StringPayloadMarshaller)
         .using(exchange)
@@ -86,21 +93,21 @@ class PublishConsumeTest extends AsyncFunSuite with AsyncIOSpec with IOAmqpClien
         for {
           _ <- client.publisher()(commandBuilder.using(rkRouted).toPublishCommand(message))
           _ <- client.publisher()(commandBuilder.using(rkUnrouted).toPublishCommand(message))
-        } yield {
-          handler.receivedMessages should have size 1
-        }
+        } yield handler.receivedMessages should have size 1
       }
     }
   }
 
-  test("A message can be published to a Topic exchange and consumed from a queue bound with wildcard suffix routing key" +
-    "which matches 0 words") {
+  test(
+    "A message can be published to a Topic exchange and consumed from a queue bound with wildcard suffix routing key" +
+      "which matches 0 words"
+  ) {
     runAmqpTest { client =>
-      val exchange = ExchangeName("anexchange")
-      val queue    = QueueName("aqueue")
-      val rkRouted       = RoutingKey("ar")
-      val rkUnrouted       = RoutingKey("ask")
-      val message  = "Hello"
+      val exchange   = ExchangeName("anexchange")
+      val queue      = QueueName("aqueue")
+      val rkRouted   = RoutingKey("ar")
+      val rkUnrouted = RoutingKey("ask")
+      val message    = "Hello"
       val commandBuilder = PublishCommandBuilder
         .publishCommandBuilder[String](StringPayloadMarshaller)
         .using(exchange)
@@ -112,9 +119,7 @@ class PublishConsumeTest extends AsyncFunSuite with AsyncIOSpec with IOAmqpClien
         for {
           _ <- client.publisher()(commandBuilder.using(rkRouted).toPublishCommand(message))
           _ <- client.publisher()(commandBuilder.using(rkUnrouted).toPublishCommand(message))
-        } yield {
-          handler.receivedMessages should have size 1
-        }
+        } yield handler.receivedMessages should have size 1
       }
     }
   }
@@ -144,9 +149,7 @@ class PublishConsumeTest extends AsyncFunSuite with AsyncIOSpec with IOAmqpClien
       Resource.eval(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
         for {
           _ <- client.publisher()(commandBuilder)
-        } yield {
-          handler.receivedMessages should have size 1
-        }
+        } yield handler.receivedMessages should have size 1
       }
     }
   }
@@ -177,9 +180,7 @@ class PublishConsumeTest extends AsyncFunSuite with AsyncIOSpec with IOAmqpClien
       Resource.eval(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
         for {
           _ <- client.publisher()(commandBuilder)
-        } yield {
-          handler.receivedMessages should have size 1
-        }
+        } yield handler.receivedMessages should have size 1
       }
     }
   }
@@ -191,7 +192,7 @@ class PublishConsumeTest extends AsyncFunSuite with AsyncIOSpec with IOAmqpClien
       val rk       = RoutingKey("ark")
       val otherRk  = RoutingKey("anrk")
       val message  = "Hello"
-      val header   = "key" -> "val"
+      val header   = "key"  -> "val"
       val header2  = "key2" -> "val2"
 
       val declarations = List(
@@ -257,9 +258,7 @@ class PublishConsumeTest extends AsyncFunSuite with AsyncIOSpec with IOAmqpClien
       Resource.eval(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
         for {
           _ <- client.publisher()(commandBuilder)
-        } yield {
-          handler.receivedMessages should have size 1
-        }
+        } yield handler.receivedMessages should have size 1
       }
     }
   }
@@ -335,9 +334,7 @@ class PublishConsumeTest extends AsyncFunSuite with AsyncIOSpec with IOAmqpClien
         val publisher = client.publisherOf[String]
         for {
           _ <- publisher(message)
-        } yield {
-          handler.receivedMessages should have size 1
-        }
+        } yield handler.receivedMessages should have size 1
       }
     }
   }
@@ -357,9 +354,7 @@ class PublishConsumeTest extends AsyncFunSuite with AsyncIOSpec with IOAmqpClien
         val publisher = client.publisherOf[String](exchange, rk)
         for {
           _ <- publisher(message)
-        } yield {
-          handler.receivedMessages should have size 1
-        }
+        } yield handler.receivedMessages should have size 1
       }
     }
   }
@@ -390,14 +385,13 @@ class PublishConsumeTest extends AsyncFunSuite with AsyncIOSpec with IOAmqpClien
           for {
             _ <- client.registerRequeueConsumerOf(queue, handler)
             _ <- client.registerConsumerOf(QueueName(queue.value + ".requeue"), requeueHandler)
-          } yield ())
+          } yield ()
+        )
         .use { _ =>
           val publisher = client.publisherOf[String](exchange, rk)
           for {
             _ <- publisher("hello")
-          } yield {
-            requeueHandler.receivedMessages should have size 1
-          }
+          } yield requeueHandler.receivedMessages should have size 1
         }
     }
   }

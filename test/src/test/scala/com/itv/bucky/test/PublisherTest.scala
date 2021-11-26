@@ -2,7 +2,6 @@ package com.itv.bucky.test
 
 import cats.effect.IO
 import cats.effect.std.Dispatcher
-import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.implicits._
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.publish._
@@ -13,8 +12,9 @@ import scala.concurrent.duration._
 import scala.concurrent.{Future, TimeoutException}
 import org.scalatest.funsuite.{AnyFunSuite, AsyncFunSuite}
 import org.scalatest.matchers.should.Matchers._
+import cats.effect.unsafe.IORuntime
 
-class PublisherTest extends AsyncFunSuite with AsyncIOSpec with IOAmqpClientTest with EitherValues {
+class PublisherTest extends AsyncFunSuite with GlobalAsyncIOSpec with IOAmqpClientTest with EitherValues {
   val exchange = ExchangeName("anexchange")
   val queue    = QueueName("aqueue")
   val rk       = RoutingKey("ark")
@@ -35,10 +35,8 @@ class PublisherTest extends AsyncFunSuite with AsyncIOSpec with IOAmqpClientTest
         _            <- IO.sleep(3.seconds)
         isCompleted1 <- IO(future.isCompleted)
         _            <- IO(channel.confirmListeners.foreach(_.handleAck(pubSeq, false)))
-        _            <- IO.fromFuture(IO(future)).timeout(3.seconds) //no point waiting for the initial timeout
-      } yield {
-        isCompleted1 shouldBe false
-      }
+        _ <- IO.fromFuture(IO(future)).timeout(3.seconds) //no point waiting for the initial timeout
+      } yield isCompleted1 shouldBe false
     }
   }
 
@@ -126,8 +124,8 @@ class PublisherTest extends AsyncFunSuite with AsyncIOSpec with IOAmqpClientTest
           publish4      <- IO(dispatcher.unsafeToFuture(client.publisher()(commandBuilder)))
           _             <- IO.sleep(3.seconds)
           areCompleted1 <- IO(List(publish1.isCompleted, publish2.isCompleted, publish3.isCompleted, publish4.isCompleted))
-          _             <- IO(channel.confirmListeners.foreach(_.handleAck(0, false))) // ack 0
-          _             <- IO(channel.confirmListeners.foreach(_.handleNack(2, true))) //nack 1, 2
+          _ <- IO(channel.confirmListeners.foreach(_.handleAck(0, false))) // ack 0
+          _ <- IO(channel.confirmListeners.foreach(_.handleNack(2, true))) //nack 1, 2
           result        <- List(publish1, publish2, publish3, publish4).map(f => IO.fromFuture(IO(f)).attempt).sequence
           areCompleted2 <- IO(List(publish1.isCompleted, publish2.isCompleted, publish3.isCompleted, publish4.isCompleted))
         } yield {

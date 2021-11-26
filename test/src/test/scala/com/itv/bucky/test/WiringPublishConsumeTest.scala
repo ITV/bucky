@@ -1,6 +1,5 @@
 package com.itv.bucky.test
 
-import cats.effect.testing.scalatest.AsyncIOSpec
 import cats.effect.{IO, Resource}
 import com.itv.bucky.AmqpClient
 import com.itv.bucky.consume.Ack
@@ -9,11 +8,14 @@ import com.itv.bucky.wiring._
 import com.typesafe.scalalogging.StrictLogging
 import org.scalatest.funsuite.{AnyFunSuite, AsyncFunSuite}
 import org.scalatest.matchers.should.Matchers._
+import cats.effect.unsafe.IORuntime
 
-class WiringPublishConsumeTest extends AsyncFunSuite with AsyncIOSpec with IOAmqpClientTest with StrictLogging {
+class WiringPublishConsumeTest extends AsyncFunSuite with GlobalAsyncIOSpec with IOAmqpClientTest with StrictLogging {
 
   val incoming = new Wiring[String](WiringName("fs2.incoming"))
   val outgoing = new Wiring[String](WiringName("fs2.outgoing"))
+
+  override implicit val ioRuntime: IORuntime = cats.effect.unsafe.implicits.global
 
   test("Wirings should publish and consume messages") {
     withApp { fixture =>

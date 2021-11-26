@@ -36,8 +36,8 @@ releaseProcess := Seq[ReleaseStep](
 )
 skip in publish in ThisBuild := true
 
-releaseCrossBuild := true
-publishMavenStyle := true
+releaseCrossBuild       := true
+publishMavenStyle       := true
 publishArtifact in Test := false
 pomIncludeRepository := { _ =>
   false
@@ -56,8 +56,8 @@ useGpg := false
 
 lazy val kernelSettings = Seq(
   crossScalaVersions := Seq(scala212, scala213),
-  scalaVersion := scala212,
-  organization := "com.itv",
+  scalaVersion       := scala212,
+  organization       := "com.itv",
   scalacOptions ++= Seq("-feature", "-deprecation", "-Xfatal-warnings"),
   publishTo := {
     val nexus = "https://oss.sonatype.org/"
@@ -66,9 +66,9 @@ lazy val kernelSettings = Seq(
     else
       Some("releases" at nexus + "service/local/staging/deploy/maven2")
   },
-  publishConfiguration := publishConfiguration.value.withOverwrite(isSnapshot.value),
+  publishConfiguration      := publishConfiguration.value.withOverwrite(isSnapshot.value),
   publishLocalConfiguration := publishLocalConfiguration.value.withOverwrite(isSnapshot.value),
-  skip in publish := false,
+  skip in publish           := false,
   credentials ++= (for {
     username <- Option(System.getenv().get("SONATYPE_USER"))
     password <- Option(System.getenv().get("SONATYPE_PASS"))
@@ -147,15 +147,17 @@ lazy val core = project
   .settings(
     libraryDependencies ++= Seq(
       "com.typesafe.scala-logging" %% "scala-logging"                 % scalaLoggingVersion,
-      "org.scalatest"              %% "scalatest"                     % scalaTestVersion % "test",
+      "org.scalatest"              %% "scalatest"                     % scalaTestVersion           % "test",
       "org.typelevel"              %% "cats-effect-testing-scalatest" % catsEffectScalaTestVersion % "test",
       "org.typelevel"              %% "cats-effect"                   % catsEffectVersion,
-      "com.rabbitmq"               % "amqp-client"                    % amqpClientVersion,
-      "ch.qos.logback"             % "logback-classic"                % logbackVersion % "test,it",
+      "com.rabbitmq"                % "amqp-client"                   % amqpClientVersion,
+      "ch.qos.logback"              % "logback-classic"               % logbackVersion             % "test,it",
       "org.scala-lang.modules"     %% "scala-collection-compat"       % "2.5.0"
     )
   )
   .configs(IntegrationTest)
+
+lazy val ITTest = config("it") extend Test
 
 lazy val test = project
   .settings(name := "com.itv")
@@ -165,15 +167,16 @@ lazy val test = project
   .aggregate(core)
   .configs(IntegrationTest)
   .settings(Defaults.itSettings)
+  .settings(inConfig(ITTest)(Defaults.testSettings): _*)
   .settings(
     libraryDependencies ++= Seq(
       "com.typesafe.scala-logging" %% "scala-logging"                 % scalaLoggingVersion,
-      "org.scalatest"              %% "scalatest"                     % scalaTestVersion % "test,it",
+      "org.scalatest"              %% "scalatest"                     % scalaTestVersion           % "test,it",
       "org.typelevel"              %% "cats-effect-testing-scalatest" % catsEffectScalaTestVersion % "test,it",
       "org.typelevel"              %% "cats-effect"                   % catsEffectVersion,
-      "com.rabbitmq"               % "amqp-client"                    % amqpClientVersion,
-      "com.typesafe"               % "config"                         % typeSafeVersion % "it",
-      "ch.qos.logback"             % "logback-classic"                % logbackVersion % "test,it"
+      "com.rabbitmq"                % "amqp-client"                   % amqpClientVersion,
+      "com.typesafe"                % "config"                        % typeSafeVersion            % "it",
+      "ch.qos.logback"              % "logback-classic"               % logbackVersion             % "test,it"
     )
   )
 
@@ -189,7 +192,7 @@ lazy val example = project
       "com.typesafe.scala-logging" %% "scala-logging"                 % scalaLoggingVersion,
       "org.scalatest"              %% "scalatest"                     % scalaTestVersion,
       "org.typelevel"              %% "cats-effect-testing-scalatest" % catsEffectScalaTestVersion % "test",
-      "com.typesafe"               % "config"                         % typeSafeVersion
+      "com.typesafe"                % "config"                        % typeSafeVersion
     )
   )
 
@@ -209,7 +212,7 @@ lazy val argonaut = project
     libraryDependencies ++= Seq(
       "io.argonaut"                %% "argonaut"                      % argonautVersion,
       "com.typesafe.scala-logging" %% "scala-logging"                 % scalaLoggingVersion,
-      "org.scalatest"              %% "scalatest"                     % scalaTestVersion % "test, it",
+      "org.scalatest"              %% "scalatest"                     % scalaTestVersion           % "test, it",
       "org.typelevel"              %% "cats-effect-testing-scalatest" % catsEffectScalaTestVersion % "test,it"
     )
   )
@@ -232,7 +235,7 @@ lazy val circe = project
       "io.circe"                   %% "circe-generic"                 % circeVersion,
       "io.circe"                   %% "circe-parser"                  % circeVersion,
       "com.typesafe.scala-logging" %% "scala-logging"                 % scalaLoggingVersion,
-      "org.scalatest"              %% "scalatest"                     % scalaTestVersion % "test, it",
+      "org.scalatest"              %% "scalatest"                     % scalaTestVersion           % "test, it",
       "org.typelevel"              %% "cats-effect-testing-scalatest" % catsEffectScalaTestVersion % "test,it"
     )
   )
@@ -247,16 +250,16 @@ lazy val kamon = project
   .settings(
     internalDependencyClasspath in IntegrationTest += Attributed.blank((classDirectory in Test).value),
     parallelExecution in IntegrationTest := false,
-    crossScalaVersions := Seq(scala212)
+    crossScalaVersions                   := Seq(scala212)
   )
   .settings(
     libraryDependencies ++= Seq(
       "com.typesafe.scala-logging" %% "scala-logging"                 % scalaLoggingVersion,
-      "org.scalatest"              %% "scalatest"                     % scalaTestVersion % "test, it",
+      "org.scalatest"              %% "scalatest"                     % scalaTestVersion           % "test, it",
       "org.typelevel"              %% "cats-effect-testing-scalatest" % catsEffectScalaTestVersion % "test,it",
       "io.kamon"                   %% "kamon-bundle"                  % kamonVersion,
-      "io.kamon"                   %% "kamon-testkit"                 % kamonVersion % "test",
-      "ch.qos.logback"             % "logback-classic"                % logbackVersion % "test, it"
+      "io.kamon"                   %% "kamon-testkit"                 % kamonVersion               % "test",
+      "ch.qos.logback"              % "logback-classic"               % logbackVersion             % "test, it"
     )
   )
 
@@ -276,7 +279,7 @@ lazy val xml = project
     libraryDependencies ++= Seq(
       "org.scala-lang.modules"     %% "scala-xml"                     % scalaXmlVersion,
       "com.typesafe.scala-logging" %% "scala-logging"                 % scalaLoggingVersion,
-      "org.scalatest"              %% "scalatest"                     % scalaTestVersion % "test, it",
+      "org.scalatest"              %% "scalatest"                     % scalaTestVersion           % "test, it",
       "org.typelevel"              %% "cats-effect-testing-scalatest" % catsEffectScalaTestVersion % "test,it"
     )
   )
