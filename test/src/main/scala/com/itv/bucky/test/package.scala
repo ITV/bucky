@@ -14,6 +14,7 @@ import scala.concurrent.duration._
 import scala.language.higherKinds
 import cats.effect.Temporal
 import cats.effect.std.Dispatcher
+import cats.effect.unsafe.IORuntime
 
 package object test {
   object Config {
@@ -130,6 +131,9 @@ package object test {
       */
     def clientPublishTimeout(config: AmqpClientConfig = Config.empty())(implicit async: Async[F]): Resource[F, AmqpClient[F]] =
       client(StubChannels.publishTimeout[F], config)
+
+    def runAmqpTestIO[T](clientResource: Resource[IO, AmqpClient[IO]])(test: AmqpClient[IO] => IO[T])(implicit async: Async[IO], runtime : IORuntime): T =
+      clientResource.map(_.withLogging()).use(test).unsafeRunSync()
 
     def runAmqpTest(clientResource: Resource[F, AmqpClient[F]])(test: AmqpClient[F] => F[Unit])(implicit async: Async[F]): F[Unit] =
       clientResource.map(_.withLogging()).use(test)
