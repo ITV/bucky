@@ -1,5 +1,4 @@
-import cats.effect.kernel.Deferred
-import cats.effect.testing.scalatest.AsyncIOSpec
+import cats.effect.unsafe.{IORuntime, IORuntimeConfig, Scheduler}
 import cats.effect.{IO, Ref, Resource}
 import cats.implicits._
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
@@ -7,8 +6,8 @@ import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
 import com.itv.bucky._
 import com.itv.bucky.consume.Ack
 import com.itv.bucky.decl.{Exchange, Queue}
-import com.itv.bucky.test.StubHandlers
 import com.itv.bucky.test.stubs.RecordingHandler
+import com.itv.bucky.test.{GlobalAsyncIOSpec, StubHandlers}
 import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.StrictLogging
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
@@ -16,17 +15,13 @@ import org.scalatest.funsuite.AsyncFunSuite
 import org.scalatest.matchers.should.Matchers
 
 import java.util.UUID
-import java.util.concurrent.Executors
+import java.util.concurrent.{Executors, ScheduledThreadPoolExecutor}
 import scala.collection.immutable.TreeSet
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.higherKinds
-import java.util.concurrent.ScheduledThreadPoolExecutor
-import cats.effect.unsafe.Scheduler
-import cats.effect.unsafe.IORuntime
-import cats.effect.unsafe.IORuntimeConfig
 
-class HammerTest extends AsyncFunSuite with Eventually with IntegrationPatience with StrictLogging with Matchers {
+class HammerTest extends AsyncFunSuite with GlobalAsyncIOSpec with Eventually with IntegrationPatience with StrictLogging with Matchers {
 
   case class TestFixture(stubHandler: RecordingHandler[IO, String], publisher: Publisher[IO, String], client: AmqpClient[IO])
 
@@ -42,7 +37,7 @@ class HammerTest extends AsyncFunSuite with Eventually with IntegrationPatience 
   )
   schedulerExecutor.setRemoveOnCancelPolicy(true)
   val scheduler = Scheduler.fromScheduledExecutor(schedulerExecutor)
-  implicit val ioRuntime: IORuntime = IORuntime.apply(
+  implicit override val ioRuntime: IORuntime = IORuntime.apply(
     ExecutionContext.fromExecutor(Executors.newFixedThreadPool(300)),
     ExecutionContext.fromExecutor(Executors.newFixedThreadPool(300)),
     scheduler,
