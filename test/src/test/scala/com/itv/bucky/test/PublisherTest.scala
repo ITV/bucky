@@ -1,23 +1,28 @@
 package com.itv.bucky.test
 
 import cats.effect.kernel.Outcome.Errored
-import cats.effect.{IO, Outcome, Ref}
-import cats.effect.std.Dispatcher
+import cats.effect.unsafe.IORuntime
+import cats.effect.{IO, Outcome}
 import cats.implicits._
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.publish._
-import com.itv.bucky.{ExchangeName, QueueName, RoutingKey, consume}
-import org.scalatest.{Assertion, EitherValues}
-
-import scala.concurrent.duration._
-import scala.concurrent.{Future, TimeoutException}
-import org.scalatest.funsuite.{AnyFunSuite, AsyncFunSuite}
+import com.itv.bucky.{ExchangeName, QueueName, RoutingKey}
+import org.scalatest.EitherValues
+import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers._
-import cats.effect.unsafe.IORuntime
+
+import scala.concurrent.TimeoutException
+import scala.concurrent.duration._
+import scala.reflect.ClassTag
 
 class PublisherTest extends AnyFunSuite with IOAmqpClientTest with EitherValues {
 
   implicit val ioRuntime: IORuntime = cats.effect.unsafe.implicits.global
+
+  def hasOutcomeError[T <: Throwable](o : Outcome[IO, Throwable, Unit])(implicit tag: ClassTag[T]) = o match {
+    case Errored(e) => tag.unapply(e).isDefined
+    case _ => false
+  }
 
   val exchange = ExchangeName("anexchange")
   val queue = QueueName("aqueue")
@@ -65,23 +70,18 @@ class PublisherTest extends AnyFunSuite with IOAmqpClientTest with EitherValues 
     val channel = StubChannels.publishTimeout[IO]
     runAmqpTestIO(client(channel, Config.empty(30.seconds))) { client =>
       for {
-        ref1 <- Ref[IO].of(false)
-        ref2 <- Ref[IO].of(false)
-        ref3 <- Ref[IO].of(false)
-        fiber1 <- (client.publisher()(commandBuilder) >> ref1.update(_ => true)).start
-        fiber2 <- (client.publisher()(commandBuilder) >> ref2.update(_ => true)).start
-        fiber3 <- (client.publisher()(commandBuilder) >> ref3.update(_ => true)).start
-        _ <- IO.sleep(10.seconds)
-        pubSeq <- IO(channel.publishSeq)
-        areCompleted1 <- List(ref1.get, ref2.get, ref3.get).sequence
-        _ <- IO(channel.confirmListeners.foreach(_.handleAck(pubSeq - 1, true)))
-        _ <- fiber1.join
-        _ <- fiber2.join
-        _ <- fiber3.join
-        areCompleted2 <- List(ref1.get, ref2.get, ref3.get).sequence
+        fiber1 <- client.publisher()(commandBuilder).start
+        fiber2 <- client.publisher()(commandBuilder).start
+        fiber3 <- client.publisher()(commandBuilder).start
+        _ <- IO.sleep(5.seconds)
+        _ <- IO(channel.confirmListeners.foreach(_.handleAck(2, true)))
+        outcome1 <- fiber1.join
+        outcome2 <- fiber2.join
+        outcome3 <- fiber3.join
       } yield {
-        areCompleted1 shouldBe List(false, false, false)
-        areCompleted2 shouldBe List(true, true, true)
+        assert(outcome1.isSuccess)
+        assert(outcome2.isSuccess)
+        assert(outcome3.isSuccess)
       }
     }
   }
@@ -93,50 +93,45 @@ class PublisherTest extends AnyFunSuite with IOAmqpClientTest with EitherValues 
         fiber1 <- client.publisher()(commandBuilder).start
         fiber2 <- client.publisher()(commandBuilder).start
         fiber3 <- client.publisher()(commandBuilder).start
-        _ <- IO.sleep(10.seconds)
+        _ <- IO.sleep(5.seconds)
         pubSeq <- IO(channel.publishSeq)
         _ <- IO(channel.confirmListeners.foreach(_.handleNack(pubSeq - 1, true)))
         outcome1 <- fiber1.join
         outcome2 <- fiber2.join
         outcome3 <- fiber3.join
       } yield {
-        def assertError(o : Outcome[IO, Throwable, Unit], e : String) = o match {
-          case Errored(e) => e shouldBe a[RuntimeException]
-          case _ => fail(e)
-        }
-        assertError(outcome1, "publish 1 did not error")
-        assertError(outcome1, "publish 2 did not error")
-        assertError(outcome1, "publish 3 did not error")
+        assert(hasOutcomeError[RuntimeException](outcome1))
+        assert(hasOutcomeError[RuntimeException](outcome2))
+        assert(hasOutcomeError[RuntimeException](outcome3))
       }
     }
+  }
 
-    /*
   test("Multiple messages can be published and some can be acked and some can be Nacked.") {
     val channel = StubChannels.publishTimeout[IO]
       runAmqpTestIO(client(channel, Config.empty(10.seconds))) { client =>
+        val pub: IO[Unit] = client.publisher()(commandBuilder)
         for {
-          publish1      <- IO(client.publisher()(commandBuilder))
-          publish2      <- IO(client.publisher()(commandBuilder))
-          publish3      <- IO(client.publisher()(commandBuilder))
-          publish4      <- IO(client.publisher()(commandBuilder))
+          fiber1 <- client.publisher()(commandBuilder).start
+          fiber2 <- client.publisher()(commandBuilder).start
+          fiber3 <- client.publisher()(commandBuilder).start
+          fiber4 <- client.publisher()(commandBuilder).start
           _             <- IO.sleep(3.seconds)
-          areCompleted1 <- IO(List(publish1.isCompleted, publish2.isCompleted, publish3.isCompleted, publish4.isCompleted))
-          _ <- IO(channel.confirmListeners.foreach(_.handleAck(0, false))) // ack 0
-          _ <- IO(channel.confirmListeners.foreach(_.handleNack(2, true))) //nack 1, 2
-          result        <- List(publish1, publish2, publish3, publish4).map(f => IO.fromFuture(IO(f)).attempt).sequence
-          areCompleted2 <- IO(List(publish1.isCompleted, publish2.isCompleted, publish3.isCompleted, publish4.isCompleted))
+          _             <- IO.sleep(3.seconds)
+          _ <- IO(channel.confirmListeners.foreach(_.handleNack(0, false)))
+          _ <- IO(channel.confirmListeners.foreach(_.handleNack(1, false))) //nack 1, 2
+          _ <- IO(channel.confirmListeners.foreach(_.handleAck(2, false))) // ack 0
+          outcome1 <- fiber1.join
+          outcome2 <- fiber2.join
+          outcome3 <- fiber3.join
+          outcome4 <- fiber4.join
         } yield {
-          println(result)
-          areCompleted1 shouldBe List(false, false, false, false)
-          areCompleted2 shouldBe List(true, true, true, true)
-
-          result.filter(_.isRight) should have size 1
-          result.filter(r => r.isLeft && r.left.value.isInstanceOf[RuntimeException]) should have size 2
-          result.filter(r => r.isLeft && r.left.value.isInstanceOf[TimeoutException]) should have size 1
+          val outcomes = List(outcome1, outcome2, outcome3, outcome4)
+          println(outcomes.toString())
+          outcomes.count(_.isSuccess) should ===(1)
+          outcomes.count(hasOutcomeError[RuntimeException](_)) should ===(2)
+          outcomes.count(hasOutcomeError[TimeoutException](_)) should ===(1)
         }
       }
     }
-
-     */
-  }
 }
