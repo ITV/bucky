@@ -1,13 +1,13 @@
 package com.itv.bucky
 
-import cats.effect.Sync
 import cats.effect.std.Dispatcher
+import cats.effect.{Async, Spawn, Sync}
 import cats.implicits._
 import com.itv.bucky.consume._
 import com.itv.bucky.decl._
 import com.itv.bucky.publish.PublishCommand
 import com.rabbitmq.client.AMQP.BasicProperties
-import com.rabbitmq.client.{ConfirmListener, DefaultConsumer, Channel => RabbitChannel, Envelope => RabbitMQEnvelope}
+import com.rabbitmq.client.{ConfirmListener, DefaultConsumer, ReturnListener, Channel => RabbitChannel, Envelope => RabbitMQEnvelope}
 import com.typesafe.scalalogging.StrictLogging
 
 import scala.language.higherKinds
@@ -20,6 +20,7 @@ trait Channel[F[_]] {
   def basicQos(prefetchCount: Int): F[Unit]
   def confirmSelect: F[Unit]
   def addConfirmListener(listener: ConfirmListener): F[Unit]
+  def addReturnListener(listener: ReturnListener): F[Unit]
   def getNextPublishSeqNo: F[Long]
   def publish(sequenceNumber: Long, cmd: PublishCommand): F[Unit]
   def sendAction(action: ConsumeAction)(envelope: Envelope): F[Unit]
@@ -53,22 +54,23 @@ trait Channel[F[_]] {
 }
 
 object Channel {
-  def apply[F[_]](channel: RabbitChannel, dispatcher: Dispatcher[F])(implicit F: Sync[F]): Channel[F] = new Channel[F] with StrictLogging {
+  def apply[F[_]](channel: RabbitChannel, dispatcher: Dispatcher[F])(implicit F: Async[F]): Channel[F] = new Channel[F] with StrictLogging {
     import scala.jdk.CollectionConverters._
 
-    override def close(): F[Unit]                                       = F.blocking(channel.close())
-    override def purgeQueue(name: QueueName): F[Unit]                   = F.blocking { channel.queuePurge(name.value) }
-    override def basicQos(prefetchCount: Int): F[Unit]                  = F.blocking(channel.basicQos(prefetchCount)).void
-    override def confirmSelect: F[Unit]                                 = F.blocking(channel.confirmSelect)
-    override def addConfirmListener(listener: ConfirmListener): F[Unit] = F.blocking(channel.addConfirmListener(listener))
-    override def getNextPublishSeqNo: F[Long]                           = F.blocking(channel.getNextPublishSeqNo)
+    override def close(): F[Unit]                                       = F.delay(channel.close())
+    override def purgeQueue(name: QueueName): F[Unit]                   = F.delay { channel.queuePurge(name.value) }
+    override def basicQos(prefetchCount: Int): F[Unit]                  = F.delay(channel.basicQos(prefetchCount)).void
+    override def confirmSelect: F[Unit]                                 = F.delay(channel.confirmSelect)
+    override def addConfirmListener(listener: ConfirmListener): F[Unit] = F.delay(channel.addConfirmListener(listener))
+    override def addReturnListener(listener: ReturnListener): F[Unit]   = F.delay(channel.addReturnListener(listener))
+    override def getNextPublishSeqNo: F[Long]                           = F.delay(channel.getNextPublishSeqNo)
 
     override def publish(sequenceNumber: Long, cmd: PublishCommand): F[Unit] =
       for {
         _ <- F.delay(logger.debug("Publishing command with exchange:{} rk: {}.", cmd.exchange, cmd.routingKey))
         _ <- F.blocking(
           channel
-            .basicPublish(cmd.exchange.value, cmd.routingKey.value, false, false, MessagePropertiesConverters(cmd.basicProperties), cmd.body.value)
+            .basicPublish(cmd.exchange.value, cmd.routingKey.value, cmd.mandatory, false, MessagePropertiesConverters(cmd.basicProperties), cmd.body.value)
         )
         _ <- F.delay(logger.info("Published message: {}", cmd))
       } yield ()
@@ -82,11 +84,11 @@ object Channel {
     def declareExchange(exchange: Exchange): F[Unit] =
       F.blocking {
         channel.exchangeDeclare(exchange.name.value,
-                                exchange.exchangeType.value,
-                                exchange.isDurable,
-                                exchange.shouldAutoDelete,
-                                exchange.isInternal,
-                                exchange.arguments.asJava)
+          exchange.exchangeType.value,
+          exchange.isDurable,
+          exchange.shouldAutoDelete,
+          exchange.isInternal,
+          exchange.arguments.asJava)
       }.void
 
     override def declareQueue(queue: Queue): F[Unit] =
@@ -120,6 +122,7 @@ object Channel {
           val delivery = Consumer.deliveryFrom(consumerTag, envelope, properties, body)
           dispatcher.unsafeRunAndForget(
             (for {
+              _      <- Spawn[F].cede
               _      <- F.delay(logger.debug("Received delivery with rk:{} on exchange: {}", delivery.envelope.routingKey, delivery.envelope.exchangeName))
               action <- handler(delivery)
               _      <- F.delay(logger.info("Responding with {} to {} on {}", action, delivery, queue))
@@ -150,5 +153,4 @@ object Channel {
 
     override def isConnectionOpen: F[Boolean] = F.blocking(channel.getConnection.isOpen)
   }
-
 }

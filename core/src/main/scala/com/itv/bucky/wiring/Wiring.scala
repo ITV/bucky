@@ -105,14 +105,15 @@ class Wiring[T](
               s"routingKey=${routingKey.value} " +
               s"queue=${queueName.value} " +
               s"type=${exchangeType.value} " +
-              s"requeuePolicy=$requeuePolicy")
+              s"requeuePolicy=$requeuePolicy " +
+              s"prefetchCount=$prefetchCount")
         }
         _ <- client.declare(consumerDeclarations)
       } yield ()
 
     for {
       _ <- Resource.make(runDeclarations)(_ => F.pure(()))
-      _ <- client.registerConsumerOf(queueName, handleMessage)
+      _ <- client.registerConsumerOf(queueName, handleMessage, prefetchCount = prefetchCount)
     } yield ()
   }
 
@@ -126,7 +127,8 @@ class Wiring[T](
               s"routingKey=${routingKey.value} " +
               s"queue=${queueName.value} " +
               s"type=${exchangeType.value} " +
-              s"requeuePolicy=$requeuePolicy")
+              s"requeuePolicy=$requeuePolicy " +
+              s"prefetchCount=$prefetchCount")
         }
         _ <- client.declare(consumerDeclarations)
       } yield ()
@@ -148,7 +150,8 @@ class Wiring[T](
               s"routingKey=${routingKey.value} " +
               s"queue=${queueName.value} " +
               s"type=${exchangeType.value} " +
-              s"requeuePolicy=$requeuePolicy")
+              s"requeuePolicy=$requeuePolicy " +
+              s"prefetchCount=$prefetchCount")
         }
         _ <- client.declare(consumerDeclarations)
       } yield ()
@@ -158,7 +161,8 @@ class Wiring[T](
       _ <- client.registerRequeueConsumerOf(queueName = queueName,
                                             handler = handleMessage,
                                             requeuePolicy = requeuePolicy,
-                                            onRequeueExpiryAction = onRequeueExpiryAction)(unmarshaller, F)
+                                            onRequeueExpiryAction = onRequeueExpiryAction,
+                                            prefetchCount = prefetchCount)(unmarshaller, F)
     } yield ()
   }
 

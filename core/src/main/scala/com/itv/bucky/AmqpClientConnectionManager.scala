@@ -19,7 +19,7 @@ private[bucky] case class AmqpClientConnectionManager[F[_]](amqpConfig: AmqpClie
                                                             publishChannel: Channel[F],
                                                             pendingConfirmListener: PendingConfirmListener[F],
                                                             dispatcher: Dispatcher[F])(implicit F: Async[F], t: Temporal[F])
-    extends StrictLogging {
+  extends StrictLogging {
 
   private def runWithChannelSync[T](action: F[T]): F[T] =
     publishChannel.synchroniseIfNeeded {
@@ -41,7 +41,7 @@ private[bucky] case class AmqpClientConnectionManager[F[_]](amqpConfig: AmqpClie
             _              <- publishChannel.publish(nextPublishSeq, cmd)
           } yield ()
         }
-        _ <- signal.get.ifM(F.unit, F.raiseError[Unit](new RuntimeException("Failed to publish msg.")))
+        _ <- signal.get.ifM(F.unit, F.raiseError[Unit](new RuntimeException(s"Failed to publish msg: ${cmd}")))
       } yield ())
         .timeout(amqpConfig.publishingTimeout)
         .recoverWith {
@@ -63,6 +63,7 @@ private[bucky] case class AmqpClientConnectionManager[F[_]](amqpConfig: AmqpClie
                        onHandlerException: ConsumeAction,
                        prefetchCount: Int): F[Unit] =
     for {
+      _           <- Spawn[F].cede
       consumerTag <- F.delay(ConsumerTag.create(queueName))
       _           <- F.delay(logger.debug("Registering consumer for queue: {} with tag {}.", queueName.value, consumerTag.value))
       _           <- channel.basicQos(prefetchCount)
@@ -77,11 +78,14 @@ private[bucky] case class AmqpClientConnectionManager[F[_]](amqpConfig: AmqpClie
 private[bucky] object AmqpClientConnectionManager extends StrictLogging {
 
   def apply[F[_]](config: AmqpClientConfig, publishChannel: Channel[F], dispatcher: Dispatcher[F])(
-      implicit F: Async[F], t: Temporal[F]): F[AmqpClientConnectionManager[F]] =
+    implicit F: Async[F], t: Temporal[F]): F[AmqpClientConnectionManager[F]] =
     for {
       pendingConfirmations <- Ref.of[F, TreeMap[Long, Deferred[F, Boolean]]](TreeMap.empty)
+      pendingReturn        <- Ref.of[F, Boolean](false)
       _                    <- publishChannel.confirmSelect
-      confirmListener      <- F.blocking(publish.PendingConfirmListener(pendingConfirmations, dispatcher))
+      confirmListener      <- F.blocking(publish.PendingConfirmListener(pendingConfirmations, pendingReturn, dispatcher))
       _                    <- publishChannel.addConfirmListener(confirmListener)
+      _                    <- publishChannel.addReturnListener(confirmListener)
     } yield AmqpClientConnectionManager(config, publishChannel, confirmListener, dispatcher)
 }
+

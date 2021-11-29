@@ -35,7 +35,7 @@ package object test {
           F.map(F.fromEither(result))(_ => ())
       }
 
-    def publishTimeout[F[_]](implicit F: Async[F], t: Temporal[F]): StubChannel[F] =
+    def publishNoAck[F[_]](implicit F: Async[F], t: Temporal[F]): StubChannel[F] =
       new StubChannel[F]() {
         override def publish(sequenceNumber: Long, cmd: PublishCommand): F[Unit] = F.delay {
           pubSeqLock.synchronized {
@@ -130,7 +130,7 @@ package object test {
       * @return
       */
     def clientPublishTimeout(config: AmqpClientConfig = Config.empty())(implicit async: Async[F]): Resource[F, AmqpClient[F]] =
-      client(StubChannels.publishTimeout[F], config)
+      client(StubChannels.publishNoAck[F], config)
 
     def runAmqpTestIO[T](clientResource: Resource[IO, AmqpClient[IO]])(test: AmqpClient[IO] => IO[T])(implicit async: Async[IO], runtime : IORuntime): T =
       clientResource.map(_.withLogging()).use(test).unsafeRunSync()
