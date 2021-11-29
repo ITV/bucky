@@ -1,5 +1,7 @@
-import cats.effect
-import cats.effect.{IO, Resource, Temporal, Clock}
+package com.itv.bucky.integrationTest
+
+import cats.effect.unsafe.IORuntime
+import cats.effect.{Clock, IO, Resource, Temporal}
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
 import com.itv.bucky._
@@ -8,20 +10,18 @@ import com.itv.bucky.decl.Exchange
 import com.itv.bucky.pattern.requeue
 import com.itv.bucky.pattern.requeue.RequeuePolicy
 import com.itv.bucky.publish._
-import com.itv.bucky.test.StubHandlers
+import com.itv.bucky.test.{GlobalAsyncIOSpec, StubHandlers}
 import com.itv.bucky.test.stubs.{RecordingHandler, RecordingRequeueHandler}
 import com.typesafe.config.ConfigFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.funsuite.AsyncFunSuite
 import org.scalatest.matchers.should.Matchers._
 
-//import java.time.{Clock, Instant, LocalDateTime, ZoneOffset}
 import java.util.UUID
 import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.higherKinds
-import com.itv.bucky.test.GlobalAsyncIOSpec
 
 class ShutdownTimeoutTest extends AsyncFunSuite with GlobalAsyncIOSpec with Eventually with IntegrationPatience {
 
@@ -32,6 +32,7 @@ class ShutdownTimeoutTest extends AsyncFunSuite with GlobalAsyncIOSpec with Even
       publisher: Publisher[IO, PublishCommand]
   )
 
+  implicit override val ioRuntime: IORuntime = packageIORuntime
   implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(300))
   val requeuePolicy                 = RequeuePolicy(maximumProcessAttempts = 5, requeueAfter = 2.seconds)
 
@@ -74,6 +75,8 @@ class ShutdownTimeoutTest extends AsyncFunSuite with GlobalAsyncIOSpec with Even
       delay = 3.seconds
       _ <- runTest(delay)
       after <- Clock[IO].realTime
-    } yield (after - before) > delay shouldBe true
+      duration = after - before
+      _ = println(s"Duration $duration")
+    } yield duration > delay shouldBe true
   }
 }

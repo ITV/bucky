@@ -1,8 +1,7 @@
-import java.util.UUID
-import java.util.concurrent.Executors
-import cats.data.Kleisli
+package com.itv.bucky.integrationTest
+
+import cats.effect.unsafe.IORuntime
 import cats.effect.{IO, Resource}
-import cats.implicits._
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
 import com.itv.bucky._
@@ -11,38 +10,33 @@ import com.itv.bucky.decl.Exchange
 import com.itv.bucky.pattern.requeue
 import com.itv.bucky.pattern.requeue.RequeuePolicy
 import com.itv.bucky.publish._
-import com.itv.bucky.test.StubHandlers
+import com.itv.bucky.test.{GlobalAsyncIOSpec, StubHandlers}
 import com.itv.bucky.test.stubs.{RecordingHandler, RecordingRequeueHandler}
 import com.typesafe.config.ConfigFactory
-import org.scalatest.funsuite.{AnyFunSuite, AsyncFunSuite}
-import org.scalatest.matchers.should.Matchers._
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
+import org.scalatest.funsuite.AsyncFunSuite
+import org.scalatest.matchers.should.Matchers._
 
-import scala.collection.mutable.ListBuffer
+import java.util.UUID
+import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.higherKinds
-import com.itv.bucky.test.GlobalAsyncIOSpec
 
-class RequeueWithExpiryActionIntegrationTest extends AsyncFunSuite with GlobalAsyncIOSpec with Eventually with IntegrationPatience {
+class RequeueIntegrationTest extends AsyncFunSuite with GlobalAsyncIOSpec with Eventually with IntegrationPatience {
 
   case class TestFixture(
-      stubHandler: RecordingRequeueHandler[IO, String],
-      dlqHandler: RecordingHandler[IO, String],
+      stubHandler: RecordingRequeueHandler[IO, Delivery],
+      dlqHandler: RecordingHandler[IO, Delivery],
       publishCommandBuilder: PublishCommandBuilder.Builder[String],
       publisher: Publisher[IO, PublishCommand]
   )
 
+  implicit override val ioRuntime: IORuntime = packageIORuntime
   implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(300))
   val requeuePolicy                 = RequeuePolicy(maximumProcessAttempts = 5, requeueAfter = 2.seconds)
 
-  def withTestFixture[F[_]](onRequeueExpiryAction: String => IO[ConsumeAction], handlerAction: String => IO[Unit] = _ => IO.unit)(
-      test: TestFixture => IO[Unit]
-  ): IO[Unit] = {
-
-    implicit val payloadMarshaller: PayloadMarshaller[String]     = StringPayloadMarshaller
-    implicit val payloadUnmarshaller: PayloadUnmarshaller[String] = StringPayloadUnmarshaller
-
+  def withTestFixture(test: TestFixture => IO[Unit]): IO[Unit] = {
     val rawConfig = ConfigFactory.load("bucky")
     val config =
       AmqpClientConfig(
@@ -51,6 +45,8 @@ class RequeueWithExpiryActionIntegrationTest extends AsyncFunSuite with GlobalAs
         rawConfig.getString("rmq.username"),
         rawConfig.getString("rmq.password")
       )
+    implicit val payloadMarshaller: PayloadMarshaller[String]     = StringPayloadMarshaller
+    implicit val payloadUnmarshaller: PayloadUnmarshaller[String] = StringPayloadUnmarshaller
 
     val exchangeName        = ExchangeName(UUID.randomUUID().toString)
     val routingKey          = RoutingKey(UUID.randomUUID().toString)
@@ -62,20 +58,15 @@ class RequeueWithExpiryActionIntegrationTest extends AsyncFunSuite with GlobalAs
     ) ++ requeue.requeueDeclarations(queueName, routingKey)
 
     AmqpClient[IO](config).use { client =>
-      val handler    = new RecordingRequeueHandler[IO, String](Kleisli(handlerAction).andThen(_ => IO(Requeue)).run)
-      val dlqHandler = StubHandlers.ackHandler[IO, String]
+      val handler    = StubHandlers.requeueRequeueHandler[IO, Delivery]
+      val dlqHandler = StubHandlers.ackHandler[IO, Delivery]
 
       Resource
         .eval(client.declare(declarations))
         .flatMap(_ =>
           for {
-            _ <- client.registerRequeueConsumerOf[String](
-              queueName = queueName,
-              handler = handler,
-              requeuePolicy = requeuePolicy,
-              onRequeueExpiryAction = onRequeueExpiryAction
-            )
-            _ <- client.registerConsumerOf(deadletterQueueName, dlqHandler)
+            _ <- client.registerRequeueConsumer(queueName, handler, requeuePolicy)
+            _ <- client.registerConsumer(deadletterQueueName, dlqHandler)
           } yield ()
         )
         .use { _ =>
@@ -87,13 +78,36 @@ class RequeueWithExpiryActionIntegrationTest extends AsyncFunSuite with GlobalAs
     }
   }
 
-  test("Should record an invocation as true and DeadLetter after exhausting maximum requeue attempts") {
+  test("Should retain payload, custom headers and properties when republishing") {
+    withTestFixture { testFixture =>
+      val expectedCorrelationId: Option[String] = Some("banana")
+      val properties =
+        MessageProperties.persistentTextPlain
+          .copy(correlationId = expectedCorrelationId)
+          .withHeader("foo" -> "bar")
 
-    val invocationRecorder = ListBuffer.empty[Boolean]
-    val expiryAction       = (_: String) => IO.delay(invocationRecorder += true).as(DeadLetter)
-    val handlerAction      = (_: String) => IO.delay(invocationRecorder += false) >> IO.unit
+      val message = "hello, world!"
+      val publishCommand =
+        testFixture.publishCommandBuilder.using(properties).toPublishCommand(message)
 
-    withTestFixture(expiryAction, handlerAction) { testFixture =>
+      for {
+        _ <- testFixture.publisher(publishCommand)
+      } yield eventually {
+        testFixture.stubHandler.receivedMessages.size should be > 1
+        testFixture.stubHandler.receivedMessages.map(_.properties).foreach { properties =>
+          properties.headers("foo").toString shouldBe "bar"
+          properties.correlationId shouldBe expectedCorrelationId
+        }
+        testFixture.stubHandler.receivedMessages.map(_.body.unmarshal(StringPayloadUnmarshaller)).foreach {
+          case Right(value) => value shouldBe message
+          case _            => fail("could not unmarsal")
+        }
+      }
+    }
+  }
+
+  test("Should deadletter after maximum process attempts exceeded") {
+    withTestFixture { testFixture =>
       val publishCommand =
         testFixture.publishCommandBuilder.toPublishCommand("hello, world!")
 
@@ -102,7 +116,6 @@ class RequeueWithExpiryActionIntegrationTest extends AsyncFunSuite with GlobalAs
       } yield eventually {
         testFixture.stubHandler.receivedMessages.size should be(requeuePolicy.maximumProcessAttempts)
         testFixture.dlqHandler.receivedMessages.size shouldBe 1
-        invocationRecorder should contain theSameElementsAs List(false, false, false, false, false, true)
       }
     }
   }

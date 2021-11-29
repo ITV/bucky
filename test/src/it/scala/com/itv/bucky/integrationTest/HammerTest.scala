@@ -1,3 +1,6 @@
+package com.itv.bucky.integrationTest
+
+import cats.effect.testing.scalatest.EffectTestSupport
 import cats.effect.unsafe.{IORuntime, IORuntimeConfig, Scheduler}
 import cats.effect.{IO, Ref, Resource}
 import cats.implicits._
@@ -6,8 +9,8 @@ import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
 import com.itv.bucky._
 import com.itv.bucky.consume.Ack
 import com.itv.bucky.decl.{Exchange, Queue}
+import com.itv.bucky.test.StubHandlers
 import com.itv.bucky.test.stubs.RecordingHandler
-import com.itv.bucky.test.{GlobalAsyncIOSpec, StubHandlers}
 import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.StrictLogging
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
@@ -20,31 +23,11 @@ import scala.collection.immutable.TreeSet
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.higherKinds
-import cats.effect.testing.scalatest.EffectTestSupport
 
 class HammerTest extends AsyncFunSuite with EffectTestSupport with Eventually with IntegrationPatience with StrictLogging with Matchers {
 
+  implicit override val ioRuntime: IORuntime = packageIORuntime
   case class TestFixture(stubHandler: RecordingHandler[IO, String], publisher: Publisher[IO, String], client: AmqpClient[IO])
-
-  val schedulerExecutor = new ScheduledThreadPoolExecutor(
-    1,
-    { r =>
-      val t = new Thread(r)
-      t.setName("s")
-      t.setDaemon(true)
-      t.setPriority(Thread.MAX_PRIORITY)
-      t
-    }
-  )
-  schedulerExecutor.setRemoveOnCancelPolicy(true)
-  val scheduler = Scheduler.fromScheduledExecutor(schedulerExecutor)
-  implicit override val ioRuntime: IORuntime = IORuntime.apply(
-    ExecutionContext.fromExecutor(Executors.newFixedThreadPool(300)),
-    ExecutionContext.fromExecutor(Executors.newFixedThreadPool(300)),
-    scheduler,
-    () => (),
-    IORuntimeConfig()
-  )
 
   def withTestFixture(test: TestFixture => IO[Unit]): IO[Unit] = {
     val rawConfig = ConfigFactory.load("bucky")
