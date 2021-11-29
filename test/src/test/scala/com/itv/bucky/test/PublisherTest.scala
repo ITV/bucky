@@ -144,7 +144,6 @@ class PublisherTest extends AnyFunSuite with IOAmqpClientTest with EitherValues 
           outcome4 <- fiber4.join
         } yield {
           val outcomes = List(outcome1, outcome2, outcome3, outcome4)
-          println(outcomes.toString())
           outcomes.count(_.isSuccess) should ===(1)
           outcomes.count(hasOutcomeError[RuntimeException](_)) should ===(2)
           outcomes.count(hasOutcomeError[TimeoutException](_)) should ===(1)
