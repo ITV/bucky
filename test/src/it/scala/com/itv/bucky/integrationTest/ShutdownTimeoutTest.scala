@@ -1,7 +1,6 @@
 package com.itv.bucky.integrationTest
 
-import cats.effect.unsafe.IORuntime
-import cats.effect.{Clock, IO, Resource, Temporal}
+import cats.effect.{IO, Resource}
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
 import com.itv.bucky._
@@ -10,33 +9,34 @@ import com.itv.bucky.decl.Exchange
 import com.itv.bucky.pattern.requeue
 import com.itv.bucky.pattern.requeue.RequeuePolicy
 import com.itv.bucky.publish._
-import com.itv.bucky.test.{GlobalAsyncIOSpec, StubHandlers}
+import com.itv.bucky.test.StubHandlers
 import com.itv.bucky.test.stubs.{RecordingHandler, RecordingRequeueHandler}
 import com.typesafe.config.ConfigFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.funsuite.AsyncFunSuite
 import org.scalatest.matchers.should.Matchers._
 
+import java.time.{Clock, Instant, LocalDateTime, ZoneOffset}
 import java.util.UUID
 import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.higherKinds
+import com.itv.bucky.test.GlobalAsyncIOSpec
 
 class ShutdownTimeoutTest extends AsyncFunSuite with GlobalAsyncIOSpec with Eventually with IntegrationPatience {
 
   case class TestFixture(
-      stubHandler: RecordingRequeueHandler[IO, Delivery],
-      dlqHandler: RecordingHandler[IO, Delivery],
-      publishCommandBuilder: PublishCommandBuilder.Builder[String],
-      publisher: Publisher[IO, PublishCommand]
-  )
+                          stubHandler: RecordingRequeueHandler[IO, Delivery],
+                          dlqHandler: RecordingHandler[IO, Delivery],
+                          publishCommandBuilder: PublishCommandBuilder.Builder[String],
+                          publisher: Publisher[IO, PublishCommand]
+                        )
 
-  implicit override val ioRuntime: IORuntime = packageIORuntime
   implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(300))
   val requeuePolicy                 = RequeuePolicy(maximumProcessAttempts = 5, requeueAfter = 2.seconds)
 
-  def runTest(delay: FiniteDuration): IO[Unit] = {
+  def runTest[A](test: IO[A]): IO[A] = {
     val rawConfig = ConfigFactory.load("bucky")
     val config =
       AmqpClientConfig(
@@ -54,7 +54,7 @@ class ShutdownTimeoutTest extends AsyncFunSuite with GlobalAsyncIOSpec with Even
 
     AmqpClient[IO](config)
       .use { client =>
-        val handler = StubHandlers.recordingHandler[IO, Delivery]((_: Delivery) => Temporal[IO].sleep(delay).map(_ => Ack))
+        val handler = StubHandlers.recordingHandler[IO, Delivery]((_: Delivery) => IO.sleep(3.seconds).map(_ => Ack))
         Resource
           .eval(client.declare(declarations))
           .flatMap(_ =>
@@ -64,19 +64,20 @@ class ShutdownTimeoutTest extends AsyncFunSuite with GlobalAsyncIOSpec with Even
           )
           .use { _ =>
             val pcb = publishCommandBuilder[String](implicitly).using(exchangeName).using(routingKey)
-            client.publisher()(pcb.toPublishCommand("a message"))
+            client.publisher()(pcb.toPublishCommand("a message")).flatMap(_ => test)
           }
       }
   }
 
-  test("Should wait until a handler finishes executing before shutting down") {
-    for {
-      before <- Clock[IO].realTime
-      delay = 3.seconds
-      _ <- runTest(delay)
-      after <- Clock[IO].realTime
-      duration = after - before
-      _ = println(s"Duration $duration")
-    } yield duration > delay shouldBe true
+  test("Should wait until a handler finishes executing before shuttind down") {
+    val clock = Clock.systemUTC()
+    val start = Instant.now(clock)
+    runTest[Instant](IO.delay(Instant.now())).map { result =>
+      val after = Instant.now(clock)
+      println(LocalDateTime.ofInstant(start, ZoneOffset.UTC))
+      println(LocalDateTime.ofInstant(after, ZoneOffset.UTC))
+      (after.toEpochMilli - start.toEpochMilli) > 3000 shouldBe true
+      (result.toEpochMilli - after.toEpochMilli) < 3000 shouldBe true
+    }
   }
 }
