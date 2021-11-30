@@ -1,7 +1,7 @@
 package com.itv.bucky.integrationTest
 
 import cats.effect.testing.scalatest.EffectTestSupport
-import cats.effect.unsafe.{IORuntime, IORuntimeConfig, Scheduler}
+import cats.effect.unsafe.IORuntime
 import cats.effect.{IO, Ref, Resource}
 import cats.implicits._
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
@@ -18,9 +18,7 @@ import org.scalatest.funsuite.AsyncFunSuite
 import org.scalatest.matchers.should.Matchers
 
 import java.util.UUID
-import java.util.concurrent.{Executors, ScheduledThreadPoolExecutor}
 import scala.collection.immutable.TreeSet
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.higherKinds
 

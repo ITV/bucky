@@ -1,5 +1,7 @@
 package com.itv.bucky.integrationTest
 
+import cats.effect.testing.scalatest.EffectTestSupport
+import cats.effect.unsafe.IORuntime
 import cats.effect.{IO, Resource}
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
@@ -22,9 +24,8 @@ import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.higherKinds
-import com.itv.bucky.test.GlobalAsyncIOSpec
 
-class ShutdownTimeoutTest extends AsyncFunSuite with GlobalAsyncIOSpec with Eventually with IntegrationPatience {
+class ShutdownTimeoutTest extends AsyncFunSuite with EffectTestSupport with Eventually with IntegrationPatience {
 
   case class TestFixture(
                           stubHandler: RecordingRequeueHandler[IO, Delivery],
@@ -33,8 +34,9 @@ class ShutdownTimeoutTest extends AsyncFunSuite with GlobalAsyncIOSpec with Even
                           publisher: Publisher[IO, PublishCommand]
                         )
 
+  implicit override val ioRuntime: IORuntime = packageIORuntime
   implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(300))
-  val requeuePolicy                 = RequeuePolicy(maximumProcessAttempts = 5, requeueAfter = 2.seconds)
+  val requeuePolicy: RequeuePolicy = RequeuePolicy(maximumProcessAttempts = 5, requeueAfter = 2.seconds)
 
   def runTest[A](test: IO[A]): IO[A] = {
     val rawConfig = ConfigFactory.load("bucky")

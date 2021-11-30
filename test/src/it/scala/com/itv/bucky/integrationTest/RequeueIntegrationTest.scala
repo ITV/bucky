@@ -1,5 +1,6 @@
 package com.itv.bucky.integrationTest
 
+import cats.effect.testing.scalatest.EffectTestSupport
 import cats.effect.unsafe.IORuntime
 import cats.effect.{IO, Resource}
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
@@ -10,7 +11,7 @@ import com.itv.bucky.decl.Exchange
 import com.itv.bucky.pattern.requeue
 import com.itv.bucky.pattern.requeue.RequeuePolicy
 import com.itv.bucky.publish._
-import com.itv.bucky.test.{GlobalAsyncIOSpec, StubHandlers}
+import com.itv.bucky.test.StubHandlers
 import com.itv.bucky.test.stubs.{RecordingHandler, RecordingRequeueHandler}
 import com.typesafe.config.ConfigFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
@@ -23,7 +24,7 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.higherKinds
 
-class RequeueIntegrationTest extends AsyncFunSuite with GlobalAsyncIOSpec with Eventually with IntegrationPatience {
+class RequeueIntegrationTest extends AsyncFunSuite with EffectTestSupport with Eventually with IntegrationPatience {
 
   case class TestFixture(
       stubHandler: RecordingRequeueHandler[IO, Delivery],

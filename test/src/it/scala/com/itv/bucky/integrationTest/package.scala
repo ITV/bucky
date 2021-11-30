@@ -18,7 +18,7 @@ package object integrationTest {
     }
   )
   schedulerExecutor.setRemoveOnCancelPolicy(true)
-  val scheduler = Scheduler.fromScheduledExecutor(schedulerExecutor)
+  val scheduler: Scheduler = Scheduler.fromScheduledExecutor(schedulerExecutor)
   val packageIORuntime: IORuntime = IORuntime.apply(
     ExecutionContext.fromExecutor(Executors.newFixedThreadPool(300)),
     ExecutionContext.fromExecutor(Executors.newFixedThreadPool(300)),

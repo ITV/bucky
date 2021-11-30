@@ -1,6 +1,7 @@
 package com.itv.bucky.integrationTest
 
 import cats.data.Kleisli
+import cats.effect.testing.scalatest.EffectTestSupport
 import cats.effect.unsafe.IORuntime
 import cats.effect.{IO, Resource}
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
@@ -11,7 +12,7 @@ import com.itv.bucky.decl.Exchange
 import com.itv.bucky.pattern.requeue
 import com.itv.bucky.pattern.requeue.RequeuePolicy
 import com.itv.bucky.publish._
-import com.itv.bucky.test.{GlobalAsyncIOSpec, StubHandlers}
+import com.itv.bucky.test.StubHandlers
 import com.itv.bucky.test.stubs.{RecordingHandler, RecordingRequeueHandler}
 import com.typesafe.config.ConfigFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
@@ -25,7 +26,7 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.higherKinds
 
-class RequeueWithExpiryActionIntegrationTest extends AsyncFunSuite with GlobalAsyncIOSpec with Eventually with IntegrationPatience {
+class RequeueWithExpiryActionIntegrationTest extends AsyncFunSuite with EffectTestSupport with Eventually with IntegrationPatience {
 
   case class TestFixture(
       stubHandler: RecordingRequeueHandler[IO, String],
@@ -36,7 +37,7 @@ class RequeueWithExpiryActionIntegrationTest extends AsyncFunSuite with GlobalAs
 
   implicit override val ioRuntime: IORuntime = packageIORuntime
   implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(300))
-  val requeuePolicy                 = RequeuePolicy(maximumProcessAttempts = 5, requeueAfter = 2.seconds)
+  val requeuePolicy: RequeuePolicy = RequeuePolicy(maximumProcessAttempts = 5, requeueAfter = 2.seconds)
 
   def withTestFixture[F[_]](onRequeueExpiryAction: String => IO[ConsumeAction], handlerAction: String => IO[Unit] = _ => IO.unit)(
       test: TestFixture => IO[Unit]

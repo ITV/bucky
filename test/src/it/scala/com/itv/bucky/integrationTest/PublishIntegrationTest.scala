@@ -22,7 +22,7 @@ class PublishIntegrationTest extends AnyFunSuite with Eventually with Integratio
 
   implicit val ioRuntime: IORuntime = packageIORuntime
   implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(300))
-  val requeuePolicy                 = RequeuePolicy(maximumProcessAttempts = 5, requeueAfter = 2.seconds)
+  val requeuePolicy: RequeuePolicy = RequeuePolicy(maximumProcessAttempts = 5, requeueAfter = 2.seconds)
 
   test("publisher should error if mandatory is true and there is no routing") {
     withTestFixture{
