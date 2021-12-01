@@ -6,13 +6,16 @@ import com.itv.bucky.consume.Ack
 import com.itv.bucky.test.stubs.RecordingHandler
 import com.itv.bucky.wiring._
 import com.typesafe.scalalogging.StrictLogging
-import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.funsuite.{AnyFunSuite, AsyncFunSuite}
 import org.scalatest.matchers.should.Matchers._
+import cats.effect.unsafe.IORuntime
 
-class WiringPublishConsumeTest extends AnyFunSuite with IOAmqpClientTest with StrictLogging {
+class WiringPublishConsumeTest extends AsyncFunSuite with GlobalAsyncIOSpec with IOAmqpClientTest with StrictLogging {
 
   val incoming = new Wiring[String](WiringName("fs2.incoming"))
   val outgoing = new Wiring[String](WiringName("fs2.outgoing"))
+
+  override implicit val ioRuntime: IORuntime = cats.effect.unsafe.implicits.global
 
   test("Wirings should publish and consume messages") {
     withApp { fixture =>
@@ -31,11 +34,11 @@ class WiringPublishConsumeTest extends AnyFunSuite with IOAmqpClientTest with St
       sink: RecordingHandler[IO, String]
   )
 
-  def withApp[A](fn: Fixture => IO[A]): Unit =
+  def withApp[A](fn: Fixture => IO[A]): IO[Unit] =
     runAmqpTest { client =>
       val handler = StubHandlers.ackHandler[IO, String]
       (for {
-        sendOutgoingMessage <- Resource.liftF(outgoing.publisher(client))
+        sendOutgoingMessage <- Resource.eval(outgoing.publisher(client))
         _ <- incoming.registerConsumer(client) { message =>
           logger.info(s"Forwarding received message to sink: message=$message")
           sendOutgoingMessage(s"Outgoing: $message").map(_ => Ack)

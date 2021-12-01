@@ -8,6 +8,7 @@ import com.itv.bucky.decl.{Exchange, Queue}
 import com.itv.bucky.{ExchangeName, QueueName, RoutingKey, consume, _}
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers._
+import cats.effect.unsafe.IORuntime
 
 class StubTest extends AnyFunSuite with IOAmqpClientTest {
   val exchange     = ExchangeName("anexchange")
@@ -20,7 +21,7 @@ class StubTest extends AnyFunSuite with IOAmqpClientTest {
   test("An ack Recording Handlers should accumulate publish results and ack") {
     runAmqpTestAllAck { client =>
       val consumer = StubHandlers.ackHandler[IO, String]
-      Resource.liftF(client.declare(declarations)).flatMap(_ => client.registerConsumerOf(queue, consumer)).use { _ =>
+      Resource.eval(client.declare(declarations)).flatMap(_ => client.registerConsumerOf(queue, consumer)).use { _ =>
         for {
           publisher <- IO(client.publisherOf[String](exchange, rk))
           _         <- (1 to 10).toList.map(_ => publisher(message)).sequence
@@ -41,7 +42,7 @@ class StubTest extends AnyFunSuite with IOAmqpClientTest {
       }
 
       Resource
-        .liftF(client.declare(declarations))
+        .eval(client.declare(declarations))
         .flatMap { _ =>
           client.registerConsumerOf(queue, handler)
         }
@@ -60,7 +61,7 @@ class StubTest extends AnyFunSuite with IOAmqpClientTest {
           stubPubslisher(delivery).map(_ => Ack)
       }
       (for {
-        _ <- Resource.liftF(client.declare(declarations))
+        _ <- Resource.eval(client.declare(declarations))
         _ <- client.registerConsumerOf(queue, handler)
       } yield ())
         .use { _ =>
@@ -78,7 +79,7 @@ class StubTest extends AnyFunSuite with IOAmqpClientTest {
     val queue2    = QueueName("queue2")
     runAmqpTestAllAck { client =>
       (for {
-        _ <- Resource.liftF(client.declare(declarations ++ List(Queue(queue2), Exchange(exchange).binding(rk -> queue2))))
+        _ <- Resource.eval(client.declare(declarations ++ List(Queue(queue2), Exchange(exchange).binding(rk -> queue2))))
         _ <- client.registerConsumerOf(queue, consumer1)
         _ <- client.registerConsumerOf(queue2, consumer2)
       } yield ()).use { _ =>
@@ -99,7 +100,7 @@ class StubTest extends AnyFunSuite with IOAmqpClientTest {
     val consumer = StubHandlers.deadLetterHandler[IO, String]
     runAmqpTestAllAck { client =>
       (for {
-        _ <- Resource.liftF(client.declare(declarations))
+        _ <- Resource.eval(client.declare(declarations))
         _ <- client.registerConsumerOf(queue, consumer)
       } yield ()).use { _ =>
         for {
@@ -118,7 +119,7 @@ class StubTest extends AnyFunSuite with IOAmqpClientTest {
     val consumer = StubHandlers.recordingHandler[IO, String](_ => IO.raiseError(exception))
     runAmqpTestAllAck { client =>
       (for {
-        _ <- Resource.liftF(client.declare(declarations))
+        _ <- Resource.eval(client.declare(declarations))
         _ <- client.registerConsumerOf(queue, consumer)
       } yield ()).use { _ =>
         for {
@@ -137,7 +138,7 @@ class StubTest extends AnyFunSuite with IOAmqpClientTest {
     val consumer = StubHandlers.deadLetterHandler[IO, String]
     runAmqpTestForgiving { client =>
       (for {
-        _ <- Resource.liftF(client.declare(declarations))
+        _ <- Resource.eval(client.declare(declarations))
         _ <- client.registerConsumerOf(queue, consumer)
       } yield ()).use { _ =>
         for {
@@ -155,7 +156,7 @@ class StubTest extends AnyFunSuite with IOAmqpClientTest {
     val consumer = StubHandlers.recordingHandler[IO, String](_ => IO.raiseError(exception))
     runAmqpTestForgiving { client =>
       (for {
-        _ <- Resource.liftF(client.declare(declarations))
+        _ <- Resource.eval(client.declare(declarations))
         _ <- client.registerConsumerOf(queue, consumer)
 
       } yield ()).use { _ =>
@@ -174,7 +175,7 @@ class StubTest extends AnyFunSuite with IOAmqpClientTest {
     val consumer = StubHandlers.deadLetterHandler[IO, String]
     runAmqpTestStrict { client =>
       (for {
-        _ <- Resource.liftF(client.declare(declarations))
+        _ <- Resource.eval(client.declare(declarations))
         _ <- client.registerConsumerOf(queue, consumer)
       } yield ()).use { _ =>
         for {
@@ -193,7 +194,7 @@ class StubTest extends AnyFunSuite with IOAmqpClientTest {
     val consumer = StubHandlers.recordingHandler[IO, String](_ => IO.raiseError(exception))
     runAmqpTestStrict { client =>
       (for {
-        _ <- Resource.liftF(client.declare(declarations))
+        _ <- Resource.eval(client.declare(declarations))
         _ <- client.registerConsumerOf(queue, consumer)
 
       } yield ()).use { _ =>

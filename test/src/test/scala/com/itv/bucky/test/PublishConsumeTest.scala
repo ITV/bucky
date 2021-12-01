@@ -1,22 +1,32 @@
 package com.itv.bucky.test
 
-import java.util.concurrent.TimeoutException
+import cats.effect.testing.scalatest.AsyncIOSpec
 
+import java.util.concurrent.TimeoutException
 import cats.effect.{IO, Resource}
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.consume._
 import com.itv.bucky.decl.{Direct, Exchange, ExchangeBinding, Headers, Queue, Topic}
 import com.itv.bucky.publish._
 import com.itv.bucky.{ExchangeName, Handler, PayloadMarshaller, PublisherSugar, QueueName, RequeueHandler, RoutingKey}
-import org.scalatest.{EitherValues, FunSuite}
-import org.scalatest.Matchers._
+import org.scalatest.EitherValues
 import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
-import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.funsuite.AsyncFunSuite
+import org.scalatest.matchers.should.Matchers
 import org.scalatest.matchers.should.Matchers._
 
 import scala.language.reflectiveCalls
+import cats.effect.unsafe.IORuntime
 
-class PublishConsumeTest extends AnyFunSuite with IOAmqpClientTest with Eventually with IntegrationPatience with ScalaFutures with EitherValues {
+class PublishConsumeTest
+    extends AsyncFunSuite
+    with GlobalAsyncIOSpec
+    with IOAmqpClientTest
+    with Eventually
+    with IntegrationPatience
+    with ScalaFutures
+    with EitherValues
+    with Matchers {
 
   test("A message can be published and consumed") {
     runAmqpTest { client =>
@@ -32,12 +42,10 @@ class PublishConsumeTest extends AnyFunSuite with IOAmqpClientTest with Eventual
       val handler      = StubHandlers.ackHandler[IO, Delivery]
       val declarations = List(Queue(queue), Exchange(exchange).binding((rk, queue)))
 
-      Resource.liftF(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
+      Resource.eval(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
         for {
           _ <- client.publisher()(commandBuilder)
-        } yield {
-          handler.receivedMessages should have size 1
-        }
+        } yield handler.receivedMessages should have size 1
       }
     }
   }
@@ -56,24 +64,24 @@ class PublishConsumeTest extends AnyFunSuite with IOAmqpClientTest with Eventual
       val handler      = StubHandlers.ackHandler[IO, Delivery]
       val declarations = List(Queue(queue), Exchange(exchange, exchangeType = Topic).binding((RoutingKey("#"), queue)))
 
-      Resource.liftF(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
+      Resource.eval(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
         for {
           _ <- client.publisher()(commandBuilder)
-        } yield {
-          handler.receivedMessages should have size 1
-        }
+        } yield handler.receivedMessages should have size 1
       }
     }
   }
 
-  test("A message can be published to a Topic exchange and consumed from a queue bound with wildcard suffix routing key" +
-    "which matches more than 0 words") {
+  test(
+    "A message can be published to a Topic exchange and consumed from a queue bound with wildcard suffix routing key" +
+      "which matches more than 0 words"
+  ) {
     runAmqpTest { client =>
-      val exchange = ExchangeName("anexchange")
-      val queue    = QueueName("aqueue")
-      val rkRouted       = RoutingKey("ar.k")
-      val rkUnrouted       = RoutingKey("ask")
-      val message  = "Hello"
+      val exchange   = ExchangeName("anexchange")
+      val queue      = QueueName("aqueue")
+      val rkRouted   = RoutingKey("ar.k")
+      val rkUnrouted = RoutingKey("ask")
+      val message    = "Hello"
       val commandBuilder = PublishCommandBuilder
         .publishCommandBuilder[String](StringPayloadMarshaller)
         .using(exchange)
@@ -81,25 +89,25 @@ class PublishConsumeTest extends AnyFunSuite with IOAmqpClientTest with Eventual
       val handler      = StubHandlers.ackHandler[IO, Delivery]
       val declarations = List(Queue(queue), Exchange(exchange, exchangeType = Topic).binding((RoutingKey("ar.#"), queue)))
 
-      Resource.liftF(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
+      Resource.eval(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
         for {
           _ <- client.publisher()(commandBuilder.using(rkRouted).toPublishCommand(message))
           _ <- client.publisher()(commandBuilder.using(rkUnrouted).toPublishCommand(message))
-        } yield {
-          handler.receivedMessages should have size 1
-        }
+        } yield handler.receivedMessages should have size 1
       }
     }
   }
 
-  test("A message can be published to a Topic exchange and consumed from a queue bound with wildcard suffix routing key" +
-    "which matches 0 words") {
+  test(
+    "A message can be published to a Topic exchange and consumed from a queue bound with wildcard suffix routing key" +
+      "which matches 0 words"
+  ) {
     runAmqpTest { client =>
-      val exchange = ExchangeName("anexchange")
-      val queue    = QueueName("aqueue")
-      val rkRouted       = RoutingKey("ar")
-      val rkUnrouted       = RoutingKey("ask")
-      val message  = "Hello"
+      val exchange   = ExchangeName("anexchange")
+      val queue      = QueueName("aqueue")
+      val rkRouted   = RoutingKey("ar")
+      val rkUnrouted = RoutingKey("ask")
+      val message    = "Hello"
       val commandBuilder = PublishCommandBuilder
         .publishCommandBuilder[String](StringPayloadMarshaller)
         .using(exchange)
@@ -107,13 +115,11 @@ class PublishConsumeTest extends AnyFunSuite with IOAmqpClientTest with Eventual
       val handler      = StubHandlers.ackHandler[IO, Delivery]
       val declarations = List(Queue(queue), Exchange(exchange, exchangeType = Topic).binding((RoutingKey("ar.#"), queue)))
 
-      Resource.liftF(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
+      Resource.eval(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
         for {
           _ <- client.publisher()(commandBuilder.using(rkRouted).toPublishCommand(message))
           _ <- client.publisher()(commandBuilder.using(rkUnrouted).toPublishCommand(message))
-        } yield {
-          handler.receivedMessages should have size 1
-        }
+        } yield handler.receivedMessages should have size 1
       }
     }
   }
@@ -140,12 +146,10 @@ class PublishConsumeTest extends AnyFunSuite with IOAmqpClientTest with Eventual
         .toPublishCommand(message)
       val handler = StubHandlers.ackHandler[IO, Delivery]
 
-      Resource.liftF(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
+      Resource.eval(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
         for {
           _ <- client.publisher()(commandBuilder)
-        } yield {
-          handler.receivedMessages should have size 1
-        }
+        } yield handler.receivedMessages should have size 1
       }
     }
   }
@@ -173,12 +177,10 @@ class PublishConsumeTest extends AnyFunSuite with IOAmqpClientTest with Eventual
 
       val handler = StubHandlers.ackHandler[IO, Delivery]
 
-      Resource.liftF(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
+      Resource.eval(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
         for {
           _ <- client.publisher()(commandBuilder)
-        } yield {
-          handler.receivedMessages should have size 1
-        }
+        } yield handler.receivedMessages should have size 1
       }
     }
   }
@@ -190,7 +192,7 @@ class PublishConsumeTest extends AnyFunSuite with IOAmqpClientTest with Eventual
       val rk       = RoutingKey("ark")
       val otherRk  = RoutingKey("anrk")
       val message  = "Hello"
-      val header   = "key" -> "val"
+      val header   = "key"  -> "val"
       val header2  = "key2" -> "val2"
 
       val declarations = List(
@@ -213,7 +215,7 @@ class PublishConsumeTest extends AnyFunSuite with IOAmqpClientTest with Eventual
 
       val handler = StubHandlers.ackHandler[IO, Delivery]
 
-      Resource.liftF(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
+      Resource.eval(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
         for {
           _ <- client.publisher()(message1)
           firstCount = handler.receivedMessages.size
@@ -253,12 +255,10 @@ class PublishConsumeTest extends AnyFunSuite with IOAmqpClientTest with Eventual
 
       val handler = StubHandlers.ackHandler[IO, Delivery]
 
-      Resource.liftF(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
+      Resource.eval(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
         for {
           _ <- client.publisher()(commandBuilder)
-        } yield {
-          handler.receivedMessages should have size 1
-        }
+        } yield handler.receivedMessages should have size 1
       }
     }
   }
@@ -279,7 +279,7 @@ class PublishConsumeTest extends AnyFunSuite with IOAmqpClientTest with Eventual
 
       val headers: Map[String, AnyRef] = Map("foo" -> "bar")
 
-      Resource.liftF(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
+      Resource.eval(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
         val publisher = new PublisherSugar(client).publisherWithHeadersOf(commandBuilder)
         for {
           _ <- publisher(message, headers)
@@ -305,7 +305,7 @@ class PublishConsumeTest extends AnyFunSuite with IOAmqpClientTest with Eventual
       val handler      = StubHandlers.ackHandler[IO, Delivery]
       val declarations = List(Queue(queue))
 
-      Resource.liftF(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
+      Resource.eval(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
         for {
           publishResult <- client.publisher()(commandBuilder).attempt
         } yield {
@@ -330,13 +330,11 @@ class PublishConsumeTest extends AnyFunSuite with IOAmqpClientTest with Eventual
       val handler      = StubHandlers.ackHandler[IO, Delivery]
       val declarations = List(Queue(queue), Exchange(exchange).binding((rk, queue)))
 
-      Resource.liftF(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
+      Resource.eval(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
         val publisher = client.publisherOf[String]
         for {
           _ <- publisher(message)
-        } yield {
-          handler.receivedMessages should have size 1
-        }
+        } yield handler.receivedMessages should have size 1
       }
     }
   }
@@ -352,13 +350,11 @@ class PublishConsumeTest extends AnyFunSuite with IOAmqpClientTest with Eventual
       val handler      = StubHandlers.ackHandler[IO, Delivery]
       val declarations = List(Queue(queue), Exchange(exchange).binding((rk, queue)))
 
-      Resource.liftF(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
+      Resource.eval(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
         val publisher = client.publisherOf[String](exchange, rk)
         for {
           _ <- publisher(message)
-        } yield {
-          handler.receivedMessages should have size 1
-        }
+        } yield handler.receivedMessages should have size 1
       }
     }
   }
@@ -384,19 +380,18 @@ class PublishConsumeTest extends AnyFunSuite with IOAmqpClientTest with Eventual
       val requeueHandler = StubHandlers.ackHandler[IO, String]
 
       Resource
-        .liftF(client.declare(declarations))
+        .eval(client.declare(declarations))
         .flatMap(_ =>
           for {
             _ <- client.registerRequeueConsumerOf(queue, handler)
             _ <- client.registerConsumerOf(QueueName(queue.value + ".requeue"), requeueHandler)
-          } yield ())
+          } yield ()
+        )
         .use { _ =>
           val publisher = client.publisherOf[String](exchange, rk)
           for {
             _ <- publisher("hello")
-          } yield {
-            requeueHandler.receivedMessages should have size 1
-          }
+          } yield requeueHandler.receivedMessages should have size 1
         }
     }
   }

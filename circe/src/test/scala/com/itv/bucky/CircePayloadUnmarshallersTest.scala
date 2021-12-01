@@ -6,10 +6,9 @@ import com.itv.bucky.circe.auto._
 import io.circe._
 import io.circe.generic.auto._
 import io.circe.syntax._
-import org.scalatest.{EitherValues, FunSuite, OptionValues}
+import org.scalatest.{EitherValues, OptionValues}
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers._
-import org.scalatest.exceptions.TestFailedException
 
 import scala.util.Random
 

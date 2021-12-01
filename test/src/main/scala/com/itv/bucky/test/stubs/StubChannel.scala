@@ -10,7 +10,6 @@ import com.itv.bucky.decl.{Binding, Direct, Exchange, ExchangeBinding, ExchangeT
 import com.rabbitmq.client.{ConfirmListener, ReturnListener}
 import cats._
 import cats.effect._
-import cats.effect.ConcurrentEffect
 import cats.implicits._
 import com.typesafe.scalalogging.StrictLogging
 
@@ -21,7 +20,7 @@ import com.itv.bucky.decl.Fanout
 
 import scala.collection.compat._
 
-abstract class StubChannel[F[_]](implicit F: ConcurrentEffect[F]) extends Channel[F] with StrictLogging {
+abstract class StubChannel[F[_]](implicit F: Async[F]) extends Channel[F] with StrictLogging {
   var publishSeq: Long                                                        = 0L
   val pubSeqLock: Object                                                      = new Object
   val exchanges: ListBuffer[Exchange]                                         = ListBuffer.empty
@@ -175,8 +174,7 @@ abstract class StubChannel[F[_]](implicit F: ConcurrentEffect[F]) extends Channe
   override def registerConsumer(handler: Handler[F, Delivery],
                                 onHandlerException: ConsumeAction,
                                 queue: QueueName,
-                                consumerTag: ConsumerTag,
-                                cs: ContextShift[F]): F[Unit] =
+                                consumerTag: ConsumerTag): F[Unit] =
     F.delay(handlers.synchronized(handlers.put(queue, handler -> onHandlerException))).void
 
   override def addConfirmListener(listener: ConfirmListener): F[Unit] = F.delay(confirmListeners.synchronized(confirmListeners += listener))

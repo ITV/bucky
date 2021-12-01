@@ -1,39 +1,28 @@
-import cats.effect.{ContextShift, IO, Resource, Timer}
+package com.itv.bucky.integrationTest
+
+import cats.effect.unsafe.IORuntime
+import cats.effect.{IO, Resource}
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
-import com.itv.bucky.consume.Delivery
 import com.itv.bucky.decl.Exchange
-import com.itv.bucky.pattern.requeue
 import com.itv.bucky.pattern.requeue.RequeuePolicy
 import com.itv.bucky.publish.{PublishCommand, PublishCommandBuilder}
-import com.itv.bucky.{
-  AmqpClient,
-  AmqpClientConfig,
-  ExchangeName,
-  PayloadMarshaller,
-  PayloadUnmarshaller,
-  Publisher,
-  QueueName,
-  RoutingKey,
-  publishCommandBuilder
-}
-import com.itv.bucky.test.StubHandlers
+import com.itv.bucky.{AmqpClient, AmqpClientConfig, ExchangeName, PayloadMarshaller, PayloadUnmarshaller, Publisher, RoutingKey, publishCommandBuilder}
 import com.typesafe.config.ConfigFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.funsuite.AnyFunSuite
+import org.scalatest.matchers.should.Matchers._
 
 import java.util.UUID
 import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.DurationInt
-import org.scalatest.matchers.should.Matchers._
 
 class PublishIntegrationTest extends AnyFunSuite with Eventually with IntegrationPatience {
 
+  implicit val ioRuntime: IORuntime = packageIORuntime
   implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(300))
-  implicit val cs: ContextShift[IO] = IO.contextShift(ec)
-  implicit val timer: Timer[IO]     = IO.timer(ec)
-  val requeuePolicy                 = RequeuePolicy(maximumProcessAttempts = 5, requeueAfter = 2.seconds)
+  val requeuePolicy: RequeuePolicy = RequeuePolicy(maximumProcessAttempts = 5, requeueAfter = 2.seconds)
 
   test("publisher should error if mandatory is true and there is no routing") {
     withTestFixture{
@@ -65,7 +54,7 @@ class PublishIntegrationTest extends AnyFunSuite with Eventually with Integratio
     AmqpClient[IO](config)
       .use { client =>
         Resource
-          .liftF(
+          .eval(
             client.declare(Exchange(exchangeName))
           )
           .use { _ =>

@@ -1,19 +1,17 @@
 package com.itv.bucky.publish
 
-import cats._
+import cats.effect.std.Dispatcher
+import cats.effect.{Deferred, Ref, _}
 import cats.implicits._
-import cats.effect._
-import cats.effect.implicits._
-import cats.effect.concurrent.{Deferred, Ref}
 import com.rabbitmq.client.{AMQP, ConfirmListener, ReturnListener}
 import com.typesafe.scalalogging.StrictLogging
 
-import scala.language.higherKinds
-import scala.collection.immutable.TreeMap
 import scala.collection.compat._
+import scala.collection.immutable.TreeMap
+import scala.language.higherKinds
 
-private[bucky] case class PendingConfirmListener[F[_]](pendingConfirmations: Ref[F, TreeMap[Long, Deferred[F, Boolean]]], pendingReturn: Ref[F, Boolean])(
-  implicit F: ConcurrentEffect[F])
+private[bucky] case class PendingConfirmListener[F[_]](pendingConfirmations: Ref[F, TreeMap[Long, Deferred[F, Boolean]]], pendingReturn: Ref[F, Boolean], dispatcher: Dispatcher[F])(
+  implicit F: Sync[F])
   extends ConfirmListener
     with ReturnListener
     with StrictLogging {
@@ -29,24 +27,26 @@ private[bucky] case class PendingConfirmListener[F[_]](pendingConfirmations: Ref
     }
 
   override def handleAck(deliveryTag: Long, multiple: Boolean): Unit =
-    (for {
-      returnRef <- pendingReturn.getAndSet(false)
-      toComplete <- pop(deliveryTag, multiple)
-      _ <- F.delay(logger.info("Received ack for delivery tag: {} and multiple: {}", deliveryTag, multiple))
-      _ <- toComplete.traverse(_.complete(!returnRef))
-    } yield ()).toIO
-      .unsafeRunSync()
+    dispatcher.unsafeRunSync(
+      for {
+        returnRef <- pendingReturn.getAndSet(false)
+        toComplete <- pop(deliveryTag, multiple)
+        _          <- F.delay(logger.info("Received ack for delivery tag: {} and multiple: {}", deliveryTag, multiple))
+        _          <- toComplete.traverse(_.complete(!returnRef))
+      } yield ()
+    )
 
   override def handleNack(deliveryTag: Long, multiple: Boolean): Unit =
-    (for {
-      toComplete <- pop(deliveryTag, multiple)
-      _ <- F.delay(logger.error("Received Nack for delivery tag: {} and multiple: {}", deliveryTag, multiple))
-      _ <- pendingReturn.set(false)
-      _ <- toComplete.traverse(_.complete(false))
-    } yield ()).toIO
-      .unsafeRunSync()
+    dispatcher.unsafeRunSync(
+      for {
+        toComplete <- pop(deliveryTag, multiple)
+        _          <- F.delay(logger.error("Received Nack for delivery tag: {} and multiple: {}", deliveryTag, multiple))
+        _          <- pendingReturn.set(false)
+        _          <- toComplete.traverse(_.complete(false))
+      } yield ()
+    )
 
   override def handleReturn(replyCode: Int, replyText: String, exchange: String, routingKey: String, properties: AMQP.BasicProperties, body: Array[Byte]): Unit = {
-    pendingReturn.set(true).toIO.unsafeRunSync()
+    dispatcher.unsafeRunSync(pendingReturn.set(true))
   }
 }
