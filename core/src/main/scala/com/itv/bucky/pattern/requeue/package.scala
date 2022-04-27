@@ -18,7 +18,8 @@ package object requeue {
                           routingKey: RoutingKey,
                           dlxName: Option[ExchangeName] = None,
                           dlxType: ExchangeType = Fanout,
-                          retryAfter: FiniteDuration = 5.minutes): Iterable[Declaration] = {
+                          retryAfter: FiniteDuration = 5.minutes,
+                          maxPriority: Option[Int] = None): Iterable[Declaration] = {
 
     val name = dlxName.getOrElse(ExchangeName(s"${queueName.value}.dlx"))
     val deadLetterQueueName: QueueName = QueueName(s"${queueName.value}.dlq")
@@ -27,7 +28,7 @@ package object requeue {
     val requeueExchangeName: ExchangeName = ExchangeName(s"${queueName.value}.requeue")
 
     List(
-      Queue(queueName).deadLetterExchange(name),
+      Queue(queueName).deadLetterExchange(name).maxPriority(maxPriority),
       Queue(deadLetterQueueName),
       Queue(requeueQueueName).deadLetterExchange(redeliverExchangeName).messageTTL(retryAfter),
       Exchange(name, exchangeType = dlxType).binding(routingKey -> deadLetterQueueName),

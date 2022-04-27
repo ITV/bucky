@@ -136,5 +136,33 @@ class WiringTest extends AnyFunSuite with StrictLogging {
                             dlxType,
                             CustomTestWiring.requeuePolicy.requeueAfter)
   }
+  test("it should allow specification of a priority queue") {
+    val routingKey = RoutingKey("route")
+    val dlxType    = Direct
+    val queueName  = QueueName("queue")
+    object CustomTestWiring
+        extends Wiring[String](
+          name = WiringName("test"),
+          setExchangeName = Some(ExchangeName("exchange")),
+          setRoutingKey = Some(routingKey),
+          setQueueName = Some(queueName),
+          setExchangeType = Some(Direct),
+          setRequeuePolicy = Some(RequeuePolicy(10, 1.hour)),
+          setPrefetchCount = Some(100),
+          setDeadLetterExchangeType = Some(dlxType),
+          maxPriority = Some(5)
+        )
+    CustomTestWiring.consumerDeclarations shouldBe
+      List(
+        Exchange(ExchangeName("exchange"), Direct)
+          .binding(routingKey -> QueueName("queue"))
+      ) ++
+        requeueDeclarations(QueueName("queue"),
+                            routingKey,
+                            Some(ExchangeName(s"${queueName.value}.dlx")),
+                            dlxType,
+                            CustomTestWiring.requeuePolicy.requeueAfter,
+                            maxPriority = Some(5))
+  }
 
 }

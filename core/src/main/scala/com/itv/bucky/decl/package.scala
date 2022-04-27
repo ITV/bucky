@@ -59,6 +59,6 @@ package object decl {
     def expires(value: FiniteDuration): Queue                 = argument("x-expires" -> Long.box(value.toMillis))
     def deadLetterExchange(exchangeName: ExchangeName): Queue = argument("x-dead-letter-exchange" -> exchangeName.value)
     def messageTTL(value: FiniteDuration): Queue              = argument("x-message-ttl" -> Long.box(value.toMillis))
+    def maxPriority(value: Option[Int]): Queue                = value.fold(this)(max => argument("x-max-priority" -> Long.box(max)))
   }
-
 }

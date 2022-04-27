@@ -26,7 +26,8 @@ class Wiring[T](
     setExchangeType: Option[ExchangeType] = None,
     setRequeuePolicy: Option[RequeuePolicy] = None,
     setPrefetchCount: Option[Int] = None,
-    setDeadLetterExchangeType: Option[ExchangeType] = None
+    setDeadLetterExchangeType: Option[ExchangeType] = None,
+    maxPriority: Option[Int] = None
 )(implicit
   val marshaller: PayloadMarshaller[T],
   val unmarshaller: PayloadUnmarshaller[T])
@@ -60,7 +61,8 @@ class Wiring[T](
                                                              dlxRoutingKey,
                                                              Some(ExchangeName(s"${queueName.value}.dlx")),
                                                              dlxType,
-                                                             requeueRetryAfter)
+                                                             requeueRetryAfter,
+                                                             maxPriority = maxPriority)
 
   //retain the default requeue ttl of 5 minutes, unless requeue policy requires a longer delay
   private def requeueRetryAfter: FiniteDuration = requeuePolicy.requeueAfter.max(5.minutes)
