@@ -1,8 +1,7 @@
 package com.itv.bucky
 
-import java.util.{Collections, UUID}
+import java.util.{Collections, Date, UUID}
 import java.util.concurrent.{AbstractExecutorService, TimeUnit}
-
 import cats.effect._
 import cats.effect.implicits._
 import cats.effect.concurrent.Ref
@@ -140,7 +139,11 @@ object AmqpClient extends StrictLogging {
       override def publisher(): Publisher[F, PublishCommand] = cmd => {
         for {
           _ <- cs.shift
-          _ <- connectionManager.publish(cmd)
+          cmdWithTimestamp = cmd.basicProperties.timestamp match {
+            case Some(_) => cmd
+            case None => cmd.copy(basicProperties = cmd.basicProperties.copy(timestamp = Some(new Date())))
+          }
+          _ <- connectionManager.publish(cmdWithTimestamp)
         } yield ()
       }
 

@@ -1,19 +1,21 @@
 package com.itv.bucky.test
 
 import java.util.concurrent.TimeoutException
-
 import cats.effect.{IO, Resource}
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.consume._
 import com.itv.bucky.decl.{Direct, Exchange, ExchangeBinding, Headers, Queue, Topic}
 import com.itv.bucky.publish._
 import com.itv.bucky.{ExchangeName, Handler, PayloadMarshaller, PublisherSugar, QueueName, RequeueHandler, RoutingKey}
+import com.rabbitmq.client.AMQP.BasicProperties
 import org.scalatest.{EitherValues, FunSuite}
 import org.scalatest.Matchers._
 import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers._
 
+import java.util.Date
+import scala.concurrent.duration.DurationInt
 import scala.language.reflectiveCalls
 
 class PublishConsumeTest extends AnyFunSuite with IOAmqpClientTest with Eventually with IntegrationPatience with ScalaFutures with EitherValues {
@@ -286,6 +288,68 @@ class PublishConsumeTest extends AnyFunSuite with IOAmqpClientTest with Eventual
         } yield {
           handler.receivedMessages should have size 1
           handler.receivedMessages.head.properties.headers shouldBe headers
+        }
+      }
+    }
+  }
+
+  test("Can publish messages with an existing timestamp") {
+    runAmqpTest { client =>
+      val exchange = ExchangeName("anexchange")
+      val queue    = QueueName("aqueue")
+      val rk       = RoutingKey("ark")
+      val date = new Date()
+      val basicProperties = MessageProperties.basic.copy(timestamp = Some(date))
+      val message  = "Hello"
+      val commandBuilder = PublishCommandBuilder
+        .publishCommandBuilder[String](StringPayloadMarshaller)
+        .using(exchange)
+        .using(rk)
+        .using(basicProperties)
+
+
+
+      val handler      = StubHandlers.ackHandler[IO, Delivery]
+      val declarations = List(Queue(queue), Exchange(exchange).binding((rk, queue)))
+
+
+      Resource.liftF(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
+        val publisher = new PublisherSugar(client).publisherOf(commandBuilder)
+        for {
+          _ <- publisher(message)
+        } yield {
+          handler.receivedMessages should have size 1
+          handler.receivedMessages.head.properties.timestamp.get shouldBe date
+        }
+      }
+    }
+  }
+
+  test("Can publish messages with timestamp") {
+    runAmqpTest { client =>
+      val exchange = ExchangeName("anexchange")
+      val queue    = QueueName("aqueue")
+      val rk       = RoutingKey("ark")
+      val message  = "Hello"
+      val commandBuilder = PublishCommandBuilder
+        .publishCommandBuilder[String](StringPayloadMarshaller)
+        .using(exchange)
+        .using(rk)
+
+      val handler      = StubHandlers.ackHandler[IO, Delivery]
+      val declarations = List(Queue(queue), Exchange(exchange).binding((rk, queue)))
+
+
+      Resource.liftF(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
+        val publisher = new PublisherSugar(client).publisherOf(commandBuilder)
+        for {
+          date1 <- IO.pure(new Date())
+          _ <- publisher(message)
+          date2 = new Date()
+        } yield {
+          handler.receivedMessages should have size 1
+          handler.receivedMessages.head.properties.timestamp.get.before(date2) shouldBe true
+          handler.receivedMessages.head.properties.timestamp.get.after(date1) shouldBe true
         }
       }
     }
