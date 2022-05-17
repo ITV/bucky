@@ -284,6 +284,24 @@ lazy val xml = project
     )
   )
 
+lazy val natchez = project
+  .settings(name := "com.itv")
+  .settings(moduleName := "bucky-natchez")
+  .settings(kernelSettings: _*)
+  .dependsOn(core, test % "test,it")
+  .configs(IntegrationTest)
+  .settings(Defaults.itSettings)
+  .settings(
+    parallelExecution in IntegrationTest := false,
+    crossScalaVersions                   := Seq(scala212, scala213)
+  )
+  .settings(
+    libraryDependencies ++= Seq(
+      "org.tpolecat"  %% "natchez-core"                  % "0.1.5",
+      "org.scalatest" %% "scalatest"                     % scalaTestVersion           % "test,it",
+      "org.typelevel" %% "cats-effect-testing-scalatest" % catsEffectScalaTestVersion % "test,it"
+    )
+  )
 lazy val root = (project in file("."))
-  .aggregate(xml, circe, kamon, argonaut, example, test, core)
+  .aggregate(natchez, xml, circe, kamon, argonaut, example, test, core)
   .settings(publishArtifact := false)
