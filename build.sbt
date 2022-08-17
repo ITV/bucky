@@ -263,6 +263,24 @@ lazy val kamon = project
     )
   )
 
+lazy val epimetheus = project
+  .settings(name := "com.itv")
+  .settings(moduleName := "bucky-kamon")
+  .settings(kernelSettings: _*)
+  .dependsOn(core, test % "test,it")
+  .configs(IntegrationTest)
+  .settings(Defaults.itSettings)
+  .settings(
+    internalDependencyClasspath in IntegrationTest += Attributed.blank((classDirectory in Test).value),
+    parallelExecution in IntegrationTest := false,
+    crossScalaVersions                   := Seq(scala212)
+  )
+  .settings(
+    libraryDependencies ++= Seq(
+      "io.chrisdavenport" %% "epimetheus" % "0.5.0-M2"
+    )
+  )
+
 lazy val xml = project
   .settings(name := "com.itv")
   .settings(moduleName := "bucky-xml")
