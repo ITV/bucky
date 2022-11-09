@@ -56,7 +56,7 @@ object AmqpClient extends StrictLogging {
         }
         .rethrow
 
-    Resource.make(Spawn[F].cede.flatMap(_ => make))(channel => F.blocking(channel.close()))
+    Resource.make(make)(channel => F.blocking(channel.close()))
   }
 
   private def createConnection[F[_]](
@@ -98,7 +98,7 @@ object AmqpClient extends StrictLogging {
         }
         .rethrow
 
-    Resource.make(Spawn[F].cede.flatMap(_ => make))(connection => F.blocking(connection.close()))
+    Resource.make(make)(connection => F.blocking(connection.close()))
   }
 
   def apply[F[_]](config: AmqpClientConfig)(implicit F: Async[F],
@@ -119,7 +119,6 @@ object AmqpClient extends StrictLogging {
     publishChannel.flatMap { channel =>
       val make =
         for {
-          _                 <- Spawn[F].cede
           connectionManager <- AmqpClientConnectionManager(config, channel, dispatcher)
         } yield mkClient(buildChannel, connectionManager)
       Resource.make(make)(_ => F.unit)
@@ -137,12 +136,8 @@ object AmqpClient extends StrictLogging {
           _      <- if (ended) F.unit else t.sleep(sleep) *> repeatUntil(eval)(pred)(sleep)
         } yield ()
 
-      override def publisher(): Publisher[F, PublishCommand] = cmd => {
-        for {
-          _ <- Spawn[F].cede
-          _ <- connectionManager.publish(cmd)
-        } yield ()
-      }
+      override def publisher(): Publisher[F, PublishCommand] = cmd => connectionManager.publish(cmd)
+
 
       override def registerConsumer(queueName: QueueName,
                                     handler: Handler[F, Delivery],

@@ -63,7 +63,6 @@ private[bucky] case class AmqpClientConnectionManager[F[_]](amqpConfig: AmqpClie
                        onHandlerException: ConsumeAction,
                        prefetchCount: Int): F[Unit] =
     for {
-      _           <- Spawn[F].cede
       consumerTag <- F.delay(ConsumerTag.create(queueName))
       _           <- F.delay(logger.debug("Registering consumer for queue: {} with tag {}.", queueName.value, consumerTag.value))
       _           <- channel.basicQos(prefetchCount)
