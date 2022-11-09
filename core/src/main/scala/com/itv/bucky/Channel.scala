@@ -122,7 +122,6 @@ object Channel {
           val delivery = Consumer.deliveryFrom(consumerTag, envelope, properties, body)
           dispatcher.unsafeRunAndForget(
             (for {
-              _      <- Spawn[F].cede
               _      <- F.delay(logger.debug("Received delivery with rk:{} on exchange: {}", delivery.envelope.routingKey, delivery.envelope.exchangeName))
               action <- handler(delivery)
               _      <- F.delay(logger.info("Responding with {} to {} on {}", action, delivery, queue))
