@@ -1,14 +1,12 @@
 package com.itv.bucky.test.stubs
 
 import java.util.UUID
-import java.util.concurrent.atomic.AtomicLong
 import com.itv.bucky
 import com.itv.bucky.consume._
 import com.itv.bucky.publish._
 import com.itv.bucky.{Channel, Envelope, ExchangeName, Handler, QueueName, RoutingKey}
-import com.itv.bucky.decl.{Binding, Direct, Exchange, ExchangeBinding, ExchangeType, Headers, Queue, Topic}
+import com.itv.bucky.decl.{Binding, Exchange, ExchangeBinding, ExchangeType, Headers, Queue, Topic}
 import com.rabbitmq.client.{ConfirmListener, ReturnListener}
-import cats._
 import cats.effect._
 import cats.implicits._
 import com.typesafe.scalalogging.StrictLogging
@@ -18,7 +16,9 @@ import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import com.itv.bucky.decl.Fanout
 
+import java.util.concurrent.Executors
 import scala.collection.compat._
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
 
 abstract class StubChannel[F[_]](implicit F: Async[F]) extends Channel[F] with StrictLogging {
   var publishSeq: Long                                                        = 0L
@@ -208,4 +208,6 @@ abstract class StubChannel[F[_]](implicit F: Async[F]) extends Channel[F] with S
   override def synchroniseIfNeeded[T](f: => T): T = f
 
   override def isConnectionOpen: F[Boolean] = F.pure(true)
+
+  override def singleThreadExecutor: ExecutionContextExecutor = ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor())
 }

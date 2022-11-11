@@ -11,10 +11,13 @@ import com.rabbitmq.client.{ConfirmListener, DefaultConsumer, ReturnListener, Ch
 import com.typesafe.scalalogging.StrictLogging
 
 import java.util.concurrent.Executors
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
 import scala.language.higherKinds
 
 trait Channel[F[_]] {
+
+  def singleThreadExecutor: ExecutionContextExecutor
+
   def isConnectionOpen: F[Boolean]
   def synchroniseIfNeeded[T](f: => T): T
   def close(): F[Unit]
@@ -57,9 +60,10 @@ object Channel {
 
     import scala.jdk.CollectionConverters._
 
-    private val singleThreadEc = ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor())
+    //TODO: Make a Resource
+    val singleThreadExecutor = ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor((r: Runnable) => new Thread(r, "RabbitChannelThread")))
 
-    private def runOnSingleThread[A](fa : => F[A]) = F.evalOn(fa, singleThreadEc)
+    private def runOnSingleThread[A](fa : => F[A]) = F.evalOn(fa, singleThreadExecutor)
 
     override def close(): F[Unit]                                       = runOnSingleThread(F.delay(channel.close()))
     override def purgeQueue(name: QueueName): F[Unit]                   = runOnSingleThread(F.delay(channel.queuePurge(name.value)))
@@ -84,7 +88,7 @@ object Channel {
                 cmd.body.value
               )
           )),
-          singleThreadEc
+          singleThreadExecutor
         )
         _ <- F.delay(logger.info("Published message: {}", cmd))
       } yield ()
@@ -175,7 +179,8 @@ object Channel {
       runOnSingleThread(F.delay(channel.basicConsume(queue.value, false, consumerTag.value, deliveryCallback)).void)
     }
 
-    override def synchroniseIfNeeded[T](f: => T): T = this.synchronized(f)
+    //TODO: Remove
+    @deprecated override def synchroniseIfNeeded[T](f: => T): T = f
 
     override def isConnectionOpen: F[Boolean] = runOnSingleThread(F.delay(channel.getConnection.isOpen))
   }

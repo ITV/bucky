@@ -21,12 +21,9 @@ private[bucky] case class AmqpClientConnectionManager[F[_]](amqpConfig: AmqpClie
                                                             dispatcher: Dispatcher[F])(implicit F: Async[F], t: Temporal[F])
   extends StrictLogging {
 
-  private def runWithChannelSync[T](action: F[T]): F[T] =
-    publishChannel.synchroniseIfNeeded {
-      F.fromTry(Try {
-        dispatcher.unsafeRunSync(action)
-      })
-    }
+  //TODO: Remove
+  @deprecated private def runWithChannelSync[T](action: F[T]): F[T] =
+    action
 
   def publish(cmd: PublishCommand): F[Unit] =
     for {
@@ -41,7 +38,7 @@ private[bucky] case class AmqpClientConnectionManager[F[_]](amqpConfig: AmqpClie
             _              <- publishChannel.publish(nextPublishSeq, cmd)
           } yield ()
         }
-        _ <- signal.get.ifM(F.unit, F.raiseError[Unit](new RuntimeException(s"Failed to publish msg: ${cmd}")))
+        _ <- F.blocking(signal.get.ifM(F.unit, F.raiseError[Unit](new RuntimeException(s"Failed to publish msg: ${cmd}"))))
       } yield ())
         .timeout(amqpConfig.publishingTimeout)
         .recoverWith {
