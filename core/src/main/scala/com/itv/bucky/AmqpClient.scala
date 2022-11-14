@@ -1,22 +1,21 @@
 package com.itv.bucky
 
-import java.util.{Collections, UUID}
-import java.util.concurrent.{AbstractExecutorService, TimeUnit}
-import cats.effect._
 import cats.effect.implicits._
 import cats.effect.std.Dispatcher
+import cats.effect._
 import cats.implicits._
 import com.itv.bucky.consume.{ConsumeAction, DeadLetter, Delivery}
-import com.rabbitmq.client.{ConnectionFactory, ShutdownListener, ShutdownSignalException, Channel => RabbitChannel, Connection => RabbitConnection}
 import com.itv.bucky.decl._
 import com.itv.bucky.publish.PublishCommand
+import com.rabbitmq.client.{ConnectionFactory, ShutdownListener, ShutdownSignalException, Channel => RabbitChannel, Connection => RabbitConnection}
 import com.typesafe.scalalogging.StrictLogging
 
-import scala.concurrent.duration._
-import scala.concurrent.duration.FiniteDuration
+import java.util.concurrent.{AbstractExecutorService, Executors, TimeUnit}
+import java.util.{Collections, UUID}
+import scala.concurrent.duration.{FiniteDuration, _}
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutorService}
 import scala.language.higherKinds
-import cats.effect.{Ref, Spawn, Temporal}
+import scala.util.Random
 
 trait AmqpClient[F[_]] {
   def declare(declarations: Declaration*): F[Unit]
@@ -107,8 +106,9 @@ object AmqpClient extends StrictLogging {
     for {
       dispatcher <- Dispatcher[F]
       connection <- createConnection(config)
-      publishChannel = createChannel(connection).map(Channel.apply[F](_, dispatcher))
-      buildChannel   = () => createChannel(connection).map(Channel.apply[F](_, dispatcher))
+      singleThreadExecutor <- Resource.eval(F.delay(ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor(new Thread(_, s" RabbitChannelThread-${Random.alphanumeric.take(6).mkString}")))))
+      publishChannel = createChannel(connection).map(Channel.apply[F](_, dispatcher, singleThreadExecutor))
+      buildChannel   = () => createChannel(connection).map(Channel.apply[F](_, dispatcher, singleThreadExecutor))
       client <- apply[F](config, buildChannel, publishChannel, dispatcher)
     } yield client
 

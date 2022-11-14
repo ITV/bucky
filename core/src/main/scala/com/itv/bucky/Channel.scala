@@ -16,8 +16,6 @@ import scala.language.higherKinds
 
 trait Channel[F[_]] {
 
-  def singleThreadExecutor: ExecutionContextExecutor
-
   def isConnectionOpen: F[Boolean]
   def close(): F[Unit]
   def purgeQueue(name: QueueName): F[Unit]
@@ -55,12 +53,9 @@ trait Channel[F[_]] {
 }
 
 object Channel {
-  def apply[F[_]](channel: RabbitChannel, dispatcher: Dispatcher[F])(implicit F: Async[F]): Channel[F] = new Channel[F] with StrictLogging {
+  def apply[F[_]](channel: RabbitChannel, dispatcher: Dispatcher[F], singleThreadExecutor: ExecutionContextExecutor)(implicit F: Async[F]): Channel[F] = new Channel[F] with StrictLogging {
 
     import scala.jdk.CollectionConverters._
-
-    //TODO: Make a Resource
-    val singleThreadExecutor = ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor((r: Runnable) => new Thread(r, "RabbitChannelThread")))
 
     private def runOnSingleThread[A](fa : => F[A]) = F.evalOn(fa, singleThreadExecutor)
 
