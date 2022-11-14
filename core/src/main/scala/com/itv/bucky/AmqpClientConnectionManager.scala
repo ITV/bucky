@@ -21,36 +21,26 @@ private[bucky] case class AmqpClientConnectionManager[F[_]](amqpConfig: AmqpClie
                                                             dispatcher: Dispatcher[F])(implicit F: Async[F], t: Temporal[F])
   extends StrictLogging {
 
-  //TODO: Remove
-  @deprecated private def runWithChannelSync[T](action: F[T]): F[T] =
-    action
-
   def publish(cmd: PublishCommand): F[Unit] =
     for {
       deliveryTag <- Ref.of[F, Option[Long]](None)
       _ <- (for {
         signal <- Deferred[F, Boolean]
-        _ <- runWithChannelSync {
-          for {
-            nextPublishSeq <- publishChannel.getNextPublishSeqNo
-            _              <- deliveryTag.set(Some(nextPublishSeq))
-            _              <- pendingConfirmListener.pendingConfirmations.update(_ + (nextPublishSeq -> signal))
-            _              <- publishChannel.publish(nextPublishSeq, cmd)
-          } yield ()
-        }
+        nextPublishSeq <- publishChannel.getNextPublishSeqNo
+        _ <- deliveryTag.set(Some(nextPublishSeq))
+        _ <- pendingConfirmListener.pendingConfirmations.update(_ + (nextPublishSeq -> signal))
+        _ <- publishChannel.publish(nextPublishSeq, cmd)
         _ <- F.blocking(signal.get.ifM(F.unit, F.raiseError[Unit](new RuntimeException(s"Failed to publish msg: ${cmd}"))))
       } yield ())
         .timeout(amqpConfig.publishingTimeout)
         .recoverWith {
           case e =>
-            runWithChannelSync {
-              for {
-                dl          <- deliveryTag.get
-                deliveryTag <- F.fromOption(dl, new RuntimeException("Timeout occurred before a delivery tag could be obtained.", e))
-                _           <- pendingConfirmListener.pop(deliveryTag, multiple = false)
-                _           <- F.raiseError[Unit](e)
-              } yield ()
-            }
+            for {
+              dl          <- deliveryTag.get
+              deliveryTag <- F.fromOption(dl, new RuntimeException("Timeout occurred before a delivery tag could be obtained.", e))
+              _           <- pendingConfirmListener.pop(deliveryTag, multiple = false)
+              _           <- F.raiseError[Unit](e)
+            } yield ()
         }
     } yield ()
 

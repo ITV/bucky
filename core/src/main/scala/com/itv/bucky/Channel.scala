@@ -19,7 +19,6 @@ trait Channel[F[_]] {
   def singleThreadExecutor: ExecutionContextExecutor
 
   def isConnectionOpen: F[Boolean]
-  def synchroniseIfNeeded[T](f: => T): T
   def close(): F[Unit]
   def purgeQueue(name: QueueName): F[Unit]
   def basicQos(prefetchCount: Int): F[Unit]
@@ -178,9 +177,6 @@ object Channel {
       }
       runOnSingleThread(F.delay(channel.basicConsume(queue.value, false, consumerTag.value, deliveryCallback)).void)
     }
-
-    //TODO: Remove
-    @deprecated override def synchroniseIfNeeded[T](f: => T): T = f
 
     override def isConnectionOpen: F[Boolean] = runOnSingleThread(F.delay(channel.getConnection.isOpen))
   }
