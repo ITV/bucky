@@ -70,8 +70,8 @@ object Channel {
     override def publish(sequenceNumber: Long, cmd: PublishCommand): F[Unit] =
       for {
         _ <- F.delay(logger.debug("Publishing command with exchange:{} rk: {}.", cmd.exchange, cmd.routingKey))
-        _ <- F.evalOn(
-          (F.delay(
+        _ <- runOnSingleThread(
+          F.delay(
             channel
               .basicPublish(
                 cmd.exchange.value,
@@ -81,9 +81,7 @@ object Channel {
                 MessagePropertiesConverters(cmd.basicProperties),
                 cmd.body.value
               )
-          )),
-          singleThreadExecutor
-        )
+          ))
         _ <- F.delay(logger.info("Published message: {}", cmd))
       } yield ()
 
