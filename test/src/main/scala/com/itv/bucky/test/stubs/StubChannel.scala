@@ -16,13 +16,9 @@ import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import com.itv.bucky.decl.Fanout
 
-import java.util.concurrent.Executors
 import scala.collection.compat._
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
 
-abstract class StubChannel[F[_]](implicit F: Async[F]) extends Channel[F] with StrictLogging {
-  var publishSeq: Long                                                        = 0L
-  val pubSeqLock: Object                                                      = new Object
+abstract class StubChannel[F[_]](publishSeq: Ref[F, Long])(implicit F: Async[F]) extends Channel[F] with StrictLogging {
   val exchanges: ListBuffer[Exchange]                                         = ListBuffer.empty
   val queues: ListBuffer[Queue]                                               = ListBuffer.empty
   val bindings: ListBuffer[Binding]                                           = ListBuffer.empty
@@ -37,11 +33,7 @@ abstract class StubChannel[F[_]](implicit F: Async[F]) extends Channel[F] with S
   override def confirmSelect: F[Unit]                = F.unit
 
   override def getNextPublishSeqNo: F[Long] =
-    F.delay(pubSeqLock.synchronized {
-      val current = publishSeq
-      publishSeq = publishSeq + 1
-      current
-    })
+    publishSeq.getAndUpdate(c => c + 1)
 
   def handlePublishHandlersResult(result: Either[Throwable, List[ConsumeAction]]): F[Unit]
 

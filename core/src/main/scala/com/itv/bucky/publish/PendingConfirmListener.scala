@@ -47,6 +47,9 @@ private[bucky] case class PendingConfirmListener[F[_]](pendingConfirmations: Ref
     )
 
   override def handleReturn(replyCode: Int, replyText: String, exchange: String, routingKey: String, properties: AMQP.BasicProperties, body: Array[Byte]): Unit = {
-    dispatcher.unsafeRunSync(pendingReturn.set(true))
+    dispatcher.unsafeRunSync {
+      F.delay(logger.error("Received return for replyCode {} on exchange {} and routingKey {}", replyCode, exchange, routingKey)) *>
+        pendingReturn.set(true)
+    }
   }
 }

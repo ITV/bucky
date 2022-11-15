@@ -24,6 +24,7 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.util.Random
 import cats.effect.unsafe.IORuntime
+import com.itv.bucky.test.stubs.StubChannel
 
 class KamonSupportTest
     extends AsyncFunSuite
@@ -150,30 +151,32 @@ class KamonSupportTest
   }
 
   def withChannel(test: (BufferingSpanReporter, Channel[IO]) => IO[Unit]) = {
-    val handler       = StubHandlers.recordingHandler[IO, String](_ => IO.delay(Ack))
-    val declarations  = List(queue, exchange) ++ exchange.bindings
-    val executor      = instrument(Executors.newFixedThreadPool(10))
-    implicit val ec   = ExecutionContext.fromExecutor(executor)
-    val actualChannel = StubChannels.forgiving[IO]
-    val channel       = Resource.make(IO(actualChannel))(_.close())
-    val clientResource =
+    val handler               = StubHandlers.recordingHandler[IO, String](_ => IO.delay(Ack))
+    val declarations          = List(queue, exchange) ++ exchange.bindings
+    val executor              = instrument(Executors.newFixedThreadPool(10))
+    implicit val ec           = ExecutionContext.fromExecutor(executor)
+    val channelResource       = Resource.make(StubChannels.forgiving[IO])(_.close())
+
+    def clientResource(channelRes: StubChannel[IO]) =
       Dispatcher[IO].flatMap { dispatcher =>
         AmqpClient
-          .apply[IO](Config.empty(3.seconds), () => channel.map(_.asInstanceOf[Channel[IO]]), channel.map(_.asInstanceOf[Channel[IO]]), dispatcher)
+          .apply[IO](
+            Config.empty(3.seconds),
+            () => Resource.eval(IO.pure(channelRes.asInstanceOf[Channel[IO]])),
+            Resource.eval(IO.pure(channelRes.asInstanceOf[Channel[IO]])),
+            dispatcher
+          )
       }
 
-    val result =
-      (for {
-        client <- clientResource
-        _      <- Resource.eval(client.declare(declarations))
-        _      <- client.withKamonSupport(logging = false).registerConsumerOf(queue.name, handler)
-      } yield ())
-        .use { _ =>
-          test(reporter, actualChannel).attempt
-        }
-        .unsafeRunSync()
-
-    IO.fromEither(result)
+    (for {
+      actualChannel <- channelResource
+      client <- clientResource(actualChannel)
+      _      <- Resource.eval(client.declare(declarations))
+      _      <- client.withKamonSupport(logging = false).registerConsumerOf(queue.name, handler)
+    } yield actualChannel)
+      .use { channel =>
+        test(reporter, channel)
+      }
   }
 
   def tagSetToMap(tagSet: TagSet): Map[String, String] =

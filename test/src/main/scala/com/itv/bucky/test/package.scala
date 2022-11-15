@@ -1,20 +1,16 @@
 package com.itv.bucky
 
-import cats.effect.{Resource, Sync}
+import cats.effect.std.Dispatcher
+import cats.effect.unsafe.IORuntime
+import cats.effect._
+import cats.implicits._
 import com.itv.bucky.consume._
 import com.itv.bucky.publish._
-import cats.implicits._
-import cats.effect._
 import com.itv.bucky.test.stubs.{RecordingHandler, RecordingRequeueHandler, StubChannel, StubPublisher}
-import cats.effect.implicits._
-import com.itv.bucky.test.AmqpClientTest
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.higherKinds
-import cats.effect.Temporal
-import cats.effect.std.Dispatcher
-import cats.effect.unsafe.IORuntime
 
 package object test {
   object Config {
@@ -23,39 +19,54 @@ package object test {
   }
 
   object StubChannels {
-    def forgiving[F[_]](implicit F: Async[F], t: Temporal[F]): StubChannel[F] =
-      new StubChannel[F] {
-        override def handlePublishHandlersResult(result: Either[Throwable, List[consume.ConsumeAction]]): F[Unit] =
-          F.unit
-      }
-
-    def strict[F[_]](implicit F: Async[F], t: Temporal[F]): StubChannel[F] =
-      new StubChannel[F]() {
-        override def handlePublishHandlersResult(result: Either[Throwable, List[consume.ConsumeAction]]): F[Unit] =
-          F.map(F.fromEither(result))(_ => ())
-      }
-
-    def publishNoAck[F[_]](publishSleepDuration: FiniteDuration = 0.seconds,
-                           publisherResultSleepDuration: FiniteDuration = 0.seconds)(implicit F: Async[F], t: Temporal[F]): StubChannel[F] =
-      new StubChannel[F]() {
-        override def publish(sequenceNumber: Long, cmd: PublishCommand): F[Unit] = F.sleep(publishSleepDuration) >> F.delay {
-          pubSeqLock.synchronized {
-            publishSeq = sequenceNumber + 1
-          }
+    def forgiving[F[_]](implicit F: Async[F], t: Temporal[F]): F[StubChannel[F]] = {
+      Ref[F].of(0L).map { publishSeq =>
+        new StubChannel[F](publishSeq) {
+          override def handlePublishHandlersResult(result: Either[Throwable, List[consume.ConsumeAction]]): F[Unit] =
+            F.unit
         }
-        override def handlePublishHandlersResult(result: Either[Throwable, List[consume.ConsumeAction]]): F[Unit] =
-          F.map(F.fromEither(result))(_ => ())
       }
+    }
 
-    def allShallAck[F[_]](implicit F: Async[F], t: Temporal[F]): StubChannel[F] =
-      new StubChannel[F]() {
-        override def handlePublishHandlersResult(result: Either[Throwable, List[consume.ConsumeAction]]): F[Unit] =
-          F.fromEither(result)
-            .flatMap { result =>
-              F.ifM[Unit](F.delay(result.forall(_ == Ack)))(F.unit, F.raiseError(new RuntimeException("Not all consumers ack the result.")))
-            }
-            .void
+    def strict[F[_]](implicit F: Async[F], t: Temporal[F]): F[StubChannel[F]] = {
+      Ref[F].of(0L).map { publishSeq =>
+        new StubChannel[F](publishSeq) {
+          override def handlePublishHandlersResult(result: Either[Throwable, List[consume.ConsumeAction]]): F[Unit] =
+            F.map(F.fromEither(result))(_ => ())
+        }
       }
+    }
+
+    def publishNoAck[F[_]](publishSeq: Ref[F, Long],
+                           publishSleepDuration: FiniteDuration = 0.seconds)(implicit F: Async[F], t: Temporal[F]): F[StubChannel[F]] = {
+      F.pure {
+        new StubChannel[F](publishSeq) {
+          override def publish(sequenceNumber: Long, cmd: PublishCommand): F[Unit] = {
+            val log = if (publishSleepDuration == 0.seconds) F.unit else F.delay(logger.info(s"Sleeping $publishSleepDuration before publishing"))
+
+            log *>
+              F.sleep(publishSleepDuration) *>
+              publishSeq.update(_ => sequenceNumber + 1)
+          }
+
+          override def handlePublishHandlersResult(result: Either[Throwable, List[consume.ConsumeAction]]): F[Unit] =
+            F.map(F.fromEither(result))(_ => ())
+        }
+      }
+    }
+
+    def allShallAck[F[_]](implicit F: Async[F], t: Temporal[F]): F[StubChannel[F]] = {
+      Ref[F].of(0L).map { publishSeq =>
+        new StubChannel[F](publishSeq) {
+          override def handlePublishHandlersResult(result: Either[Throwable, List[consume.ConsumeAction]]): F[Unit] =
+            F.fromEither(result)
+              .flatMap { result =>
+                F.ifM[Unit](F.delay(result.forall(_ == Ack)))(F.unit, F.raiseError(new RuntimeException("Not all consumers ack the result.")))
+              }
+              .void
+        }
+      }
+    }
   }
 
   object IOAmqpClientTest {
@@ -107,7 +118,7 @@ package object test {
       * @return
       */
     def clientAllAck(config: AmqpClientConfig = Config.empty())(implicit async: Async[F]): Resource[F, AmqpClient[F]] =
-      client(StubChannels.allShallAck[F], config)
+      Resource.eval(StubChannels.allShallAck[F]).flatMap(ch => client(ch, config))
 
     /**
       * A publish will fail if any handler throws an exception
@@ -115,7 +126,7 @@ package object test {
       * @return
       */
     def clientStrict(config: AmqpClientConfig = Config.empty())(implicit async: Async[F]): Resource[F, AmqpClient[F]] =
-      client(StubChannels.strict[F], config)
+      Resource.eval(StubChannels.strict[F]).flatMap(ch => client(ch, config))
 
     /**
       * Publishes always succeed, even if a handler throws an exception or does not Ack
@@ -123,18 +134,20 @@ package object test {
       * @return
       */
     def clientForgiving(config: AmqpClientConfig = Config.empty())(implicit async: Async[F]): Resource[F, AmqpClient[F]] =
-      client(StubChannels.forgiving[F], config)
+      Resource.eval(StubChannels.forgiving[F]).flatMap(ch => client(ch, config))
 
     /**
       * Every attempt to publish will result in a timeout (after the time specified in config)
       * @param config
       * @return
       */
-    def clientPublishTimeout(config: AmqpClientConfig = Config.empty())(implicit async: Async[F]): Resource[F, AmqpClient[F]] =
-      client(StubChannels.publishNoAck[F], config)
-
-    def runAmqpTestIO[T](clientResource: Resource[IO, AmqpClient[IO]])(test: AmqpClient[IO] => IO[T])(implicit async: Async[IO], runtime : IORuntime): T =
-      clientResource.map(_.withLogging()).use(test).unsafeRunSync()
+    def clientPublishTimeout(config: AmqpClientConfig = Config.empty())(implicit async: Async[F]): Resource[F, AmqpClient[F]] = {
+      for {
+        publishSeqRef <- Resource.eval(Ref[F].of(0L))
+        channel <- Resource.eval(StubChannels.publishNoAck[F](publishSeqRef))
+        c <- client(channel, config)
+      } yield c
+    }
 
     def runAmqpTest(clientResource: Resource[F, AmqpClient[F]])(test: AmqpClient[F] => F[Unit])(implicit async: Async[F]): F[Unit] =
       clientResource.map(_.withLogging()).use(test)

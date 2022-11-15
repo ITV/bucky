@@ -30,7 +30,7 @@ private[bucky] case class AmqpClientConnectionManager[F[_]](amqpConfig: AmqpClie
         _ <- deliveryTag.set(Some(nextPublishSeq))
         _ <- pendingConfirmListener.pendingConfirmations.update(_ + (nextPublishSeq -> signal))
         _ <- publishChannel.publish(nextPublishSeq, cmd)
-        _ <- F.blocking(signal.get.ifM(F.unit, F.raiseError[Unit](new RuntimeException(s"Failed to publish msg: ${cmd}"))))
+        _ <- signal.get.ifM(F.unit, F.raiseError[Unit](new RuntimeException(s"Failed to publish msg: ${cmd}")))
       } yield ())
         .timeout(amqpConfig.publishingTimeout)
         .recoverWith {
