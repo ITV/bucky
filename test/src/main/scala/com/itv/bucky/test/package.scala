@@ -35,9 +35,10 @@ package object test {
           F.map(F.fromEither(result))(_ => ())
       }
 
-    def publishNoAck[F[_]](implicit F: Async[F], t: Temporal[F]): StubChannel[F] =
+    def publishNoAck[F[_]](publishSleepDuration: FiniteDuration = 0.seconds,
+                           publisherResultSleepDuration: FiniteDuration = 0.seconds)(implicit F: Async[F], t: Temporal[F]): StubChannel[F] =
       new StubChannel[F]() {
-        override def publish(sequenceNumber: Long, cmd: PublishCommand): F[Unit] = F.delay {
+        override def publish(sequenceNumber: Long, cmd: PublishCommand): F[Unit] = F.sleep(publishSleepDuration) >> F.delay {
           pubSeqLock.synchronized {
             publishSeq = sequenceNumber + 1
           }
