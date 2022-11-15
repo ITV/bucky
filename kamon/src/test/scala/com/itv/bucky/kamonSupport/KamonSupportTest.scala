@@ -133,7 +133,7 @@ class KamonSupportTest
     val declarations = List(queue, exchange) ++ exchange.bindings
     val executor     = instrument(Executors.newFixedThreadPool(10))
     implicit val ec  = ExecutionContext.fromExecutor(executor)
-    val result = IOAmqpClientTest(ec)
+    IOAmqpClientTest(ec)
       .clientForgiving()
       .map(_.withKamonSupport(true))
       .use { client =>
@@ -141,13 +141,9 @@ class KamonSupportTest
           _ <- Resource.eval(client.declare(declarations))
           _ <- client.registerConsumerOf(queue.name, handler)
         } yield ()).use { _ =>
-          for {
-            result <- test(reporter, client.publisherOf[String](exchange.name, rk)).attempt
-          } yield result
+           test(reporter, client.publisherOf[String](exchange.name, rk))
         }
       }
-      .unsafeRunSync()
-    IO.fromEither(result)
   }
 
   def withChannel(test: (BufferingSpanReporter, Channel[IO]) => IO[Unit]) = {
