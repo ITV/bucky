@@ -31,7 +31,6 @@ class KamonSupportTest
     with AsyncIOSpec
     with Matchers
     with Eventually
-    with TestSpanReporter
     with BeforeAndAfterAll
     with BeforeAndAfterEach {
   val queue = Queue(QueueName("kamon-spec-test"))
@@ -39,13 +38,9 @@ class KamonSupportTest
   val exchange = Exchange(ExchangeName("kamon-spec-exchange"))
     .binding(rk -> queue.name)
 
-  val reporter = testSpanReporter()
-
   override implicit val ioRuntime: IORuntime = cats.effect.unsafe.implicits.global
 
-  override def afterAll(): Unit = shutdownTestSpanReporter()
-
-  override def beforeEach(): Unit = reporter.clear()
+  private class SafeTestSpanReporter() extends TestSpanReporter
 
   test("Propagate the context via the headers") {
     withPreDeclaredConsumer() { (reporter, publisher) =>
@@ -133,19 +128,20 @@ class KamonSupportTest
     val declarations = List(queue, exchange) ++ exchange.bindings
     val executor     = instrument(Executors.newFixedThreadPool(10))
     implicit val ec  = ExecutionContext.fromExecutor(executor)
+
     IOAmqpClientTest(ec)
       .clientForgiving()
       .map(_.withKamonSupport(true))
       .use { client =>
         (for {
           _ <- Resource.eval(client.declare(declarations))
+          reporter <- Resource.make(IO.pure(new SafeTestSpanReporter()))(reporter => IO(reporter.shutdownTestSpanReporter))
           _ <- client.registerConsumerOf(queue.name, handler)
-        } yield ()).use { _ =>
-           test(reporter, client.publisherOf[String](exchange.name, rk))
+        } yield reporter.testSpanReporter()).use { testSpanReporter =>
+           test(testSpanReporter, client.publisherOf[String](exchange.name, rk))
         }
       }
   }
-
   def withChannel(test: (BufferingSpanReporter, Channel[IO]) => IO[Unit]) = {
     val handler               = StubHandlers.recordingHandler[IO, String](_ => IO.delay(Ack))
     val declarations          = List(queue, exchange) ++ exchange.bindings
@@ -169,8 +165,9 @@ class KamonSupportTest
       client <- clientResource(actualChannel)
       _      <- Resource.eval(client.declare(declarations))
       _      <- client.withKamonSupport(logging = false).registerConsumerOf(queue.name, handler)
-    } yield actualChannel)
-      .use { channel =>
+      reporter <- Resource.make(IO.pure(new SafeTestSpanReporter()))(reporter => IO(reporter.shutdownTestSpanReporter))
+    } yield (reporter.testSpanReporter(), actualChannel))
+      .use { case (reporter, channel) =>
         test(reporter, channel)
       }
   }
