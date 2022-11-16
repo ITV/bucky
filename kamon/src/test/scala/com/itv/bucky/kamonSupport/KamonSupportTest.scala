@@ -64,14 +64,14 @@ class KamonSupportTest
         eventually(reporter.spans should have size 2)
         val publishSpan  = reporter.spans.find(_.operationName == s"bucky.publish.exchange.${exchange.name.value}").get
         val consumerSpan = reporter.spans.find(_.operationName == s"bucky.consume.${queue.name.value}").get
-        tagSetToMap(publishSpan.metricTags) shouldBe Map(
+        assert(Map(
           "span.kind" -> "bucky.publish",
           "component" -> "bucky",
           "rk"        -> rk.value,
           "exchange"  -> exchange.name.value,
           "operation" -> "bucky.publish.exchange.kamon-spec-exchange",
           "error"     -> "false"
-        )
+        ).toSet.subsetOf(tagSetToMap(publishSpan.metricTags).toSet))
 
         tagSetToMap(publishSpan.tags) shouldBe Map(
           "result" -> "success"
