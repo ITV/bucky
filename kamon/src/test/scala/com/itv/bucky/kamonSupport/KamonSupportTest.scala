@@ -141,6 +141,7 @@ class KamonSupportTest
           _ <- client.registerConsumerOf(queue.name, handler)
         } yield ()).use { _ =>
           for {
+            _      <- Spawn[IO].cede
             result <- test(reporter, client.publisherOf[String](exchange.name, rk)).attempt
           } yield result
         }

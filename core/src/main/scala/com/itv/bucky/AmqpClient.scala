@@ -1,22 +1,20 @@
 package com.itv.bucky
 
-import java.util.{Collections, UUID}
-import java.util.concurrent.{AbstractExecutorService, TimeUnit}
-import cats.effect._
 import cats.effect.implicits._
 import cats.effect.std.Dispatcher
+import cats.effect._
 import cats.implicits._
 import com.itv.bucky.consume.{ConsumeAction, DeadLetter, Delivery}
-import com.rabbitmq.client.{ConnectionFactory, ShutdownListener, ShutdownSignalException, Channel => RabbitChannel, Connection => RabbitConnection}
 import com.itv.bucky.decl._
 import com.itv.bucky.publish.PublishCommand
+import com.rabbitmq.client.{ConnectionFactory, ShutdownListener, ShutdownSignalException, Channel => RabbitChannel, Connection => RabbitConnection}
 import com.typesafe.scalalogging.StrictLogging
 
-import scala.concurrent.duration._
-import scala.concurrent.duration.FiniteDuration
+import java.util.concurrent.{AbstractExecutorService, TimeUnit}
+import java.util.{Collections, UUID}
+import scala.concurrent.duration.{FiniteDuration, _}
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutorService}
 import scala.language.higherKinds
-import cats.effect.{Ref, Spawn, Temporal}
 
 trait AmqpClient[F[_]] {
   def declare(declarations: Declaration*): F[Unit]
@@ -33,7 +31,7 @@ trait AmqpClient[F[_]] {
 
 object AmqpClient extends StrictLogging {
 
-  private def createChannel[F[_]](connection: RabbitConnection)(implicit F: Async[F]): Resource[F, RabbitChannel] = {
+  private def createChannel[F[_]](connection: RabbitConnection)(implicit F: Async[F], executionContext: ExecutionContext): Resource[F, RabbitChannel] = {
     val make =
       F.blocking {
           logger.info(s"Starting Channel")
@@ -56,7 +54,7 @@ object AmqpClient extends StrictLogging {
         }
         .rethrow
 
-    Resource.make(make)(channel => F.blocking(channel.close()))
+    Resource.make(make.evalOn(executionContext))(channel => F.blocking(channel.close()))
   }
 
   private def createConnection[F[_]](
@@ -98,7 +96,7 @@ object AmqpClient extends StrictLogging {
         }
         .rethrow
 
-    Resource.make(make)(connection => F.blocking(connection.close()))
+    Resource.make(make.evalOn(executionContext))(connection => F.blocking(connection.close()))
   }
 
   def apply[F[_]](config: AmqpClientConfig)(implicit F: Async[F],
@@ -121,13 +119,13 @@ object AmqpClient extends StrictLogging {
         for {
           connectionManager <- AmqpClientConnectionManager(config, channel, dispatcher)
         } yield mkClient(buildChannel, connectionManager)
-      Resource.make(make)(_ => F.unit)
+      Resource.make(make.evalOn(executionContext))(_ => F.unit)
     }
 
   
   private def mkClient[F[_]](
       buildChannel: () => Resource[F, Channel[F]],
-      connectionManager: AmqpClientConnectionManager[F])(implicit F: Async[F], t: Temporal[F]): AmqpClient[F] =
+      connectionManager: AmqpClientConnectionManager[F])(implicit F: Async[F], t: Temporal[F], executionContext: ExecutionContext): AmqpClient[F] =
     new AmqpClient[F] {
       private def repeatUntil[A](eval: F[A])(pred: A => Boolean)(sleep: FiniteDuration): F[Unit] =
         for {
@@ -136,8 +134,9 @@ object AmqpClient extends StrictLogging {
           _      <- if (ended) F.unit else t.sleep(sleep) *> repeatUntil(eval)(pred)(sleep)
         } yield ()
 
-      override def publisher(): Publisher[F, PublishCommand] = cmd => connectionManager.publish(cmd)
-
+      override def publisher(): Publisher[F, PublishCommand] = cmd => {
+        connectionManager.publish(cmd).evalOn(executionContext)
+      }
 
       override def registerConsumer(queueName: QueueName,
                                     handler: Handler[F, Delivery],
