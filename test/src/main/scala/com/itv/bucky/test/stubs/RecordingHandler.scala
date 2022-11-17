@@ -33,30 +33,37 @@ object RecordingHandler {
     createRefResource[F, T, RequeueConsumeAction]()
 }
 
-class RecordingHandler[F[_], T](handler: Handler[F, T],
-                                results: ConsumeActionBufferRef[F,T])(implicit F: Sync[F]) extends Handler[F, T] {
+class RecordingHandler[F[_], T](handler: Handler[F, T])(implicit F: Sync[F]) extends Handler[F, T] {
 
-  def executions: F[List[ExecutionResult[T, ConsumeAction]]]  = results.get.map(_.toList)
-  def receivedMessages: F[List[T]]                               = executions.map(_.map(_.message))
-  def returnedResults: F[List[Either[Throwable, ConsumeAction]]] = executions.map(_.map(_.result))
+  val buffer = new AtomicReference[List[ExecutionResult[T, ConsumeAction]]](List.empty)
+
+  def executions: List[ExecutionResult[T, ConsumeAction]]  = buffer.get()
+  def receivedMessages: List[T]                               = executions.map(_.message)
+  def returnedResults: List[Either[Throwable, ConsumeAction]] = executions.map(_.result)
+
   override def apply(message: T): F[ConsumeAction] =
     (for {
       result <- handler(message).attempt
-      _ <- results.updateAndGet(buffer => buffer += ExecutionResult(message, result))
+      _ <- F.blocking(buffer.updateAndGet(buffer => buffer :+ ExecutionResult(message, result)))
     } yield {
       result
     }).rethrow
 }
 
-class RecordingRequeueHandler[F[_], T](handler: RequeueHandler[F, T],
-                                       results: RequeueConsumeActionBufferRef[F,T])(implicit F: Sync[F]) extends RequeueHandler[F, T] {
-  def executions: F[List[ExecutionResult[T, RequeueConsumeAction]]]                    = results.get.map(_.toList)
-  def receivedMessages: F[List[T]]                               = executions.map(_.map(_.message))
-  def returnedResults: F[List[Either[Throwable, RequeueConsumeAction]]] = executions.map(_.map(_.result))
+class RecordingRequeueHandler[F[_], T](handler: RequeueHandler[F, T])(implicit F: Sync[F]) extends RequeueHandler[F, T] {
+
+  val buffer = new AtomicReference[List[ExecutionResult[T, RequeueConsumeAction]]](List.empty)
+
+  def executions: List[ExecutionResult[T, RequeueConsumeAction]] = buffer.get()
+
+  def receivedMessages: List[T] = executions.map(_.message)
+
+  def returnedResults: List[Either[Throwable, RequeueConsumeAction]] = executions.map(_.result)
+
   override def apply(message: T): F[RequeueConsumeAction] =
     (for {
       result <- handler(message).attempt
-      _ <- results.updateAndGet(buffer => buffer += ExecutionResult(message, result))
+      _ <- F.blocking(buffer.updateAndGet(buffer => buffer :+ ExecutionResult(message, result)))
     } yield {
       result
     }).rethrow

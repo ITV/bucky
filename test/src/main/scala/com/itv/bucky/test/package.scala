@@ -192,12 +192,13 @@ package object test {
 
   object StubHandlers {
 
-    def ackHandler[F[_], T](ref: ConsumeActionBufferRef[F,T])(implicit F: Sync[F]): RecordingHandler[F, T]                   = new RecordingHandler[F, T](_ => F.delay(Ack), ref)
-    def deadLetterHandler[F[_], T](ref: ConsumeActionBufferRef[F,T])(implicit F: Sync[F]): RecordingHandler[F, T]            = new RecordingHandler[F, T](_ => F.delay(DeadLetter), ref)
-    def requeueRequeueHandler[F[_], T](ref: RequeueConsumeActionBufferRef[F,T])(implicit F: Sync[F]): RecordingRequeueHandler[F, T] = new RecordingRequeueHandler[F, T](_ => F.delay(Requeue), ref)
+    def ackHandler[F[_], T](implicit F: Sync[F]): RecordingHandler[F, T] = new RecordingHandler[F, T](_ => F.delay(Ack))
 
-    def recordingHandler[F[_], T](handler: Handler[F, T],
-                                  ref: ConsumeActionBufferRef[F,T])(implicit F: Sync[F]): RecordingHandler[F, T] = new RecordingHandler[F, T](handler, ref)
+    def deadLetterHandler[F[_], T](implicit F: Sync[F]): RecordingHandler[F, T] = new RecordingHandler[F, T](_ => F.delay(DeadLetter))
+
+    def requeueRequeueHandler[F[_], T](implicit F: Sync[F]): RecordingRequeueHandler[F, T] = new RecordingRequeueHandler[F, T](_ => F.delay(Requeue))
+
+    def recordingHandler[F[_], T](handler: Handler[F, T])(implicit F: Sync[F]): RecordingHandler[F, T] = new RecordingHandler[F, T](handler)
   }
 
   object StubPublishers {

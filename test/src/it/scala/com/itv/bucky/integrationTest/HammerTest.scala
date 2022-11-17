@@ -17,6 +17,7 @@ import com.typesafe.scalalogging.StrictLogging
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.funsuite.AsyncFunSuite
 import org.scalatest.matchers.should.Matchers
+import org.scalatest.time.{Millis, Seconds, Span}
 
 import java.util.UUID
 import scala.collection.immutable.TreeSet
@@ -26,6 +27,12 @@ import scala.language.higherKinds
 class HammerTest extends AsyncFunSuite with EffectTestSupport with Eventually with IntegrationPatience with StrictLogging with Matchers {
 
   implicit override val ioRuntime: IORuntime = packageIORuntime
+
+  implicit override val patienceConfig = PatienceConfig(
+    timeout = scaled(Span(30, Seconds)),
+    interval = scaled(Span(300, Millis))
+  )
+
   case class TestFixture(stubHandler: RecordingHandler[IO, String], publisher: Publisher[IO, String], client: AmqpClient[IO])
 
   def withTestFixture(test: TestFixture => IO[Unit]): IO[Unit] = {
@@ -49,13 +56,8 @@ class HammerTest extends AsyncFunSuite with EffectTestSupport with Eventually wi
       Exchange(exchangeName).binding(routingKey -> queueName).autoDelete.expires(20.minutes)
     )
 
-    val testInfra = for {
-      client <- AmqpClient[IO](config)
-      ref <- RecordingHandler.createConsumeActionBufferRef[IO, String]()
-    } yield (client, ref)
-
-    testInfra.use { case (client, ref) =>
-      val handler = StubHandlers.ackHandler[IO, String](ref)
+    AmqpClient[IO](config).use { client =>
+      val handler = StubHandlers.ackHandler[IO, String]
       val handlerResource =
         Resource.eval(client.declare(declarations)).flatMap(_ => client.registerConsumerOf(queueName, handler))
 
@@ -72,36 +74,27 @@ class HammerTest extends AsyncFunSuite with EffectTestSupport with Eventually wi
       val hammerStrength  = 10000
       val parallelPublish = 250
 
-//      val results =
-//        (1 to hammerStrength)
-//          .grouped(parallelPublish)
-//          .toList
-//          .flatTraverse { group =>
-//            group
-//              .toList
-//              .parTraverse { i =>
-//                testFixture.publisher(s"hello$i").start
-//              }
-//          }
-
-      val results = (1 to hammerStrength).toList.parTraverse { i =>
-        testFixture.publisher(s"hello$i").start
-      }
+      val results =
+        (1 to hammerStrength)
+          .grouped(parallelPublish)
+          .toList
+        .flatTraverse { group =>
+          group.toList
+            .traverse { i =>
+              testFixture.publisher(s"hello$i").attempt.map {
+                case Right(_)    => None
+                case Left(error) => Some(error)
+              }
+            }
+            .map(_.flatten)
+        }
 
       for {
-        listOfOutcomes <- results.flatMap(_.parTraverse(_.join))
-        receivedMessages <- testFixture.stubHandler.receivedMessages
-//        errors <- results
+        errors <- results
       } yield eventually {
-//        errors shouldBe empty
-        println(s"errors = ${listOfOutcomes.count(_.isError)}")
-        println(s"success = ${listOfOutcomes.count(_.isSuccess)}")
-        println(s"cancelled = ${listOfOutcomes.count(_.isCanceled)}")
-        listOfOutcomes.forall(_.isSuccess) shouldBe true
-
-//        errors shouldBe empty
-        receivedMessages should have size hammerStrength
-        val set = TreeSet(receivedMessages: _*)
+        errors shouldBe empty
+        testFixture.stubHandler.receivedMessages should have size hammerStrength
+        val set = TreeSet(testFixture.stubHandler.receivedMessages: _*)
         (1 to hammerStrength).foreach(i => set.contains(s"hello$i") shouldBe true)
       }
     }
@@ -124,32 +117,29 @@ class HammerTest extends AsyncFunSuite with EffectTestSupport with Eventually wi
       val fastPublisher = testFixture.client.publisherOf[String](exchange, fastRk)
       val slowPublisher = testFixture.client.publisherOf[String](exchange, slowRk)
 
-      val fastHandler = { ref: ConsumeActionBufferRef[IO, String] =>
+      val fastHandler =
         new RecordingHandler[IO, String]((v1: String) =>
           for {
             _ <- order.update(_ :+ "fast")
           } yield Ack
-        , ref)
-      }
+        )
 
-      val slowHandler = { ref: ConsumeActionBufferRef[IO, String] =>
+
+      val slowHandler =
         new RecordingHandler[IO, String]((v1: String) =>
           for {
             _ <- IO.sleep(10.second)
             _ <- order.update(_ :+ "slow")
           } yield Ack
-        ,ref)
-      }
+        )
 
       val declarations =
         List(Queue(slowQueue), Queue(fastQueue), Exchange(exchange).binding(slowRk -> slowQueue).binding(fastRk -> fastQueue))
 
       val handlers =
         for {
-          slowHandlerBufferRef <- RecordingHandler.createConsumeActionBufferRef[IO, String]
-          fastHandlerBufferRef <- RecordingHandler.createConsumeActionBufferRef[IO, String]
-          _ <- testFixture.client.registerConsumerOf(slowQueue, slowHandler(slowHandlerBufferRef))
-          _ <- testFixture.client.registerConsumerOf(fastQueue, fastHandler(fastHandlerBufferRef))
+          _ <- testFixture.client.registerConsumerOf(slowQueue, slowHandler)
+          _ <- testFixture.client.registerConsumerOf(fastQueue, fastHandler)
         } yield ()
 
       val handlersResource =

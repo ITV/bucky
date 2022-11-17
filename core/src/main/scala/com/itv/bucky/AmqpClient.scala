@@ -13,7 +13,7 @@ import com.typesafe.scalalogging.StrictLogging
 import java.util.concurrent.{AbstractExecutorService, Executors, TimeUnit}
 import java.util.{Collections, UUID}
 import scala.concurrent.duration.{FiniteDuration, _}
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutorService}
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, ExecutionContextExecutorService}
 import scala.language.higherKinds
 import scala.util.Random
 
@@ -100,13 +100,23 @@ object AmqpClient extends StrictLogging {
     Resource.make(make)(connection => F.blocking(connection.close()))
   }
 
+  private def createSingleThreadExecutor[F[_]](implicit F: Async[F]): F[ExecutionContextExecutor] = {
+    F.delay {
+      val t = { r: Runnable =>
+        val thread = new Thread(r, s" RabbitChannelThread-${Random.alphanumeric.take(6).mkString}")
+        thread
+      }
+      ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor(r => t(r)))
+    }
+  }
+
   def apply[F[_]](config: AmqpClientConfig)(implicit F: Async[F],
                                             t: Temporal[F],
                                             executionContext: ExecutionContext): Resource[F, AmqpClient[F]] =
     for {
       dispatcher <- Dispatcher[F]
       connection <- createConnection(config)
-      singleThreadExecutor <- Resource.eval(F.delay(ExecutionContext.fromExecutor(Executors.newSingleThreadExecutor(new Thread(_, s" RabbitChannelThread-${Random.alphanumeric.take(6).mkString}")))))
+      singleThreadExecutor <- Resource.eval(createSingleThreadExecutor)
       publishChannel = createChannel(connection).map(Channel.apply[F](_, dispatcher, singleThreadExecutor))
       buildChannel   = () => createChannel(connection).map(Channel.apply[F](_, dispatcher, singleThreadExecutor))
       client <- apply[F](config, buildChannel, publishChannel, dispatcher)
