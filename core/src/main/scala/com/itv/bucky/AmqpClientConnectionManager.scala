@@ -12,7 +12,6 @@ import com.typesafe.scalalogging.StrictLogging
 
 import scala.collection.immutable.TreeMap
 import scala.language.higherKinds
-import scala.util.Try
 import cats.effect.{Deferred, Ref, Temporal}
 
 private[bucky] case class AmqpClientConnectionManager[F[_]](amqpConfig: AmqpClientConfig,

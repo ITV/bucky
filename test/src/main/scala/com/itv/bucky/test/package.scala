@@ -6,6 +6,7 @@ import cats.effect._
 import cats.implicits._
 import com.itv.bucky.consume._
 import com.itv.bucky.publish._
+import com.itv.bucky.test.stubs.RecordingHandler.{ConsumeActionBufferRef, ListBufferRef, RequeueConsumeActionBufferRef}
 import com.itv.bucky.test.stubs.{RecordingHandler, RecordingRequeueHandler, StubChannel, StubPublisher}
 
 import scala.concurrent.ExecutionContext
@@ -190,13 +191,13 @@ package object test {
   }
 
   object StubHandlers {
-    def ackHandler[F[_], T](implicit F: Sync[F]): RecordingHandler[F, T]                   = new RecordingHandler[F, T](_ => F.delay(Ack))
-    def deadLetterHandler[F[_], T](implicit F: Sync[F]): RecordingHandler[F, T]            = new RecordingHandler[F, T](_ => F.delay(DeadLetter))
-    def requeueRequeueHandler[F[_], T](implicit F: Sync[F]): RecordingRequeueHandler[F, T] = new RecordingRequeueHandler[F, T](_ => F.delay(Requeue))
-    def ackRequeueHandler[F[_], T](implicit F: Sync[F]): RecordingRequeueHandler[F, T]     = new RecordingRequeueHandler[F, T](_ => F.delay(Ack))
-    def deadletterRequeueHandler[F[_], T](implicit F: Sync[F]): RecordingRequeueHandler[F, T] =
-      new RecordingRequeueHandler[F, T](_ => F.delay(DeadLetter))
-    def recordingHandler[F[_], T](handler: Handler[F, T])(implicit F: Sync[F]): RecordingHandler[F, T] = new RecordingHandler[F, T](handler)
+
+    def ackHandler[F[_], T](ref: ConsumeActionBufferRef[F,T])(implicit F: Sync[F]): RecordingHandler[F, T]                   = new RecordingHandler[F, T](_ => F.delay(Ack), ref)
+    def deadLetterHandler[F[_], T](ref: ConsumeActionBufferRef[F,T])(implicit F: Sync[F]): RecordingHandler[F, T]            = new RecordingHandler[F, T](_ => F.delay(DeadLetter), ref)
+    def requeueRequeueHandler[F[_], T](ref: RequeueConsumeActionBufferRef[F,T])(implicit F: Sync[F]): RecordingRequeueHandler[F, T] = new RecordingRequeueHandler[F, T](_ => F.delay(Requeue), ref)
+
+    def recordingHandler[F[_], T](handler: Handler[F, T],
+                                  ref: ConsumeActionBufferRef[F,T])(implicit F: Sync[F]): RecordingHandler[F, T] = new RecordingHandler[F, T](handler, ref)
   }
 
   object StubPublishers {

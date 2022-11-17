@@ -39,7 +39,7 @@ class ShutdownTimeoutTest extends AsyncFunSuite with EffectTestSupport with Even
   val requeuePolicy: RequeuePolicy = RequeuePolicy(maximumProcessAttempts = 5, requeueAfter = 2.seconds)
 
   def runTest[A](test: IO[A]): IO[A] = {
-    val rawConfig = ConfigFactory.load("bucky")
+    val rawConfig = ConfigFactory.load()
     val config =
       AmqpClientConfig(
         rawConfig.getString("rmq.host"),

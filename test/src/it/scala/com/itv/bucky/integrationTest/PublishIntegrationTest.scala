@@ -39,7 +39,7 @@ class PublishIntegrationTest extends AnyFunSuite with Eventually with Integratio
   }
 
   def withTestFixture(test: (PublishCommandBuilder.Builder[String], Publisher[IO, PublishCommand]) => IO[Unit]): Unit = {
-    val rawConfig = ConfigFactory.load("bucky")
+    val rawConfig = ConfigFactory.load
     val config =
       AmqpClientConfig(rawConfig.getString("rmq.host"),
                        rawConfig.getInt("rmq.port"),

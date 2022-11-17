@@ -46,7 +46,7 @@ class RequeueWithExpiryActionIntegrationTest extends AsyncFunSuite with EffectTe
     implicit val payloadMarshaller: PayloadMarshaller[String]     = StringPayloadMarshaller
     implicit val payloadUnmarshaller: PayloadUnmarshaller[String] = StringPayloadUnmarshaller
 
-    val rawConfig = ConfigFactory.load("bucky")
+    val rawConfig = ConfigFactory.load
     val config =
       AmqpClientConfig(
         rawConfig.getString("rmq.host"),

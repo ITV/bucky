@@ -38,7 +38,7 @@ class RequeueIntegrationTest extends AsyncFunSuite with EffectTestSupport with E
   val requeuePolicy                 = RequeuePolicy(maximumProcessAttempts = 5, requeueAfter = 2.seconds)
 
   def withTestFixture(test: TestFixture => IO[Unit]): IO[Unit] = {
-    val rawConfig = ConfigFactory.load("bucky")
+    val rawConfig = ConfigFactory.load
     val config =
       AmqpClientConfig(
         rawConfig.getString("rmq.host"),
