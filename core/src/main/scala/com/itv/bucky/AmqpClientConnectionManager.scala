@@ -18,11 +18,14 @@ import cats.effect.{Deferred, Ref, Temporal}
 import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
 
-private[bucky] case class AmqpClientConnectionManager[F[_]](amqpConfig: AmqpClientConfig,
-                                                            publishChannel: Channel[F],
-                                                            pendingConfirmListener: PendingConfirmListener[F],
-                                                            dispatcher: Dispatcher[F])(implicit F: Async[F], t: Temporal[F], executionContext: ExecutionContext)
-  extends StrictLogging {
+private[bucky] case class AmqpClientConnectionManager[F[_]](
+    amqpConfig: AmqpClientConfig,
+    publishChannel: Channel[F],
+    pendingConfirmListener: PendingConfirmListener[F],
+    dispatcher: Dispatcher[F],
+    executionContext: ExecutionContext
+)(implicit F: Async[F], t: Temporal[F])
+    extends StrictLogging {
 
   private def runWithChannelSync[T](action: F[T]): F[T] =
     publishChannel.synchroniseIfNeeded {
@@ -79,8 +82,10 @@ private[bucky] case class AmqpClientConnectionManager[F[_]](amqpConfig: AmqpClie
 
 private[bucky] object AmqpClientConnectionManager extends StrictLogging {
 
-  def apply[F[_]](config: AmqpClientConfig, publishChannel: Channel[F], dispatcher: Dispatcher[F])(
-    implicit F: Async[F], t: Temporal[F], executionContext: ExecutionContext): F[AmqpClientConnectionManager[F]] =
+  def apply[F[_]](config: AmqpClientConfig, publishChannel: Channel[F], dispatcher: Dispatcher[F], executionContext: ExecutionContext)(implicit
+      F: Async[F],
+      t: Temporal[F]
+  ): F[AmqpClientConnectionManager[F]] =
     for {
       pendingConfirmations <- Ref.of[F, TreeMap[Long, Deferred[F, Boolean]]](TreeMap.empty)
       pendingReturn        <- Ref.of[F, Boolean](false)
@@ -88,6 +93,5 @@ private[bucky] object AmqpClientConnectionManager extends StrictLogging {
       confirmListener      <- F.blocking(publish.PendingConfirmListener(pendingConfirmations, pendingReturn, dispatcher))
       _                    <- publishChannel.addConfirmListener(confirmListener)
       _                    <- publishChannel.addReturnListener(confirmListener)
-    } yield AmqpClientConnectionManager(config, publishChannel, confirmListener, dispatcher)
+    } yield AmqpClientConnectionManager(config, publishChannel, confirmListener, dispatcher, executionContext)
 }
-

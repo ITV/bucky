@@ -160,7 +160,7 @@ class KamonSupportTest
     val clientResource =
       Dispatcher[IO].flatMap { dispatcher =>
         AmqpClient
-          .apply[IO](Config.empty(3.seconds), () => channel.map(_.asInstanceOf[Channel[IO]]), channel.map(_.asInstanceOf[Channel[IO]]), dispatcher)
+          .apply[IO](Config.empty(3.seconds), () => channel.map(_.asInstanceOf[Channel[IO]]), channel.map(_.asInstanceOf[Channel[IO]]), dispatcher, ec)
       }
 
     val result =

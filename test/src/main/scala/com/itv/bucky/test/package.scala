@@ -87,7 +87,8 @@ package object test {
           config,
           () => Resource.pure[F, Channel[F]](channel),
           Resource.pure[F, Channel[F]](channel),
-          dispatcher
+          dispatcher,
+          ec
         )
       }
     }

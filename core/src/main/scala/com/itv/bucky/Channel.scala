@@ -56,7 +56,7 @@ trait Channel[F[_]] {
 }
 
 object Channel {
-  def apply[F[_]](channel: RabbitChannel, dispatcher: Dispatcher[F])(implicit F: Async[F], executionContext: ExecutionContext): Channel[F] = new Channel[F] with StrictLogging {
+  def apply[F[_]](channel: RabbitChannel, dispatcher: Dispatcher[F], executionContext: ExecutionContext)(implicit F: Async[F]): Channel[F] = new Channel[F] with StrictLogging {
     import scala.jdk.CollectionConverters._
 
     override def close(): F[Unit]                                       = F.delay(channel.close())
