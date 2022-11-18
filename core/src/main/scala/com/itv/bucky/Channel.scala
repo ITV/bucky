@@ -1,7 +1,8 @@
 package com.itv.bucky
 
+import cats.effect.implicits._
 import cats.effect.std.Dispatcher
-import cats.effect.{Async, Spawn, Sync}
+import cats.effect.{Async, Sync}
 import cats.implicits._
 import com.itv.bucky.consume._
 import com.itv.bucky.decl._
@@ -10,6 +11,7 @@ import com.rabbitmq.client.AMQP.BasicProperties
 import com.rabbitmq.client.{ConfirmListener, DefaultConsumer, ReturnListener, Channel => RabbitChannel, Envelope => RabbitMQEnvelope}
 import com.typesafe.scalalogging.StrictLogging
 
+import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 trait Channel[F[_]] {
@@ -54,7 +56,7 @@ trait Channel[F[_]] {
 }
 
 object Channel {
-  def apply[F[_]](channel: RabbitChannel, dispatcher: Dispatcher[F])(implicit F: Async[F]): Channel[F] = new Channel[F] with StrictLogging {
+  def apply[F[_]](channel: RabbitChannel, dispatcher: Dispatcher[F], executionContext: ExecutionContext)(implicit F: Async[F]): Channel[F] = new Channel[F] with StrictLogging {
     import scala.jdk.CollectionConverters._
 
     override def close(): F[Unit]                                       = F.delay(channel.close())
@@ -125,7 +127,7 @@ object Channel {
               _      <- F.delay(logger.debug("Received delivery with rk:{} on exchange: {}", delivery.envelope.routingKey, delivery.envelope.exchangeName))
               action <- handler(delivery)
               _      <- F.delay(logger.info("Responding with {} to {} on {}", action, delivery, queue))
-            } yield action).attempt
+            } yield action).evalOn(executionContext).attempt
               .flatTap {
                 case Left(e) =>
                   F.point {

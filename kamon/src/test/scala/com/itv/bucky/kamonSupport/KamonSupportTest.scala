@@ -141,6 +141,7 @@ class KamonSupportTest
           _ <- client.registerConsumerOf(queue.name, handler)
         } yield ()).use { _ =>
           for {
+            _      <- Spawn[IO].cede
             result <- test(reporter, client.publisherOf[String](exchange.name, rk)).attempt
           } yield result
         }
@@ -159,7 +160,7 @@ class KamonSupportTest
     val clientResource =
       Dispatcher[IO].flatMap { dispatcher =>
         AmqpClient
-          .apply[IO](Config.empty(3.seconds), () => channel.map(_.asInstanceOf[Channel[IO]]), channel.map(_.asInstanceOf[Channel[IO]]), dispatcher)
+          .apply[IO](Config.empty(3.seconds), () => channel.map(_.asInstanceOf[Channel[IO]]), channel.map(_.asInstanceOf[Channel[IO]]), dispatcher, ec)
       }
 
     val result =
