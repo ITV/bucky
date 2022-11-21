@@ -26,10 +26,9 @@ class Wiring[T](
     setExchangeType: Option[ExchangeType] = None,
     setRequeuePolicy: Option[RequeuePolicy] = None,
     setPrefetchCount: Option[Int] = None,
-    setDeadLetterExchangeType: Option[ExchangeType] = None
-)(implicit
-  val marshaller: PayloadMarshaller[T],
-  val unmarshaller: PayloadUnmarshaller[T])
+    setDeadLetterExchangeType: Option[ExchangeType] = None,
+    maxPriority: Option[Int] = None
+)(implicit val marshaller: PayloadMarshaller[T], val unmarshaller: PayloadUnmarshaller[T])
     extends StrictLogging {
 
   def exchangeName: ExchangeName =
@@ -56,11 +55,14 @@ class Wiring[T](
   def publisherDeclarations: List[Declaration] =
     List(exchange)
   def consumerDeclarations: List[Declaration] =
-    List(exchangeWithBinding) ++ requeue.requeueDeclarations(queueName,
-                                                             dlxRoutingKey,
-                                                             Some(ExchangeName(s"${queueName.value}.dlx")),
-                                                             dlxType,
-                                                             requeueRetryAfter)
+    List(exchangeWithBinding) ++ requeue.requeueDeclarations(
+      queueName,
+      dlxRoutingKey,
+      Some(ExchangeName(s"${queueName.value}.dlx")),
+      dlxType,
+      requeueRetryAfter,
+      maxPriority = maxPriority
+    )
 
   //retain the default requeue ttl of 5 minutes, unless requeue policy requires a longer delay
   private def requeueRetryAfter: FiniteDuration = requeuePolicy.requeueAfter.max(5.minutes)
@@ -77,7 +79,9 @@ class Wiring[T](
             s"routingKey=${routingKey.value} " +
             s"queue=${queueName.value} " +
             s"type=${exchangeType.value} " +
-            s"requeuePolicy=$requeuePolicy"))
+            s"requeuePolicy=$requeuePolicy"
+        )
+      )
       _ <- client.declare(publisherDeclarations)
     } yield client.publisherOf(publisherBuilder)
 
@@ -90,7 +94,8 @@ class Wiring[T](
             s"routingKey=${routingKey.value} " +
             s"queue=${queueName.value} " +
             s"type=${exchangeType.value} " +
-            s"requeuePolicy=$requeuePolicy")
+            s"requeuePolicy=$requeuePolicy"
+        )
       }
       _ <- client.declare(publisherDeclarations)
     } yield client.publisherWithHeadersOf(publisherBuilder)
@@ -106,7 +111,8 @@ class Wiring[T](
               s"queue=${queueName.value} " +
               s"type=${exchangeType.value} " +
               s"requeuePolicy=$requeuePolicy " +
-              s"prefetchCount=$prefetchCount")
+              s"prefetchCount=$prefetchCount"
+          )
         }
         _ <- client.declare(consumerDeclarations)
       } yield ()
@@ -128,7 +134,8 @@ class Wiring[T](
               s"queue=${queueName.value} " +
               s"type=${exchangeType.value} " +
               s"requeuePolicy=$requeuePolicy " +
-              s"prefetchCount=$prefetchCount")
+              s"prefetchCount=$prefetchCount"
+          )
         }
         _ <- client.declare(consumerDeclarations)
       } yield ()
@@ -139,8 +146,9 @@ class Wiring[T](
     } yield ()
   }
 
-  def registerRequeueConsumer[F[_]](client: AmqpClient[F], onRequeueExpiryAction: T => F[ConsumeAction])(handleMessage: T => F[RequeueConsumeAction])(
-      implicit F: Sync[F]): Resource[F, Unit] = {
+  def registerRequeueConsumer[F[_]](client: AmqpClient[F], onRequeueExpiryAction: T => F[ConsumeAction])(
+      handleMessage: T => F[RequeueConsumeAction]
+  )(implicit F: Sync[F]): Resource[F, Unit] = {
     val runDeclarations =
       for {
         _ <- F.delay {
@@ -151,18 +159,21 @@ class Wiring[T](
               s"queue=${queueName.value} " +
               s"type=${exchangeType.value} " +
               s"requeuePolicy=$requeuePolicy " +
-              s"prefetchCount=$prefetchCount")
+              s"prefetchCount=$prefetchCount"
+          )
         }
         _ <- client.declare(consumerDeclarations)
       } yield ()
 
     for {
       _ <- Resource.make(runDeclarations)(_ => F.pure(()))
-      _ <- client.registerRequeueConsumerOf(queueName = queueName,
-                                            handler = handleMessage,
-                                            requeuePolicy = requeuePolicy,
-                                            onRequeueExpiryAction = onRequeueExpiryAction,
-                                            prefetchCount = prefetchCount)(unmarshaller, F)
+      _ <- client.registerRequeueConsumerOf(
+        queueName = queueName,
+        handler = handleMessage,
+        requeuePolicy = requeuePolicy,
+        onRequeueExpiryAction = onRequeueExpiryAction,
+        prefetchCount = prefetchCount
+      )(unmarshaller, F)
     } yield ()
   }
 

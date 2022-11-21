@@ -80,11 +80,13 @@ class WiringTest extends AnyFunSuite with StrictLogging {
         Exchange(ExchangeName("exchange"), Direct)
           .binding(routingKey -> queueName)
       ) ++
-        requeueDeclarations(QueueName("queue"),
-                            RoutingKey("-"),
-                            Some(ExchangeName(s"${queueName.value}.dlx")),
-                            Fanout,
-                            CustomTestWiring.requeuePolicy.requeueAfter)
+      requeueDeclarations(
+        QueueName("queue"),
+        RoutingKey("-"),
+        Some(ExchangeName(s"${queueName.value}.dlx")),
+        Fanout,
+        CustomTestWiring.requeuePolicy.requeueAfter
+      )
   }
 
   test("it should set the requeue ttl to 5 minutes where the requeue policy has a wait time of lower than 5 minutes") {
@@ -99,7 +101,7 @@ class WiringTest extends AnyFunSuite with StrictLogging {
           setQueueName = Some(QueueName("queue")),
           setExchangeType = Some(Direct),
           setPrefetchCount = Some(100),
-          setRequeuePolicy = Some(RequeuePolicy(10, 1.minute)),
+          setRequeuePolicy = Some(RequeuePolicy(10, 1.minute))
         )
 
     CustomTestWiring.consumerDeclarations shouldBe
@@ -107,7 +109,7 @@ class WiringTest extends AnyFunSuite with StrictLogging {
         Exchange(ExchangeName("exchange"), Direct)
           .binding(routingKey -> queueName)
       ) ++
-        requeueDeclarations(QueueName("queue"), RoutingKey("-"), Some(ExchangeName(s"${queueName.value}.dlx")), Fanout, 5.minutes)
+      requeueDeclarations(QueueName("queue"), RoutingKey("-"), Some(ExchangeName(s"${queueName.value}.dlx")), Fanout, 5.minutes)
   }
 
   test("it should allow specification of dead letter exchange type") {
@@ -130,11 +132,43 @@ class WiringTest extends AnyFunSuite with StrictLogging {
         Exchange(ExchangeName("exchange"), Direct)
           .binding(routingKey -> QueueName("queue"))
       ) ++
-        requeueDeclarations(QueueName("queue"),
-                            routingKey,
-                            Some(ExchangeName(s"${queueName.value}.dlx")),
-                            dlxType,
-                            CustomTestWiring.requeuePolicy.requeueAfter)
+      requeueDeclarations(
+        QueueName("queue"),
+        routingKey,
+        Some(ExchangeName(s"${queueName.value}.dlx")),
+        dlxType,
+        CustomTestWiring.requeuePolicy.requeueAfter
+      )
   }
 
+  test("it should allow specification of a priority queue") {
+    val routingKey = RoutingKey("route")
+    val dlxType    = Direct
+    val queueName  = QueueName("queue")
+    object CustomTestWiring
+        extends Wiring[String](
+          name = WiringName("test"),
+          setExchangeName = Some(ExchangeName("exchange")),
+          setRoutingKey = Some(routingKey),
+          setQueueName = Some(queueName),
+          setExchangeType = Some(Direct),
+          setRequeuePolicy = Some(RequeuePolicy(10, 1.hour)),
+          setPrefetchCount = Some(100),
+          setDeadLetterExchangeType = Some(dlxType),
+          maxPriority = Some(5)
+        )
+    CustomTestWiring.consumerDeclarations shouldBe
+      List(
+        Exchange(ExchangeName("exchange"), Direct)
+          .binding(routingKey -> QueueName("queue"))
+      ) ++
+      requeueDeclarations(
+        QueueName("queue"),
+        routingKey,
+        Some(ExchangeName(s"${queueName.value}.dlx")),
+        dlxType,
+        CustomTestWiring.requeuePolicy.requeueAfter,
+        maxPriority = Some(5)
+      )
+  }
 }
