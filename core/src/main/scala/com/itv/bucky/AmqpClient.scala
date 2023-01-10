@@ -1,5 +1,6 @@
 package com.itv.bucky
 
+import cats.~>
 import cats.effect._
 import cats.effect.implicits._
 import cats.effect.std.Dispatcher
@@ -15,6 +16,7 @@ import java.util.{Collections, UUID}
 import scala.concurrent.duration.{FiniteDuration, _}
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutorService}
 import scala.language.higherKinds
+import cats.data.Kleisli
 
 trait AmqpClient[F[_]] {
   def declare(declarations: Declaration*): F[Unit]
@@ -183,4 +185,59 @@ object AmqpClient extends StrictLogging {
 
       override def isConnectionOpen: F[Boolean] = connectionManager.publishChannel.isConnectionOpen
     }
+
+    /**
+      * Natural transformation between effect types
+      *
+      * @todo Providing both arrows is cumbersome but necessary given 
+      * the Handler[G, _] in the method signature signature 
+      *
+      * @param fg F ~> G
+      * @param gf G ~> F
+      * @param client client to transform
+      * @param mcg MonadCancel for F
+      * @param mcf MonadCancel for G
+      * @return transformed client
+      */
+    def mapK[F[_], G[_]](fg: F ~> G, gf: G ~> F)(client: AmqpClient[F])(implicit
+        mcg: MonadCancel[F, _],
+        mcf: MonadCancel[G, _]
+    ): AmqpClient[G] =
+      new AmqpClient[G] {
+        def declare(declarations: Declaration*): G[Unit] =
+          fg(client.declare(declarations))
+
+        def declare(declarations: Iterable[Declaration]): G[Unit] =
+          fg(client.declare(declarations))
+
+        def publisher(): Publisher[G, PublishCommand] =
+          Kleisli(client.publisher()).mapK(fg).run
+
+        def registerConsumer(
+            queueName: QueueName,
+            handler: Handler[G, Delivery],
+            exceptionalAction: ConsumeAction,
+            prefetchCount: Int,
+            shutdownTimeout: FiniteDuration,
+            shutdownRetry: FiniteDuration
+        ): Resource[G, Unit] = {
+          val handlerF =
+            Kleisli(handler).mapK(gf).run
+
+          client
+            .registerConsumer(
+              queueName,
+              handlerF,
+              exceptionalAction,
+              prefetchCount,
+              shutdownTimeout,
+              shutdownRetry
+            )
+            .mapK(fg)
+        }
+
+        def isConnectionOpen: G[Boolean] =
+          fg(client.isConnectionOpen)
+
+      }
 }
