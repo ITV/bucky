@@ -294,7 +294,7 @@ lazy val prometheus = project
   .settings(Defaults.itSettings)
   .settings(
     internalDependencyClasspath in IntegrationTest += Attributed.blank((classDirectory in Test).value),
-    parallelExecution in IntegrationTest := false
+    parallelExecution in IntegrationTest := false,
   )
   .settings(
     libraryDependencies ++= Seq(
@@ -306,5 +306,5 @@ lazy val prometheus = project
   )
 
 lazy val root = (project in file("."))
-  .aggregate(xml, circe, kamon, argonaut, example, test, core)
+  .aggregate(prometheus, xml, circe, kamon, argonaut, example, test, core)
   .settings(publishArtifact := false)
