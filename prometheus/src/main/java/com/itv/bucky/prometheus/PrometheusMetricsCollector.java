@@ -38,51 +38,63 @@ public class PrometheusMetricsCollector extends AbstractMetricsCollector {
 	}
 
 	public PrometheusMetricsCollector(final CollectorRegistry registry, final String prefix) {
-		this.connections = Gauge.build().name(prefix + "_connections").create();
+		this.connections = Gauge.build()
+      .name(prefix + "_connections")
+      .help("Current connections")
+      .create();
 		registry.register(this.connections);
 
 		this.channels = Gauge.build()
       .name(prefix + "_channels")
+      .help("Current channels")
       .create();
 		registry.register(this.channels);
 
 		this.publishedMessages = Counter.build()
       .name(prefix + "_published_messages")
+      .help("Count of published messages")
       .create();
 		registry.register(this.publishedMessages);
 
 		this.failedToPublishMessages = Counter.build()
       .name(prefix + "_failed_to_publish_messages")
+      .help("Count of failed to publish messages")
       .create();
 		registry.register(failedToPublishMessages);
 
 		this.ackedPublishedMessages = Counter.build()
       .name(prefix + "_acked_published_messages")
+      .help("Count of acknowledged publish messages")
       .create();
 		registry.register(ackedPublishedMessages);
 
 		this.nackedPublishedMessages = Counter.build()
       .name(prefix + "_nacked_published_messages")
+      .help("Count of not acknowledged publish messages")
       .create();
 		registry.register(nackedPublishedMessages);
 
 		this.unroutedPublishedMessages = Counter.build()
       .name(prefix + "_unrouted_published_messages")
+      .help("Count of unrouted publish messages")
       .create();
 		registry.register(unroutedPublishedMessages);
 
 		this.consumedMessages = Counter.build()
       .name(prefix + "_consumed_messages")
+      .help("Count of consumed messages")
       .create();
 		registry.register(consumedMessages);
 
 		this.acknowledgedMessages = Counter.build()
       .name(prefix + "_acknowledged_messages")
+      .help("Count of acknowledged consumed messages")
       .create();
 		registry.register(acknowledgedMessages);
 
 		this.rejectedMessages = Counter.build()
       .name(prefix + "_rejected_messages")
+      .help("Count of rejected consumed messages")
       .create();
 		registry.register(rejectedMessages);
 
