@@ -195,6 +195,7 @@ lazy val example = project
       "org.scalatest"              %% "scalatest"                     % scalaTestVersion,
       "org.typelevel"              %% "cats-effect-testing-scalatest" % catsEffectScalaTestVersion % "test",
       "com.typesafe"                % "config"                        % typeSafeVersion,
+      "ch.qos.logback" % "logback-classic" % logbackVersion,
       "dev.profunktor" %% "fs2-rabbit" % "5.0.0",
       "dev.profunktor" %% "fs2-rabbit-circe" % "5.0.0"
     )
