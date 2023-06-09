@@ -19,7 +19,8 @@ import dev.profunktor.fs2rabbit.config.declaration.DeclarationQueueConfig
 import dev.profunktor.fs2rabbit.effects.EnvelopeDecoder
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
 import dev.profunktor.fs2rabbit.model
-import dev.profunktor.fs2rabbit.model.{AckResult, AmqpEnvelope, DeliveryTag, ExchangeName, ExchangeType, QueueName, RabbitConnection}
+import dev.profunktor.fs2rabbit.model.{AMQPConnection, AckResult, AmqpEnvelope, AmqpMessage, DeliveryTag, ExchangeName, ExchangeType, QueueName, RabbitConnection}
+import fs2.{Pipe, Pure}
 
 object RequeueConsumer extends IOApp with StrictLogging {
 
@@ -61,17 +62,18 @@ object RequeueConsumer extends IOApp with StrictLogging {
 
     (for {
       amqpClient <- RabbitClient.default[IO](config).resource
-      channel <- amqpClient.createConnectionChannel
+      connection <- amqpClient.createConnection
+      channel <- amqpClient.createChannel(connection)
       _ <- Resource.eval(amqpClient.declareQueue(DeclarationQueueConfig.default(Declarations.queueName).copy(arguments = Map("x-dead-letter-exchange" -> s"${Declarations.queueName.value}.dlx")))(channel))
       _ <- Resource.eval(amqpClient.declareExchange(ExchangeName(s"${Declarations.queueName.value}.dlx"), ExchangeType.FanOut)(channel))
       _ <- Resource.eval(amqpClient.declareQueue(DeclarationQueueConfig.default(QueueName(s"${Declarations.queueName.value}.dlq")))(channel))
       _ <- Resource.eval(amqpClient.bindQueue(QueueName(s"${Declarations.queueName.value}.dlq"), ExchangeName(s"${Declarations.queueName.value}.dlx"), model.RoutingKey("*"))(channel))
 //      _          <- Resource.eval(amqpClient.declare(Declarations.all))
-      _ <- registerRequeueConsumerOf(amqpClient)(Declarations.queueName, stringToLogRequeueHandler)
+      _ <- registerRequeueConsumerOf(amqpClient, connection)(Declarations.queueName, stringToLogRequeueHandler)
     } yield ()).use(_ => IO.never *> IO(ExitCode.Success))
   }
 
-  def registerRequeueConsumerOf[T](client: RabbitClient[IO])(
+  def registerRequeueConsumerOf[T](client: RabbitClient[IO], connection: AMQPConnection)(
       queueName: model.QueueName,
       handler: RequeueHandler[IO, T],
       requeuePolicy: RequeuePolicy = RequeuePolicy(maximumProcessAttempts = 10, requeueAfter = 3.minutes),
@@ -89,7 +91,7 @@ object RequeueConsumer extends IOApp with StrictLogging {
         }
       )
 
-    client.createConnectionChannel.flatMap { implicit channel =>
+    client.createChannel(connection).flatMap { implicit channel =>
       Resource.eval(client.createAckerConsumer[T](queueName)).flatMap { case (acker, consumer) =>
         consumer
           .evalMap(msg => handler(msg.payload).map(msg.deliveryTag -> _))
