@@ -192,7 +192,9 @@ lazy val example = project
       "com.typesafe.scala-logging" %% "scala-logging"                 % scalaLoggingVersion,
       "org.scalatest"              %% "scalatest"                     % scalaTestVersion,
       "org.typelevel"              %% "cats-effect-testing-scalatest" % catsEffectScalaTestVersion % "test",
-      "com.typesafe"                % "config"                        % typeSafeVersion
+      "com.typesafe"                % "config"                        % typeSafeVersion,
+      "dev.profunktor" %% "fs2-rabbit" % "5.0.0",
+      "dev.profunktor" %% "fs2-rabbit-circe" % "5.0.0"
     )
   )
 
