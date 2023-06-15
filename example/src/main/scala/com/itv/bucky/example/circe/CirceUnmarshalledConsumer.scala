@@ -11,6 +11,8 @@ import com.itv.bucky.example.circe.Shared.Person
 import com.typesafe.config.{Config, ConfigFactory}
 import cats.effect._
 import cats.implicits._
+import com.itv.bucky.backend.javaamqp.JavaBackendAmqpClient
+
 import scala.concurrent.ExecutionContext.Implicits.global
 
 /*
@@ -37,7 +39,7 @@ object CirceUnmarshalledConsumer extends IOApp with StrictLogging {
 
   override def run(args: List[String]): IO[ExitCode] =
     (for {
-      client <- AmqpClient[IO](amqpClientConfig)
+      client <- JavaBackendAmqpClient[IO](amqpClientConfig)
       _      <- Resource.eval(client.declare(Declarations.all))
       _      <- client.registerConsumerOf(Declarations.queue.name, personHandler)
     } yield ()).use(_ => IO.never *> IO(ExitCode.Success))

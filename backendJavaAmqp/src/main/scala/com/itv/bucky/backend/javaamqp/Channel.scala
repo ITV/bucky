@@ -1,12 +1,14 @@
-package com.itv.bucky
+package com.itv.bucky.backend.javaamqp
 
 import cats.effect.implicits._
 import cats.effect.std.Dispatcher
 import cats.effect.{Async, Sync}
 import cats.implicits._
+import com.itv.bucky.backend.javaamqp.consume.Consumer
 import com.itv.bucky.consume._
 import com.itv.bucky.decl._
 import com.itv.bucky.publish.PublishCommand
+import com.itv.bucky.{Envelope, Handler, QueueName}
 import com.rabbitmq.client.AMQP.BasicProperties
 import com.rabbitmq.client.{ConfirmListener, DefaultConsumer, ReturnListener, Channel => RabbitChannel, Envelope => RabbitMQEnvelope}
 import com.typesafe.scalalogging.StrictLogging
@@ -142,7 +144,7 @@ object Channel {
                 case Left(e) =>
                   F.delay(logger.debug(s"Handler failure with {} will recover to: {}", e.getMessage, onHandlerException)) *> F.delay(onHandlerException)
               }
-              .flatMap(sendAction(_)(Envelope.fromEnvelope(envelope)))
+              .flatMap(sendAction(_)(EnvelopeConversion.fromJavaEnvelope(envelope)))
           )
         }
       }

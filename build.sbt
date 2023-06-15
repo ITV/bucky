@@ -141,9 +141,45 @@ lazy val core = project
       "org.scalatest"              %% "scalatest"                     % scalaTestVersion           % "test",
       "org.typelevel"              %% "cats-effect-testing-scalatest" % catsEffectScalaTestVersion % "test",
       "org.typelevel"              %% "cats-effect"                   % catsEffectVersion,
-      "com.rabbitmq"                % "amqp-client"                   % amqpClientVersion,
       "ch.qos.logback"              % "logback-classic"               % logbackVersion             % "test",
-      "org.scala-lang.modules"     %% "scala-collection-compat"       % "2.11.0"
+      "org.scala-lang.modules"     %% "scala-collection-compat"       % "2.5.0"
+    )
+  )
+
+lazy val backendJavaAmqp = project
+  .settings(name := "com.itv")
+  .settings(moduleName := "bucky-backend-java-amqp")
+  .settings(kernelSettings: _*)
+  .dependsOn(core)
+  .aggregate(core)
+  .settings(
+    libraryDependencies ++= Seq(
+      "com.rabbitmq"                % "amqp-client"                   % amqpClientVersion,
+      "com.typesafe.scala-logging" %% "scala-logging"                 % scalaLoggingVersion,
+      "org.scalatest"              %% "scalatest"                     % scalaTestVersion           % "test",
+      "org.typelevel"              %% "cats-effect-testing-scalatest" % catsEffectScalaTestVersion % "test",
+      "org.typelevel"              %% "cats-effect"                   % catsEffectVersion,
+      "ch.qos.logback"              % "logback-classic"               % logbackVersion             % "test",
+      "org.scala-lang.modules"     %% "scala-collection-compat"       % "2.5.0"
+    )
+  )
+
+lazy val backendFs2Rabbit = project
+  .settings(name := "com.itv")
+  .settings(moduleName := "bucky-backend-fs2-rabbit")
+  .settings(kernelSettings: _*)
+  .dependsOn(core)
+  .aggregate(core)
+  .settings(
+    libraryDependencies ++= Seq(
+      "com.typesafe.scala-logging" %% "scala-logging"                 % scalaLoggingVersion,
+      "org.scalatest"              %% "scalatest"                     % scalaTestVersion           % "test",
+      "org.typelevel"              %% "cats-effect-testing-scalatest" % catsEffectScalaTestVersion % "test",
+      "org.typelevel"              %% "cats-effect"                   % catsEffectVersion,
+      "dev.profunktor"             %% "fs2-rabbit"                    % "5.0.0",
+      "dev.profunktor"             %% "fs2-rabbit-circe"              % "5.0.0",
+      "ch.qos.logback"              % "logback-classic"               % logbackVersion             % "test,it",
+      "org.scala-lang.modules"     %% "scala-collection-compat"       % "2.5.0"
     )
   )
 
@@ -151,7 +187,7 @@ lazy val test = project
   .settings(name := "com.itv")
   .settings(moduleName := "bucky-test")
   .settings(kernelSettings)
-  .dependsOn(core)
+  .dependsOn(core, backendJavaAmqp)
   .aggregate(core)
   .settings(
     libraryDependencies ++= Seq(
@@ -249,5 +285,5 @@ lazy val xml = project
   )
 
 lazy val root = (project in file("."))
-  .aggregate(xml, circe, argonaut, example, test, core)
+  .aggregate(xml, circe, argonaut, example, test, backendJavaAmqp, backendFs2Rabbit, core)
   .settings(publishArtifact := false)

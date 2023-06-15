@@ -1,15 +1,12 @@
-package com.itv.bucky
-
-import java.util.Date
+package com.itv.bucky.backend.javaamqp
 
 import com.itv.bucky.consume.DeliveryMode
 import com.itv.bucky.publish.{ContentEncoding, ContentType, MessageProperties}
 import com.rabbitmq.client.AMQP.BasicProperties
-
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers._
 
-
+import java.util.Date
 import scala.jdk.CollectionConverters._
 
 class MessagePropertiesConvertersTest extends AnyFunSuite {
@@ -17,9 +14,9 @@ class MessagePropertiesConvertersTest extends AnyFunSuite {
   test("should be able to convert minimal basic properties to message properties") {
 
     val basicProperties: BasicProperties             = new BasicProperties()
-    val messageProperties: publish.MessageProperties = MessagePropertiesConverters.apply(basicProperties)
+    val messageProperties: MessageProperties = MessagePropertiesConverters.apply(basicProperties)
 
-    messageProperties shouldBe publish.MessageProperties(
+    messageProperties shouldBe MessageProperties(
       contentType = None,
       contentEncoding = None,
       headers = Map.empty,
