@@ -4,6 +4,7 @@ import cats.effect.unsafe.IORuntime
 import cats.effect.{IO, Resource}
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
+import com.itv.bucky.backend.javaamqp.JavaBackendAmqpClient
 import com.itv.bucky.decl.Exchange
 import com.itv.bucky.pattern.requeue.RequeuePolicy
 import com.itv.bucky.publish.{PublishCommand, PublishCommandBuilder}
@@ -51,7 +52,7 @@ class PublishIntegrationTest extends AnyFunSuite with Eventually with Integratio
     val exchangeName = ExchangeName(UUID.randomUUID().toString)
     val routingKey   = RoutingKey(UUID.randomUUID().toString)
 
-    AmqpClient[IO](config)
+    JavaBackendAmqpClient[IO](config)
       .use { client =>
         Resource
           .eval(
