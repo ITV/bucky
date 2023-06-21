@@ -7,57 +7,92 @@ import cats.implicits._
 import com.itv.bucky
 import com.itv.bucky.decl.ExchangeType
 import com.itv.bucky.publish.PublishCommand
-import com.itv.bucky.{AmqpClient, AmqpClientConfig, Envelope, ExchangeName, Handler, Payload, Publisher, QueueName, RoutingKey, consume, decl, publish}
+import com.itv.bucky.{
+  AmqpClient,
+  AmqpClientConfig,
+  Envelope,
+  ExchangeName,
+  Handler,
+  Payload,
+  Publisher,
+  QueueName,
+  RoutingKey,
+  consume,
+  decl,
+  publish
+}
 import com.rabbitmq.client.LongString
 import dev.profunktor.fs2rabbit.arguments.SafeArg
 import dev.profunktor.fs2rabbit.config.Fs2RabbitConfig
-import dev.profunktor.fs2rabbit.config.declaration.{DeclarationExchangeConfig, DeclarationQueueConfig}
+import dev.profunktor.fs2rabbit.config.declaration._
 import dev.profunktor.fs2rabbit.effects.{EnvelopeDecoder, MessageEncoder}
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
 import dev.profunktor.fs2rabbit.model
-import dev.profunktor.fs2rabbit.model.AmqpFieldValue.{BooleanVal, ByteArrayVal, ByteVal, DecimalVal, DoubleVal, FloatVal, IntVal, LongVal, NullVal, ShortVal, StringVal, TimestampVal}
+import dev.profunktor.fs2rabbit.model.AmqpFieldValue.{
+  ArrayVal,
+  BooleanVal,
+  ByteArrayVal,
+  ByteVal,
+  DecimalVal,
+  DoubleVal,
+  FloatVal,
+  IntVal,
+  LongVal,
+  NullVal,
+  ShortVal,
+  StringVal,
+  TableVal,
+  TimestampVal
+}
+import dev.profunktor.fs2rabbit.model.ShortString
 import scodec.bits.ByteVector
 
 import java.nio.charset.StandardCharsets.UTF_8
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
+import scala.jdk.CollectionConverters._
 import scala.language.higherKinds
 
-class Fs2RabbitAmqpClient[F[_]](client: RabbitClient[F], connection: model.AMQPConnection, publishChannel: model.AMQPChannel)(implicit F: Async[F]) extends AmqpClient[F] {
+class Fs2RabbitAmqpClient[F[_]](client: RabbitClient[F], connection: model.AMQPConnection, publishChannel: model.AMQPChannel)(implicit F: Async[F])
+    extends AmqpClient[F] {
 
   implicit val deliveryEncoder: MessageEncoder[F, PublishCommand] =
     Kleisli { publishCommand =>
-      val fs2MessageHeaders: Map[String, model.AmqpFieldValue] = publishCommand.basicProperties.headers.mapValues {
+      def toAmqpValue(value: AnyRef): model.AmqpFieldValue = value match {
         case bd: java.math.BigDecimal => DecimalVal.unsafeFrom(bd)
         case ts: java.time.Instant    => TimestampVal.from(ts)
         case d: java.util.Date        => TimestampVal.from(d)
-        //        case t: java.util.Map[String@unchecked, AnyRef@unchecked] =>
-        //          TableVal(t.asScala.toMap.map { case (key, v) => ShortString.unsafeFrom(key) -> unsafeFrom(v) })
-        case byte: java.lang.Byte     => ByteVal(byte)
-        case double: java.lang.Double => DoubleVal(double)
-        case float: java.lang.Float   => FloatVal(float)
-        case short: java.lang.Short   => ShortVal(short)
-        case byteArray: Array[Byte]   => ByteArrayVal(ByteVector(byteArray))
-        case b: java.lang.Boolean     => BooleanVal(b)
-        case i: java.lang.Integer     => IntVal(i)
-        case l: java.lang.Long        => LongVal(l)
-        case s: java.lang.String      => StringVal(s)
-        case ls: LongString           => StringVal(ls.toString)
-        //        case a: java.util.List[AnyRef@unchecked] => ArrayVal(a.asScala.toVector.map(unsafeFrom))
-        case _ => NullVal
+        case t: java.util.Map[String, AnyRef] =>
+          TableVal(t.asScala.toMap.map { case (key, v) => ShortString.unsafeFrom(key) -> toAmqpValue(v) })
+        case byte: java.lang.Byte      => ByteVal(byte)
+        case double: java.lang.Double  => DoubleVal(double)
+        case float: java.lang.Float    => FloatVal(float)
+        case short: java.lang.Short    => ShortVal(short)
+        case byteArray: Array[Byte]    => ByteArrayVal(ByteVector(byteArray))
+        case b: java.lang.Boolean      => BooleanVal(b)
+        case i: java.lang.Integer      => IntVal(i)
+        case l: java.lang.Long         => LongVal(l)
+        case s: java.lang.String       => StringVal(s)
+        case ls: LongString            => StringVal(ls.toString)
+        case a: java.util.List[AnyRef] => ArrayVal(a.asScala.toVector.map(toAmqpValue))
+        case _                         => NullVal
       }
 
-      val message = model.AmqpMessage(publishCommand.body.value, model.AmqpProperties.empty.copy(
-        contentEncoding = Some(UTF_8.name()),
-        headers = fs2MessageHeaders,
-        expiration = publishCommand.basicProperties.expiration
-      ))
+      val fs2MessageHeaders: Map[String, model.AmqpFieldValue] = publishCommand.basicProperties.headers.mapValues(toAmqpValue)
+
+      val message = model.AmqpMessage(
+        publishCommand.body.value,
+        model.AmqpProperties.empty.copy(
+          contentEncoding = Some(UTF_8.name()),
+          headers = fs2MessageHeaders,
+          expiration = publishCommand.basicProperties.expiration
+        )
+      )
 
       F.pure(message)
     }
 
   def deliveryDecoder(queueName: QueueName): EnvelopeDecoder[F, consume.Delivery] =
     Kleisli { amqpEnvelope =>
-
       val messageProperties = publish.MessageProperties.basic.copy(
         headers = amqpEnvelope.properties.headers.mapValues(_.toValueWriterCompatibleJava)
       )
@@ -110,7 +145,12 @@ class Fs2RabbitAmqpClient[F[_]](client: RabbitClient[F], connection: model.AMQPC
         client.declareExchange(
           DeclarationExchangeConfig
             .default(model.ExchangeName(name.value), exchangeTypeToFs2ExchangeType(exchangeType))
-            .copy(arguments = argumentsFromAnyRef(arguments))
+            .copy(
+              arguments = argumentsFromAnyRef(arguments),
+              durable = if (isDurable) Durable else NonDurable,
+              autoDelete = if (shouldAutoDelete) AutoDelete else NonAutoDelete,
+              internal = if (isInternal) Internal else NonInternal
+            )
         ) *>
           declare(bindings)
       case decl.Binding(exchangeName, queueName, routingKey, arguments) =>
@@ -120,29 +160,41 @@ class Fs2RabbitAmqpClient[F[_]](client: RabbitClient[F], connection: model.AMQPC
           model.RoutingKey(routingKey.value),
           model.QueueBindingArgs(argumentsFromAnyRef(arguments))
         )
-      case decl.ExchangeBinding(destinationExchangeName, sourceExchangeName, routingKey, arguments) => ???
+      case decl.ExchangeBinding(destinationExchangeName, sourceExchangeName, routingKey, arguments) =>
+        client.bindExchange(
+          model.ExchangeName(destinationExchangeName.value),
+          model.ExchangeName(sourceExchangeName.value),
+          model.RoutingKey(routingKey.value),
+          model.ExchangeBindingArgs(argumentsFromAnyRef(arguments))
+        )
       case decl.Queue(name, isDurable, isExclusive, shouldAutoDelete, arguments) =>
-        client.declareQueue(DeclarationQueueConfig.default(model.QueueName(name.value)).copy(arguments = argumentsFromAnyRef(arguments)))
+        client.declareQueue(
+          DeclarationQueueConfig.default(model.QueueName(name.value)).copy(
+            arguments = argumentsFromAnyRef(arguments),
+            durable = if (isDurable) Durable else NonDurable,
+            autoDelete = if (shouldAutoDelete) AutoDelete else NonAutoDelete,
+            exclusive = if (isExclusive) Exclusive else NonExclusive
+          )
+        )
     }
 
   }
 
   override def publisher(): Publisher[F, publish.PublishCommand] = (publishCommand: PublishCommand) => {
     implicit val channel: model.AMQPChannel = publishChannel
-    println(publishCommand)
     client
       .createPublisher[PublishCommand](model.ExchangeName(publishCommand.exchange.value), model.RoutingKey(publishCommand.routingKey.value))
       .flatMap(f => f(publishCommand))
   }
 
   override def registerConsumer(
-                                 queueName: bucky.QueueName,
-                                 handler: Handler[F, consume.Delivery],
-                                 exceptionalAction: consume.ConsumeAction,
-                                 prefetchCount: Int,
-                                 shutdownTimeout: FiniteDuration,
-                                 shutdownRetry: FiniteDuration
-                               ): Resource[F, Unit] =
+      queueName: bucky.QueueName,
+      handler: Handler[F, consume.Delivery],
+      exceptionalAction: consume.ConsumeAction,
+      prefetchCount: Int,
+      shutdownTimeout: FiniteDuration,
+      shutdownRetry: FiniteDuration
+  ): Resource[F, Unit] =
     client.createChannel(connection).flatMap { implicit channel =>
       implicit val decoder: EnvelopeDecoder[F, consume.Delivery] = deliveryDecoder(queueName)
       Resource.eval(client.createAckerConsumer[consume.Delivery](model.QueueName(queueName.value))).flatMap { case (acker, consumer) =>
@@ -167,11 +219,20 @@ class Fs2RabbitAmqpClient[F[_]](client: RabbitClient[F], connection: model.AMQPC
 object Fs2RabbitAmqpClient {
   def apply[F[_]](config: AmqpClientConfig)(implicit async: Async[F]): Resource[F, AmqpClient[F]] = {
     val fs2RabbitConfig = Fs2RabbitConfig(
-      config.host, config.port, "/", 10.seconds, ssl = false, Some(config.username), Some(config.password), requeueOnNack = false, requeueOnReject = false, Some(10)
+      config.host,
+      config.port,
+      "/",
+      10.seconds,
+      ssl = false,
+      Some(config.username),
+      Some(config.password),
+      requeueOnNack = false,
+      requeueOnReject = false,
+      Some(10)
     )
     for {
-      client <- RabbitClient.default[F](fs2RabbitConfig).resource
-      connection <- client.createConnection
+      client         <- RabbitClient.default[F](fs2RabbitConfig).resource
+      connection     <- client.createConnection
       publishChannel <- client.createConnectionChannel
     } yield new Fs2RabbitAmqpClient(client, connection, publishChannel)
   }
