@@ -61,8 +61,8 @@ class Fs2RabbitAmqpClient[F[_]](client: RabbitClient[F], connection: model.AMQPC
         case bd: java.math.BigDecimal => DecimalVal.unsafeFrom(bd)
         case ts: java.time.Instant    => TimestampVal.from(ts)
         case d: java.util.Date        => TimestampVal.from(d)
-        case t: java.util.Map[String, AnyRef] =>
-          TableVal(t.asScala.toMap.map { case (key, v) => ShortString.unsafeFrom(key) -> toAmqpValue(v) })
+        case t: java.util.Map[_, _] =>
+          TableVal(t.asScala.toMap.collect { case (key: String, v: AnyRef) => ShortString.unsafeFrom(key) -> toAmqpValue(v) })
         case byte: java.lang.Byte      => ByteVal(byte)
         case double: java.lang.Double  => DoubleVal(double)
         case float: java.lang.Float    => FloatVal(float)
@@ -73,7 +73,7 @@ class Fs2RabbitAmqpClient[F[_]](client: RabbitClient[F], connection: model.AMQPC
         case l: java.lang.Long         => LongVal(l)
         case s: java.lang.String       => StringVal(s)
         case ls: LongString            => StringVal(ls.toString)
-        case a: java.util.List[AnyRef] => ArrayVal(a.asScala.toVector.map(toAmqpValue))
+        case a: java.util.List[_] => ArrayVal(a.asScala.toVector.collect { case v: AnyRef => toAmqpValue(v) })
         case _                         => NullVal
       }
 
