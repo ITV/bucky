@@ -203,7 +203,7 @@ class Fs2RabbitAmqpClient[F[_]](client: RabbitClient[F], connection: model.AMQPC
           .evalMap {
             case (consume.Ack, tag)                => acker(model.AckResult.Ack(tag))
             case (consume.DeadLetter, tag)         => acker(model.AckResult.NAck(tag))
-            case (consume.RequeueImmediately, tag) => ??? // TODO
+            case (consume.RequeueImmediately, tag) => acker(model.AckResult.Reject(tag))
           }
           .compile
           .drain
@@ -227,7 +227,7 @@ object Fs2RabbitAmqpClient {
       Some(config.username),
       Some(config.password),
       requeueOnNack = false,
-      requeueOnReject = false,
+      requeueOnReject = true,
       Some(10)
     )
     for {
