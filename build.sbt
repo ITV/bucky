@@ -168,13 +168,16 @@ lazy val backendFs2Rabbit = project
   .settings(name := "com.itv")
   .settings(moduleName := "bucky-backend-fs2-rabbit")
   .settings(kernelSettings: _*)
+  .configs(IntegrationTest)
+  .settings(Defaults.itSettings)
+  .settings(inConfig(ITTest)(Defaults.testSettings): _*)
   .dependsOn(core)
   .aggregate(core)
   .settings(
     libraryDependencies ++= Seq(
       "com.typesafe.scala-logging" %% "scala-logging"                 % scalaLoggingVersion,
-      "org.scalatest"              %% "scalatest"                     % scalaTestVersion           % "test",
-      "org.typelevel"              %% "cats-effect-testing-scalatest" % catsEffectScalaTestVersion % "test",
+      "org.scalatest"              %% "scalatest"                     % scalaTestVersion           % "test,it",
+      "org.typelevel"              %% "cats-effect-testing-scalatest" % catsEffectScalaTestVersion % "test,it",
       "org.typelevel"              %% "cats-effect"                   % catsEffectVersion,
       "dev.profunktor"             %% "fs2-rabbit"                    % "5.0.0",
       "dev.profunktor"             %% "fs2-rabbit-circe"              % "5.0.0",

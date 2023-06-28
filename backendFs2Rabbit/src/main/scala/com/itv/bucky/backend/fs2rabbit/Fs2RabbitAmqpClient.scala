@@ -7,20 +7,7 @@ import cats.implicits._
 import com.itv.bucky
 import com.itv.bucky.decl.ExchangeType
 import com.itv.bucky.publish.PublishCommand
-import com.itv.bucky.{
-  AmqpClient,
-  AmqpClientConfig,
-  Envelope,
-  ExchangeName,
-  Handler,
-  Payload,
-  Publisher,
-  QueueName,
-  RoutingKey,
-  consume,
-  decl,
-  publish
-}
+import com.itv.bucky.{AmqpClient, AmqpClientConfig, Envelope, ExchangeName, Handler, Payload, Publisher, QueueName, RoutingKey, consume, decl, publish}
 import com.rabbitmq.client.LongString
 import dev.profunktor.fs2rabbit.arguments.SafeArg
 import dev.profunktor.fs2rabbit.config.Fs2RabbitConfig
@@ -28,26 +15,10 @@ import dev.profunktor.fs2rabbit.config.declaration._
 import dev.profunktor.fs2rabbit.effects.{EnvelopeDecoder, MessageEncoder}
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
 import dev.profunktor.fs2rabbit.model
-import dev.profunktor.fs2rabbit.model.AmqpFieldValue.{
-  ArrayVal,
-  BooleanVal,
-  ByteArrayVal,
-  ByteVal,
-  DecimalVal,
-  DoubleVal,
-  FloatVal,
-  IntVal,
-  LongVal,
-  NullVal,
-  ShortVal,
-  StringVal,
-  TableVal,
-  TimestampVal
-}
-import dev.profunktor.fs2rabbit.model.ShortString
+import dev.profunktor.fs2rabbit.model.AmqpFieldValue.{ArrayVal, BooleanVal, ByteArrayVal, ByteVal, DecimalVal, DoubleVal, FloatVal, IntVal, LongVal, NullVal, ShortVal, StringVal, TableVal, TimestampVal}
+import dev.profunktor.fs2rabbit.model.{DeliveryMode, ShortString}
 import scodec.bits.ByteVector
 
-import java.nio.charset.StandardCharsets.UTF_8
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.jdk.CollectionConverters._
 import scala.language.higherKinds
@@ -81,10 +52,21 @@ class Fs2RabbitAmqpClient[F[_]](client: RabbitClient[F], connection: model.AMQPC
 
       val message = model.AmqpMessage(
         publishCommand.body.value,
-        model.AmqpProperties.empty.copy(
-          contentEncoding = Some(UTF_8.name()),
-          headers = fs2MessageHeaders,
-          expiration = publishCommand.basicProperties.expiration
+        model.AmqpProperties(
+          contentType = publishCommand.basicProperties.contentType.map(_.value),
+          contentEncoding = publishCommand.basicProperties.contentEncoding.map(_.value),
+          priority = publishCommand.basicProperties.priority,
+          deliveryMode = publishCommand.basicProperties.deliveryMode.map(dm => DeliveryMode.from(dm.value)),
+          correlationId = publishCommand.basicProperties.correlationId,
+          messageId = publishCommand.basicProperties.messageId,
+          `type` = publishCommand.basicProperties.messageType,
+          userId = publishCommand.basicProperties.userId,
+          appId = publishCommand.basicProperties.appId,
+          expiration = publishCommand.basicProperties.expiration,
+          replyTo = publishCommand.basicProperties.replyTo,
+          clusterId = publishCommand.basicProperties.clusterId,
+          timestamp = publishCommand.basicProperties.timestamp.map(_.toInstant),
+          headers = fs2MessageHeaders
         )
       )
 
@@ -217,7 +199,7 @@ class Fs2RabbitAmqpClient[F[_]](client: RabbitClient[F], connection: model.AMQPC
 }
 
 object Fs2RabbitAmqpClient {
-  def apply[F[_]](config: AmqpClientConfig)(implicit async: Async[F]): Resource[F, AmqpClient[F]] = {
+  def apply[F[_]](config: AmqpClientConfig)(implicit async: Async[F]): Resource[F, Fs2RabbitAmqpClient[F]] = {
     val fs2RabbitConfig = Fs2RabbitConfig(
       config.host,
       config.port,
