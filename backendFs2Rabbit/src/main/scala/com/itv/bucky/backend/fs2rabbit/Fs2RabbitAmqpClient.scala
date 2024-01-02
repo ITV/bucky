@@ -5,8 +5,9 @@ import cats.effect.implicits.genSpawnOps
 import cats.effect.{Async, Resource}
 import cats.implicits._
 import com.itv.bucky
+import com.itv.bucky.consume.DeliveryMode
 import com.itv.bucky.decl.ExchangeType
-import com.itv.bucky.publish.PublishCommand
+import com.itv.bucky.publish.{ContentEncoding, ContentType, PublishCommand}
 import com.itv.bucky.{AmqpClient, AmqpClientConfig, Envelope, ExchangeName, Handler, Payload, Publisher, QueueName, RoutingKey, consume, decl, publish}
 import com.rabbitmq.client.LongString
 import dev.profunktor.fs2rabbit.arguments.SafeArg
@@ -16,9 +17,10 @@ import dev.profunktor.fs2rabbit.effects.{EnvelopeDecoder, MessageEncoder}
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
 import dev.profunktor.fs2rabbit.model
 import dev.profunktor.fs2rabbit.model.AmqpFieldValue.{ArrayVal, BooleanVal, ByteArrayVal, ByteVal, DecimalVal, DoubleVal, FloatVal, IntVal, LongVal, NullVal, ShortVal, StringVal, TableVal, TimestampVal}
-import dev.profunktor.fs2rabbit.model.{DeliveryMode, ShortString}
+import dev.profunktor.fs2rabbit.model.{AmqpFieldValue, ShortString, instantOrderWithSecondPrecision}
 import scodec.bits.ByteVector
 
+import java.util.Date
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.jdk.CollectionConverters._
 import scala.language.higherKinds
@@ -34,18 +36,18 @@ class Fs2RabbitAmqpClient[F[_]](client: RabbitClient[F], connection: model.AMQPC
         case d: java.util.Date        => TimestampVal.from(d)
         case t: java.util.Map[_, _] =>
           TableVal(t.asScala.toMap.collect { case (key: String, v: AnyRef) => ShortString.unsafeFrom(key) -> toAmqpValue(v) })
-        case byte: java.lang.Byte      => ByteVal(byte)
-        case double: java.lang.Double  => DoubleVal(double)
-        case float: java.lang.Float    => FloatVal(float)
-        case short: java.lang.Short    => ShortVal(short)
-        case byteArray: Array[Byte]    => ByteArrayVal(ByteVector(byteArray))
-        case b: java.lang.Boolean      => BooleanVal(b)
-        case i: java.lang.Integer      => IntVal(i)
-        case l: java.lang.Long         => LongVal(l)
-        case s: java.lang.String       => StringVal(s)
-        case ls: LongString            => StringVal(ls.toString)
-        case a: java.util.List[_] => ArrayVal(a.asScala.toVector.collect { case v: AnyRef => toAmqpValue(v) })
-        case _                         => NullVal
+        case byte: java.lang.Byte     => ByteVal(byte)
+        case double: java.lang.Double => DoubleVal(double)
+        case float: java.lang.Float   => FloatVal(float)
+        case short: java.lang.Short   => ShortVal(short)
+        case byteArray: Array[Byte]   => ByteArrayVal(ByteVector(byteArray))
+        case b: java.lang.Boolean     => BooleanVal(b)
+        case i: java.lang.Integer     => IntVal(i)
+        case l: java.lang.Long        => LongVal(l)
+        case s: java.lang.String      => StringVal(s)
+        case ls: LongString           => StringVal(ls.toString)
+        case a: java.util.List[_]     => ArrayVal(a.asScala.toVector.collect { case v: AnyRef => toAmqpValue(v) })
+        case _                        => NullVal
       }
 
       val fs2MessageHeaders: Map[String, model.AmqpFieldValue] = publishCommand.basicProperties.headers.mapValues(toAmqpValue)
@@ -56,7 +58,7 @@ class Fs2RabbitAmqpClient[F[_]](client: RabbitClient[F], connection: model.AMQPC
           contentType = publishCommand.basicProperties.contentType.map(_.value),
           contentEncoding = publishCommand.basicProperties.contentEncoding.map(_.value),
           priority = publishCommand.basicProperties.priority,
-          deliveryMode = publishCommand.basicProperties.deliveryMode.map(dm => DeliveryMode.from(dm.value)),
+          deliveryMode = publishCommand.basicProperties.deliveryMode.map(dm => model.DeliveryMode.from(dm.value)),
           correlationId = publishCommand.basicProperties.correlationId,
           messageId = publishCommand.basicProperties.messageId,
           `type` = publishCommand.basicProperties.messageType,
@@ -75,8 +77,21 @@ class Fs2RabbitAmqpClient[F[_]](client: RabbitClient[F], connection: model.AMQPC
 
   def deliveryDecoder(queueName: QueueName): EnvelopeDecoder[F, consume.Delivery] =
     Kleisli { amqpEnvelope =>
-      val messageProperties = publish.MessageProperties.basic.copy(
-        headers = amqpEnvelope.properties.headers.mapValues(_.toValueWriterCompatibleJava)
+      val messageProperties = publish.MessageProperties(
+        contentType = amqpEnvelope.properties.contentType.map(ContentType.apply),
+        contentEncoding = amqpEnvelope.properties.contentEncoding.map(ContentEncoding.apply),
+        headers = amqpEnvelope.properties.headers.mapValues(_.toValueWriterCompatibleJava),
+        deliveryMode = amqpEnvelope.properties.deliveryMode.map(dm => DeliveryMode(dm.value)),
+        priority = amqpEnvelope.properties.priority,
+        correlationId = amqpEnvelope.properties.correlationId,
+        replyTo = amqpEnvelope.properties.replyTo,
+        expiration = amqpEnvelope.properties.expiration,
+        messageId = amqpEnvelope.properties.messageId,
+        timestamp = amqpEnvelope.properties.timestamp.map(Date.from),
+        messageType = amqpEnvelope.properties.`type`,
+        userId = amqpEnvelope.properties.userId,
+        appId = amqpEnvelope.properties.appId,
+        clusterId = amqpEnvelope.properties.clusterId
       )
 
       F.pure(
@@ -97,7 +112,6 @@ class Fs2RabbitAmqpClient[F[_]](client: RabbitClient[F], connection: model.AMQPC
   override def declare(declarations: decl.Declaration*): F[Unit] = declare(declarations.toIterable)
 
   override def declare(declarations: Iterable[decl.Declaration]): F[Unit] = {
-
     def argumentsFromAnyRef(arguments: Map[String, AnyRef]): Map[String, SafeArg] =
       arguments.mapValues {
         case arg: String            => arg
@@ -151,12 +165,14 @@ class Fs2RabbitAmqpClient[F[_]](client: RabbitClient[F], connection: model.AMQPC
         )
       case decl.Queue(name, isDurable, isExclusive, shouldAutoDelete, arguments) =>
         client.declareQueue(
-          DeclarationQueueConfig.default(model.QueueName(name.value)).copy(
-            arguments = argumentsFromAnyRef(arguments),
-            durable = if (isDurable) Durable else NonDurable,
-            autoDelete = if (shouldAutoDelete) AutoDelete else NonAutoDelete,
-            exclusive = if (isExclusive) Exclusive else NonExclusive
-          )
+          DeclarationQueueConfig
+            .default(model.QueueName(name.value))
+            .copy(
+              arguments = argumentsFromAnyRef(arguments),
+              durable = if (isDurable) Durable else NonDurable,
+              autoDelete = if (shouldAutoDelete) AutoDelete else NonAutoDelete,
+              exclusive = if (isExclusive) Exclusive else NonExclusive
+            )
         )
     }
 

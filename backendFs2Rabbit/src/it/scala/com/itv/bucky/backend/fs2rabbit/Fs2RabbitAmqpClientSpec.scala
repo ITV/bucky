@@ -3,22 +3,72 @@ package com.itv.bucky.backend.fs2rabbit
 import cats.effect.IO
 import cats.effect.testing.scalatest.AsyncIOSpec
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
-import com.itv.bucky.publish.{MessageProperties, PublishCommandBuilder}
-import com.itv.bucky.{AmqpClientConfig, ExchangeName, RoutingKey, consume, publish}
+import com.itv.bucky.consume.DeliveryMode
+import com.itv.bucky.publish.{ContentEncoding, ContentType, MessageProperties, PublishCommandBuilder}
+import com.itv.bucky.{AmqpClientConfig, ExchangeName, QueueName, RoutingKey, consume, publish}
 import com.rabbitmq.client.impl.LongStringHelper
 import dev.profunktor.fs2rabbit.model
-import dev.profunktor.fs2rabbit.model.{AmqpProperties, ShortString}
+import dev.profunktor.fs2rabbit.model.{AmqpEnvelope, AmqpProperties, DeliveryTag, ShortString}
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AsyncWordSpec
 import scodec.bits.ByteVector
 
 import java.time.Instant
+import java.time.temporal.{ChronoUnit, TemporalUnit}
 import java.util.Date
 import scala.jdk.CollectionConverters._
 
 class Fs2RabbitAmqpClientSpec extends AsyncWordSpec with AsyncIOSpec with Matchers {
 
   val amqpClientConfig: AmqpClientConfig = AmqpClientConfig("localhost", 5672, "guest", "guest")
+
+  val now: Instant = Instant.now()
+
+  val amqpMessageHeaders: Map[String, model.AmqpFieldValue] = Map(
+    "bigDecimal" -> model.AmqpFieldValue.DecimalVal.unsafeFrom(1),
+    "instant" -> model.AmqpFieldValue.TimestampVal.from(now),
+    "date" -> model.AmqpFieldValue.TimestampVal.from(Date.from(now)),
+    "map" -> model.AmqpFieldValue.TableVal(
+      Map(
+        ShortString.unsafeFrom("inside") -> model.AmqpFieldValue.IntVal(1)
+      )
+    ),
+    "byte" -> model.AmqpFieldValue.ByteVal('c'.toByte),
+    "double" -> model.AmqpFieldValue.DoubleVal(Double.box(4.5)),
+    "float" -> model.AmqpFieldValue.FloatVal(Double.box(4.5).toFloat),
+    "short" -> model.AmqpFieldValue.ShortVal(Short.box(1)),
+    "byteArray" -> model.AmqpFieldValue.ByteArrayVal(ByteVector(0.toByte, 1.toByte)),
+    "int" -> model.AmqpFieldValue.IntVal(Integer.MIN_VALUE),
+    "long" -> model.AmqpFieldValue.LongVal(Long.MinValue),
+    "string" -> model.AmqpFieldValue.StringVal("blah"),
+    "longString" -> model.AmqpFieldValue.StringVal("blahlong"),
+    "list" -> model.AmqpFieldValue.ArrayVal(
+      Vector(
+        model.AmqpFieldValue.IntVal(1),
+        model.AmqpFieldValue.IntVal(2),
+        model.AmqpFieldValue.IntVal(3)
+      )
+    )
+  )
+
+  val messagePropertyHeaders: Map[String, AnyRef] = Map(
+    "bigDecimal" -> java.math.BigDecimal.ONE,
+    "instant" -> now,
+    "date" -> Date.from(now),
+    "map" -> Map(
+      "inside" -> 1
+    ).asJava,
+    "byte" -> Byte.box('c'.toByte),
+    "double" -> Double.box(4.5),
+    "float" -> Float.box(Double.box(4.5).toFloat),
+    "short" -> Short.box(1),
+    "byteArray" -> Array(0.toByte, 1.toByte),
+    "int" -> Int.box(Integer.MIN_VALUE),
+    "long" -> Long.box(Long.MinValue),
+    "string" -> "blah",
+    "longString" -> LongStringHelper.asLongString("blahlong"),
+    "list" -> List(1, 2, 3).asJava
+  )
 
   "deliveryEncoder" should {
     val basicPublishCommand = PublishCommandBuilder
@@ -81,54 +131,81 @@ class Fs2RabbitAmqpClientSpec extends AsyncWordSpec with AsyncIOSpec with Matche
       Fs2RabbitAmqpClient[IO](amqpClientConfig).use { amqpClient =>
         val publishCommand = basicPublishCommand.copy(basicProperties =
           MessageProperties.basic.copy(
-            headers = Map(
-              "bigDecimal" -> java.math.BigDecimal.ONE,
-              "instant"    -> Instant.now(),
-              "date"       -> Date.from(Instant.now()),
-              "map" -> Map(
-                "inside" -> 1
-              ).asJava,
-              "byte"       -> Byte.box('c'.toByte),
-              "double"     -> Double.box(4.5),
-              "float"      -> Float.box(Double.box(4.5).toFloat),
-              "short"      -> Short.box(1),
-              "byteArray"  -> Array(0.toByte, 1.toByte),
-              "int"        -> Int.box(Integer.MIN_VALUE),
-              "long"       -> Long.box(Long.MinValue),
-              "string"     -> "blah",
-              "longString" -> LongStringHelper.asLongString("blahlong"),
-              "list"       -> List(1, 2, 3).asJava
-            )
+            headers = messagePropertyHeaders
           )
         )
 
         amqpClient.deliveryEncoder(publishCommand).map { amqpMessage =>
-          amqpMessage.properties.headers shouldBe Map(
-            "bigDecimal" -> model.AmqpFieldValue.DecimalVal.unsafeFrom(1),
-            "instant"    -> model.AmqpFieldValue.TimestampVal.from(Instant.now()),
-            "date"       -> model.AmqpFieldValue.TimestampVal.from(Date.from(Instant.now())),
-            "map" -> model.AmqpFieldValue.TableVal(
-              Map(
-                ShortString.unsafeFrom("inside") -> model.AmqpFieldValue.IntVal(1)
-              )
-            ),
-            "byte"       -> model.AmqpFieldValue.ByteVal('c'.toByte),
-            "double"     -> model.AmqpFieldValue.DoubleVal(Double.box(4.5)),
-            "float"      -> model.AmqpFieldValue.FloatVal(Double.box(4.5).toFloat),
-            "short"      -> model.AmqpFieldValue.ShortVal(Short.box(1)),
-            "byteArray"  -> model.AmqpFieldValue.ByteArrayVal(ByteVector(0.toByte, 1.toByte)),
-            "int"        -> model.AmqpFieldValue.IntVal(Integer.MIN_VALUE),
-            "long"       -> model.AmqpFieldValue.LongVal(Long.MinValue),
-            "string"     -> model.AmqpFieldValue.StringVal("blah"),
-            "longString" -> model.AmqpFieldValue.StringVal("blahlong"),
-            "list" -> model.AmqpFieldValue.ArrayVal(
-              Vector(
-                model.AmqpFieldValue.IntVal(1),
-                model.AmqpFieldValue.IntVal(2),
-                model.AmqpFieldValue.IntVal(3)
-              )
-            )
-          )
+          amqpMessage.properties.headers shouldBe amqpMessageHeaders
+        }
+      }
+    }
+  }
+
+  "deliveryDecoder" should {
+    val basicEnvelope = AmqpEnvelope(
+      DeliveryTag(123L),
+      "payload".getBytes,
+      AmqpProperties.empty,
+      model.ExchangeName("exchange"),
+      model.RoutingKey("routing"),
+      redelivered = false
+    )
+    val queueName = QueueName("queue")
+
+    "decode a basic AmqpEnvelope" in {
+      Fs2RabbitAmqpClient[IO](amqpClientConfig).use { amqpClient =>
+        amqpClient.deliveryDecoder(queueName).apply(basicEnvelope).map { delivery =>
+          delivery.envelope.deliveryTag shouldBe 123L
+          delivery.body.value shouldBe "payload".getBytes
+          delivery.envelope.exchangeName.value shouldBe "exchange"
+          delivery.envelope.routingKey.value shouldBe "routing"
+          delivery.envelope.redeliver shouldBe false
+        }
+      }
+    }
+
+    "decode an AmqpEnvelope with properties" in {
+
+      val instant = Instant.ofEpochSecond(now.getEpochSecond)
+
+      val amqpProperties = AmqpProperties.apply(
+        contentType = Some("content-type"),
+        contentEncoding = Some("content-encoding"),
+        priority = Some(5),
+        deliveryMode = Some(model.DeliveryMode.Persistent),
+        correlationId = Some("correlation-id"),
+        messageId = Some("message-id"),
+        `type` = Some("type"),
+        userId = Some("user"),
+        appId = Some("app"),
+        expiration = Some("expiry"),
+        replyTo = Some("reply"),
+        clusterId = Some("cluster"),
+        timestamp = Some(instant),
+        headers = amqpMessageHeaders
+      )
+
+      Fs2RabbitAmqpClient[IO](amqpClientConfig).use { amqpClient =>
+        amqpClient.deliveryDecoder(queueName).apply(basicEnvelope.copy(properties = amqpProperties)).map { delivery =>
+          delivery.properties.headers shouldBe
+            messagePropertyHeaders
+              .updated("longString","blahlong")
+              .updated("instant",Date.from(now))
+
+          delivery.properties.contentType.map(_.value) shouldBe amqpProperties.contentType
+          delivery.properties.contentEncoding.map(_.value) shouldBe amqpProperties.contentEncoding
+          delivery.properties.deliveryMode shouldBe Some(DeliveryMode.persistent)
+          delivery.properties.priority shouldBe Some(5)
+          delivery.properties.correlationId shouldBe Some("correlation")
+          delivery.properties.replyTo shouldBe Some("reply")
+          delivery.properties.expiration shouldBe Some("expiry")
+          delivery.properties.messageId shouldBe Some("message-id")
+          delivery.properties.timestamp shouldBe Some(Date.from(instant))
+          delivery.properties.messageType shouldBe Some("type")
+          delivery.properties.userId shouldBe Some("user")
+          delivery.properties.appId shouldBe Some("app")
+          delivery.properties.clusterId shouldBe Some("cluster")
         }
       }
     }
