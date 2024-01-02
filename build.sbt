@@ -10,7 +10,7 @@ lazy val scala213 = "2.13.6"
 scalaVersion := scala212
 scalacOptions += "-Ypartial-unification"
 
-val amqpClientVersion          = "5.13.1"
+val amqpClientVersion          = "5.18.0"
 val scalaLoggingVersion        = "3.9.4"
 val scalaTestVersion           = "3.2.10"
 val argonautVersion            = "6.3.7"

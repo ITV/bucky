@@ -2,7 +2,7 @@ version: '2'
 services:
 
   some-rabbit:
-    image: rabbitmq:3.6-management
+    image: rabbitmq:3.8.17-management
     ports:
          - 5672:5672
          - 15672:15672
