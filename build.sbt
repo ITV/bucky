@@ -284,6 +284,27 @@ lazy val xml = project
     )
   )
 
+lazy val prometheus = project
+  .settings(name := "com.itv")
+  .settings(moduleName := "bucky-prometheus")
+  .settings(kernelSettings: _*)
+  .aggregate(core, test)
+  .dependsOn(core, test % "test,it")
+  .configs(IntegrationTest)
+  .settings(Defaults.itSettings)
+  .settings(
+    internalDependencyClasspath in IntegrationTest += Attributed.blank((classDirectory in Test).value),
+    parallelExecution in IntegrationTest := false,
+  )
+  .settings(
+    libraryDependencies ++= Seq(
+      /* "io.chrisdavenport" %% "prometheus"                    % "0.5.0-M2", */
+      "io.prometheus" % "simpleclient" % "0.6.0",
+      "org.scalatest"     %% "scalatest"                     % scalaTestVersion           % "test, it",
+      "org.typelevel"     %% "cats-effect-testing-scalatest" % catsEffectScalaTestVersion % "test,it"
+    )
+  )
+
 lazy val root = (project in file("."))
-  .aggregate(xml, circe, kamon, argonaut, example, test, core)
+  .aggregate(prometheus, xml, circe, kamon, argonaut, example, test, core)
   .settings(publishArtifact := false)
