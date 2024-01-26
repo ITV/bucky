@@ -11,7 +11,6 @@ import com.itv.bucky.publish.PendingConfirmListener
 import com.typesafe.scalalogging.StrictLogging
 
 import scala.collection.immutable.TreeMap
-import scala.language.higherKinds
 import scala.util.Try
 import cats.effect.{Deferred, Ref, Temporal}
 

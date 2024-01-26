@@ -11,7 +11,6 @@ import com.itv.bucky.test.AmqpClientTest
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
-import scala.language.higherKinds
 import cats.effect.Temporal
 import cats.effect.std.Dispatcher
 import cats.effect.unsafe.IORuntime

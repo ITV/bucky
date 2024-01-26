@@ -10,7 +10,6 @@ import com.itv.bucky.pattern.requeue.{RequeueOps, RequeuePolicy}
 import com.itv.bucky.publish.MessageProperties
 
 import scala.concurrent.duration._
-import scala.language.higherKinds
 
 package object consume {
   sealed trait ConsumeAction

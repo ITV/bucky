@@ -4,7 +4,6 @@ import cats.effect.Sync
 import com.typesafe.scalalogging.StrictLogging
 
 import scala.concurrent.duration.FiniteDuration
-import scala.language.higherKinds
 import scala.util.Try
 import cats.implicits._
 import cats.effect.implicits._

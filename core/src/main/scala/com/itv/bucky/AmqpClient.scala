@@ -14,7 +14,6 @@ import java.util.concurrent.{AbstractExecutorService, Executors, TimeUnit}
 import java.util.{Collections, UUID}
 import scala.concurrent.duration.{FiniteDuration, _}
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutorService}
-import scala.language.higherKinds
 
 trait AmqpClient[F[_]] {
   def declare(declarations: Declaration*): F[Unit]

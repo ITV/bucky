@@ -12,7 +12,6 @@ import com.rabbitmq.client.{ConfirmListener, DefaultConsumer, ReturnListener, Ch
 import com.typesafe.scalalogging.StrictLogging
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 trait Channel[F[_]] {
   def isConnectionOpen: F[Boolean]

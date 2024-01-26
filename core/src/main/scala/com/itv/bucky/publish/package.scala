@@ -5,7 +5,6 @@ import java.util.Date
 import cats.effect.Sync
 import com.itv.bucky.consume.DeliveryMode
 
-import scala.language.higherKinds
 
 package object publish {
   case class ContentType(value: String)
