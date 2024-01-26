@@ -117,7 +117,7 @@ object AmqpClient extends StrictLogging {
       t: Temporal[F]
   ): Resource[F, AmqpClient[F]] =
     for {
-      dispatcher <- Dispatcher[F]
+      dispatcher <- Dispatcher.parallel[F]
       connection <- createConnection(config, connectionExecutionContext)
       publishChannel = createChannel(connection, channelExecutionContext).map(Channel.apply[F](_, dispatcher, channelExecutionContext))
       buildChannel   = () => createChannel(connection, channelExecutionContext).map(Channel.apply[F](_, dispatcher, channelExecutionContext))
