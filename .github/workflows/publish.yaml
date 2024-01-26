@@ -36,7 +36,7 @@ jobs:
         run: docker-compose up -d
 
       - name: Run tests
-        run: sbt test it/test
+        run: sbt +test +it/test
 
       - name: Import GPG key
         if: ${{ startsWith(github.ref, 'refs/tags/') }}
