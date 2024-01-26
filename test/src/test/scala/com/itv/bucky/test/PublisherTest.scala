@@ -62,7 +62,7 @@ class PublisherTest extends AnyFunSuite with IOAmqpClientTest with EitherValues 
         _      <- IO(channel.confirmListeners.foreach(_.handleAck(pubSeq, false)))
         result <- IO.fromFuture(IO(future)).attempt
       } yield {
-        result shouldBe 'left
+        result.isLeft shouldBe true
       }
     }
   }
