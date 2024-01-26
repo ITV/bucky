@@ -20,7 +20,6 @@ val catsEffectVersion          = "3.2.9"
 val scalaXmlVersion            = "2.0.1"
 val scalaz                     = "7.2.22"
 val logbackVersion             = "1.2.6"
-val kamonVersion               = "2.2.3"
 val catsEffectScalaTestVersion = "1.3.0"
 
 releaseProcess := Seq[ReleaseStep](
@@ -44,15 +43,9 @@ pomIncludeRepository := { _ =>
 }
 releasePublishArtifactsAction := PgpKeys.publishSigned.value
 
-pgpPublicRing := file("./ci/public.asc")
-
-pgpSecretRing := file("./ci/private.asc")
-
-pgpSigningKey := Some(-5373332187933973712L)
+pgpSigningKey := Some("C2B50980F625F2AF9D3CB3AA5709530EE8FA7576")
 
 pgpPassphrase := Option(System.getenv("GPG_KEY_PASSPHRASE")).map(_.toArray)
-
-useGpg := false
 
 lazy val kernelSettings = Seq(
   crossScalaVersions := Seq(scala212, scala213),
@@ -240,29 +233,6 @@ lazy val circe = project
     )
   )
 
-lazy val kamon = project
-  .settings(name := "com.itv")
-  .settings(moduleName := "bucky-kamon")
-  .settings(kernelSettings: _*)
-  .dependsOn(core, test % "test,it")
-  .configs(IntegrationTest)
-  .settings(Defaults.itSettings)
-  .settings(
-    internalDependencyClasspath in IntegrationTest += Attributed.blank((classDirectory in Test).value),
-    parallelExecution in IntegrationTest := false,
-    crossScalaVersions                   := Seq(scala212)
-  )
-  .settings(
-    libraryDependencies ++= Seq(
-      "com.typesafe.scala-logging" %% "scala-logging"                 % scalaLoggingVersion,
-      "org.scalatest"              %% "scalatest"                     % scalaTestVersion           % "test, it",
-      "org.typelevel"              %% "cats-effect-testing-scalatest" % catsEffectScalaTestVersion % "test,it",
-      "io.kamon"                   %% "kamon-bundle"                  % kamonVersion,
-      "io.kamon"                   %% "kamon-testkit"                 % kamonVersion               % "test",
-      "ch.qos.logback"              % "logback-classic"               % logbackVersion             % "test, it"
-    )
-  )
-
 lazy val xml = project
   .settings(name := "com.itv")
   .settings(moduleName := "bucky-xml")
@@ -285,5 +255,5 @@ lazy val xml = project
   )
 
 lazy val root = (project in file("."))
-  .aggregate(xml, circe, kamon, argonaut, example, test, core)
+  .aggregate(xml, circe, argonaut, example, test, core)
   .settings(publishArtifact := false)
