@@ -1,7 +1,8 @@
-package com.itv.bucky
+package com.itv.bucky.backend.javaamqp
 
 import com.itv.bucky.consume.DeliveryMode
 import com.itv.bucky.publish.{ContentEncoding, ContentType, MessageProperties}
+import com.itv.bucky.{Envelope, ExchangeName, RoutingKey}
 import com.rabbitmq.client.AMQP.BasicProperties
 import com.rabbitmq.client.{Envelope => RabbitMQEnvelope}
 

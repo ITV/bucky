@@ -5,6 +5,7 @@ import cats.effect.unsafe.IORuntime
 import cats.effect.{IO, Outcome}
 import cats.implicits._
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
+import com.itv.bucky.backend.javaamqp.publish.PendingConfirmListener
 import com.itv.bucky.publish._
 import com.itv.bucky.{ExchangeName, QueueName, RoutingKey}
 import com.rabbitmq.client.AMQP.BasicProperties

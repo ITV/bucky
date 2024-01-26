@@ -14,6 +14,7 @@ import scala.concurrent.duration._
 import cats.effect.Temporal
 import cats.effect.std.Dispatcher
 import cats.effect.unsafe.IORuntime
+import com.itv.bucky.backend.javaamqp.{Channel, JavaBackendAmqpClient}
 
 package object test {
   object Config {
@@ -82,7 +83,7 @@ package object test {
 
     def client(channel: StubChannel[F], config: AmqpClientConfig)(implicit async: Async[F]): Resource[F, AmqpClient[F]] = {
       Dispatcher.parallel[F].flatMap { dispatcher =>
-        AmqpClient[F](
+        JavaBackendAmqpClient[F](
           config,
           () => Resource.pure[F, Channel[F]](channel),
           Resource.pure[F, Channel[F]](channel),

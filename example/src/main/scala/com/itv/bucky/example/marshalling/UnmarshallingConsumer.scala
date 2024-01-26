@@ -9,6 +9,7 @@ import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.StrictLogging
 import cats.effect._
 import cats.implicits._
+import com.itv.bucky.backend.javaamqp.JavaBackendAmqpClient
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -55,7 +56,7 @@ object UnmarshallingConsumer extends IOApp with StrictLogging {
   //start snippet 4
   override def run(args: List[String]): IO[ExitCode] =
       (for {
-        amqpClient <- AmqpClient[IO](amqpClientConfig)
+        amqpClient <- JavaBackendAmqpClient[IO](amqpClientConfig)
         _ <- Resource.eval(amqpClient.declare(Declarations.all))
         _ <- amqpClient.registerConsumerOf(Declarations.queue.name, personHandler)
       } yield ()).use(_ => IO.never *> IO.delay(ExitCode.Success))
