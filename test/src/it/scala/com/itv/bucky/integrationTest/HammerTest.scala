@@ -20,7 +20,6 @@ import org.scalatest.matchers.should.Matchers
 import java.util.UUID
 import scala.collection.immutable.TreeSet
 import scala.concurrent.duration._
-import scala.language.higherKinds
 
 class HammerTest extends AsyncFunSuite with EffectTestSupport with Eventually with IntegrationPatience with StrictLogging with Matchers {
 

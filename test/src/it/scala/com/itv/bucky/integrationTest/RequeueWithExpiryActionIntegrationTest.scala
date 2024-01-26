@@ -24,7 +24,6 @@ import java.util.concurrent.Executors
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
-import scala.language.higherKinds
 
 class RequeueWithExpiryActionIntegrationTest extends AsyncFunSuite with EffectTestSupport with Eventually with IntegrationPatience {
 

@@ -14,7 +14,6 @@ import cats.effect.implicits._
 import com.itv.bucky.consume.{ConsumeAction, DeadLetter, RequeueConsumeAction}
 import com.itv.bucky.publish.PublishCommandBuilder
 
-import scala.language.higherKinds
 
 final case class WiringName(value: String) extends AnyVal
 

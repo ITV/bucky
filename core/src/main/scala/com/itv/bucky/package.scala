@@ -11,7 +11,6 @@ import com.itv.bucky.pattern.requeue.{RequeueOps, RequeuePolicy}
 import com.itv.bucky.publish.PublishCommandBuilder
 
 import scala.concurrent.duration._
-import scala.language.higherKinds
 
 package object bucky {
 

@@ -4,7 +4,7 @@ import cats.effect.Sync
 import com.itv.bucky.{Handler, RequeueHandler}
 import com.itv.bucky.consume.{ConsumeAction, RequeueConsumeAction}
 
-import scala.language.higherKinds
+
 import cats.effect._
 import cats.implicits._
 

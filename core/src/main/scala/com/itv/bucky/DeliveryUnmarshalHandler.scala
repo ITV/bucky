@@ -4,7 +4,6 @@ import cats.Applicative
 import com.itv.bucky.consume.{ConsumeAction, DeadLetter, Delivery}
 import com.typesafe.scalalogging.StrictLogging
 
-import scala.language.higherKinds
 
 class DeliveryUnmarshalHandler[F[_], T, S](unmarshaller: DeliveryUnmarshaller[T])(handler: T => F[S], deserializationFailureAction: S)(
     implicit F: Applicative[F])

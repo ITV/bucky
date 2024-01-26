@@ -8,7 +8,6 @@ import com.typesafe.scalalogging.StrictLogging
 
 import scala.collection.compat._
 import scala.collection.immutable.TreeMap
-import scala.language.higherKinds
 
 private[bucky] case class PendingConfirmListener[F[_]](pendingConfirmations: Ref[F, TreeMap[Long, Deferred[F, Boolean]]], pendingReturn: Ref[F, Boolean], dispatcher: Dispatcher[F])(
   implicit F: Sync[F])

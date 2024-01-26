@@ -23,7 +23,6 @@ import java.util.UUID
 import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
-import scala.language.higherKinds
 
 class ShutdownTimeoutTest extends AsyncFunSuite with EffectTestSupport with Eventually with IntegrationPatience {
 

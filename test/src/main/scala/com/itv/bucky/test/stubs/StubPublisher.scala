@@ -5,7 +5,6 @@ import com.itv.bucky.{Publisher, PublisherWithHeaders}
 import cats.implicits._
 
 import scala.collection.mutable.ListBuffer
-import scala.language.higherKinds
 
 class StubPublisher[F[_], T](implicit F: Sync[F]) extends Publisher[F, T] {
   private val published: ListBuffer[T] = ListBuffer[T]()

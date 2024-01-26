@@ -11,7 +11,6 @@ import com.itv.bucky.publish._
 
 import scala.concurrent.duration._
 import scala.concurrent.duration.FiniteDuration
-import scala.language.higherKinds
 
 object LoggingAmqpClient extends StrictLogging {
 

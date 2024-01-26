@@ -13,7 +13,6 @@ import cats.effect._
 import cats.implicits._
 import com.typesafe.scalalogging.StrictLogging
 
-import scala.language.higherKinds
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import com.itv.bucky.decl.Fanout

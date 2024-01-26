@@ -7,7 +7,6 @@ import com.itv.bucky.consume.{ConsumeAction, DeadLetter, Delivery, Requeue, Requ
 import com.itv.bucky.decl._
 
 import scala.concurrent.duration.{FiniteDuration, _}
-import scala.language.higherKinds
 import com.itv.bucky.consume.{ConsumeAction, DeadLetter, Delivery, Requeue, RequeueConsumeAction}
 
 package object requeue {
