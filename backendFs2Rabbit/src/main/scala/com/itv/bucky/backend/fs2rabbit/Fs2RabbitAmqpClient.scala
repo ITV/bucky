@@ -25,7 +25,7 @@ import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.jdk.CollectionConverters._
 import scala.language.higherKinds
 
-class Fs2RabbitAmqpClient[F[_]](client: RabbitClient[F], connection: model.AMQPConnection, publishChannel: model.AMQPChannel)(implicit F: Async[F])
+class Fs2RabbitAmqpClient[F[_]: Async](client: RabbitClient[F], connection: model.AMQPConnection, publishChannel: model.AMQPChannel)
     extends AmqpClient[F] {
 
   implicit val deliveryEncoder: MessageEncoder[F, PublishCommand] =
@@ -72,7 +72,7 @@ class Fs2RabbitAmqpClient[F[_]](client: RabbitClient[F], connection: model.AMQPC
         )
       )
 
-      F.pure(message)
+      Async[F].pure(message)
     }
 
   def deliveryDecoder(queueName: QueueName): EnvelopeDecoder[F, consume.Delivery] =
@@ -94,7 +94,7 @@ class Fs2RabbitAmqpClient[F[_]](client: RabbitClient[F], connection: model.AMQPC
         clusterId = amqpEnvelope.properties.clusterId
       )
 
-      F.pure(
+      Async[F].pure(
         consume.Delivery(
           Payload(amqpEnvelope.payload),
           consume.ConsumerTag.create(queueName),
@@ -210,23 +210,23 @@ class Fs2RabbitAmqpClient[F[_]](client: RabbitClient[F], connection: model.AMQPC
       }
     }
 
-  override def isConnectionOpen: F[Boolean] = F.pure(connection.value.isOpen)
+  override def isConnectionOpen: F[Boolean] = Async[F].pure(connection.value.isOpen)
 
 }
 
 object Fs2RabbitAmqpClient {
-  def apply[F[_]](config: AmqpClientConfig)(implicit async: Async[F]): Resource[F, Fs2RabbitAmqpClient[F]] = {
+  def apply[F[_]: Async](config: AmqpClientConfig): Resource[F, Fs2RabbitAmqpClient[F]] = {
     val fs2RabbitConfig = Fs2RabbitConfig(
       config.host,
       config.port,
-      "/",
-      10.seconds,
-      ssl = false,
+      config.virtualHost.getOrElse("/"),
+      config.connectionTimeout,
+      ssl = config.ssl,
       Some(config.username),
       Some(config.password),
-      requeueOnNack = false,
-      requeueOnReject = true,
-      Some(10)
+      requeueOnNack = config.requeueOnNack,
+      requeueOnReject = config.requeueOnReject,
+      config.internalQueueSize
     )
     for {
       client         <- RabbitClient.default[F](fs2RabbitConfig).resource
