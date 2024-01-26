@@ -167,10 +167,7 @@ lazy val backendJavaAmqp = project
 lazy val backendFs2Rabbit = project
   .settings(name := "com.itv")
   .settings(moduleName := "bucky-backend-fs2-rabbit")
-  .settings(kernelSettings: _*)
-  .configs(IntegrationTest)
-  .settings(Defaults.itSettings)
-  .settings(inConfig(ITTest)(Defaults.testSettings): _*)
+  .settings(kernelSettings)
   .dependsOn(core)
   .aggregate(core)
   .settings(

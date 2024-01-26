@@ -50,7 +50,7 @@ class Fs2RabbitAmqpClient[F[_]](client: RabbitClient[F], connection: model.AMQPC
         case _                        => NullVal
       }
 
-      val fs2MessageHeaders: Map[String, model.AmqpFieldValue] = publishCommand.basicProperties.headers.mapValues(toAmqpValue)
+      val fs2MessageHeaders: Map[String, model.AmqpFieldValue] = publishCommand.basicProperties.headers.view.mapValues(toAmqpValue).toMap
 
       val message = model.AmqpMessage(
         publishCommand.body.value,
@@ -80,7 +80,7 @@ class Fs2RabbitAmqpClient[F[_]](client: RabbitClient[F], connection: model.AMQPC
       val messageProperties = publish.MessageProperties(
         contentType = amqpEnvelope.properties.contentType.map(ContentType.apply),
         contentEncoding = amqpEnvelope.properties.contentEncoding.map(ContentEncoding.apply),
-        headers = amqpEnvelope.properties.headers.mapValues(_.toValueWriterCompatibleJava),
+        headers = amqpEnvelope.properties.headers.view.mapValues(_.toValueWriterCompatibleJava).toMap,
         deliveryMode = amqpEnvelope.properties.deliveryMode.map(dm => DeliveryMode(dm.value)),
         priority = amqpEnvelope.properties.priority,
         correlationId = amqpEnvelope.properties.correlationId,
@@ -109,11 +109,11 @@ class Fs2RabbitAmqpClient[F[_]](client: RabbitClient[F], connection: model.AMQPC
       )
     }
 
-  override def declare(declarations: decl.Declaration*): F[Unit] = declare(declarations.toIterable)
+  override def declare(declarations: decl.Declaration*): F[Unit] = declare(declarations.toList)
 
   override def declare(declarations: Iterable[decl.Declaration]): F[Unit] = {
     def argumentsFromAnyRef(arguments: Map[String, AnyRef]): Map[String, SafeArg] =
-      arguments.mapValues {
+      arguments.view.mapValues[SafeArg] {
         case arg: String            => arg
         case arg: BigDecimal        => arg
         case arg: Integer           => arg.intValue()
@@ -125,7 +125,7 @@ class Fs2RabbitAmqpClient[F[_]](client: RabbitClient[F], connection: model.AMQPC
         case arg: java.lang.Byte    => arg.byteValue()
         case arg: java.util.Date    => arg
         case t                      => throw new IllegalArgumentException(s"Unsupported type for rabbit arguments $t")
-      }
+      }.toMap
 
     def exchangeTypeToFs2ExchangeType(exchangeType: ExchangeType): model.ExchangeType =
       exchangeType match {
