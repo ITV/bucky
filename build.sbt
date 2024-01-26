@@ -50,7 +50,7 @@ lazy val kernelSettings = Seq(
   crossScalaVersions := Seq(scala212, scala213),
   scalaVersion       := scala213,
   organization       := "com.itv",
-  scalacOptions ++= Seq("-feature", "-deprecation", "-Xfatal-warnings"),
+  scalacOptions ++= Seq("-feature", "-deprecation", "-Xfatal-warnings", "-language:higherKinds"),
   publishTo := {
     val nexus = "https://oss.sonatype.org/"
     if (isSnapshot.value)
