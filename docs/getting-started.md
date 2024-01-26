@@ -10,7 +10,6 @@ libraryDependencies ++= Seq(
     "com.itv"                    %% "bucky-circe"             % buckyVersion,            //for circe based marshallers/unmarshallers
     "com.itv"                    %% "bucky-argonaut"          % buckyVersion,            //for argonaut based marhsallers/unmarshallers
     "com.itv"                    %% "bucky-test"              % buckyVersion % "test,it" //optional
-    "com.itv"                    %% "bucky-kamon"             % buckyVersion,            //optional
 )
 ```
 
