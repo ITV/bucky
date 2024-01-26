@@ -4,23 +4,22 @@ import sbtrelease.ReleasePlugin.autoImport.ReleaseTransformations._
 
 name := "bucky"
 
-lazy val scala212 = "2.12.15"
-lazy val scala213 = "2.13.6"
+lazy val scala212 = "2.12.18"
+lazy val scala213 = "2.13.12"
 
-scalaVersion := scala212
+scalaVersion := scala213
 scalacOptions += "-Ypartial-unification"
 
-val amqpClientVersion          = "5.18.0"
-val scalaLoggingVersion        = "3.9.4"
-val scalaTestVersion           = "3.2.10"
-val argonautVersion            = "6.3.7"
-val circeVersion               = "0.14.1"
-val typeSafeVersion            = "1.4.1"
-val catsEffectVersion          = "3.2.9"
-val scalaXmlVersion            = "2.0.1"
-val scalaz                     = "7.2.22"
-val logbackVersion             = "1.2.6"
-val catsEffectScalaTestVersion = "1.3.0"
+val amqpClientVersion          = "5.20.0"
+val scalaLoggingVersion        = "3.9.5"
+val scalaTestVersion           = "3.2.17"
+val argonautVersion            = "6.3.9"
+val circeVersion               = "0.14.6"
+val typeSafeVersion            = "1.4.3"
+val catsEffectVersion          = "3.5.3"
+val scalaXmlVersion            = "2.2.0"
+val logbackVersion             = "1.4.14"
+val catsEffectScalaTestVersion = "1.5.0"
 
 releaseProcess := Seq[ReleaseStep](
   checkSnapshotDependencies,
@@ -49,7 +48,7 @@ pgpPassphrase := Option(System.getenv("GPG_KEY_PASSPHRASE")).map(_.toArray)
 
 lazy val kernelSettings = Seq(
   crossScalaVersions := Seq(scala212, scala213),
-  scalaVersion       := scala212,
+  scalaVersion       := scala213,
   organization       := "com.itv",
   scalacOptions ++= Seq("-feature", "-deprecation", "-Xfatal-warnings"),
   publishTo := {
@@ -145,7 +144,7 @@ lazy val core = project
       "org.typelevel"              %% "cats-effect"                   % catsEffectVersion,
       "com.rabbitmq"                % "amqp-client"                   % amqpClientVersion,
       "ch.qos.logback"              % "logback-classic"               % logbackVersion             % "test,it",
-      "org.scala-lang.modules"     %% "scala-collection-compat"       % "2.5.0"
+      "org.scala-lang.modules"     %% "scala-collection-compat"       % "2.11.0"
     )
   )
   .configs(IntegrationTest)
