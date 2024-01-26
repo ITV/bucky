@@ -8,7 +8,20 @@ import com.itv.bucky
 import com.itv.bucky.consume.DeliveryMode
 import com.itv.bucky.decl.ExchangeType
 import com.itv.bucky.publish.{ContentEncoding, ContentType, PublishCommand}
-import com.itv.bucky.{AmqpClient, AmqpClientConfig, Envelope, ExchangeName, Handler, Payload, Publisher, QueueName, RoutingKey, consume, decl, publish}
+import com.itv.bucky.{
+  AmqpClient,
+  AmqpClientConfig,
+  Envelope,
+  ExchangeName,
+  Handler,
+  Payload,
+  Publisher,
+  QueueName,
+  RoutingKey,
+  consume,
+  decl,
+  publish
+}
 import com.rabbitmq.client.LongString
 import dev.profunktor.fs2rabbit.arguments.SafeArg
 import dev.profunktor.fs2rabbit.config.Fs2RabbitConfig
@@ -16,7 +29,22 @@ import dev.profunktor.fs2rabbit.config.declaration._
 import dev.profunktor.fs2rabbit.effects.{EnvelopeDecoder, MessageEncoder}
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
 import dev.profunktor.fs2rabbit.model
-import dev.profunktor.fs2rabbit.model.AmqpFieldValue.{ArrayVal, BooleanVal, ByteArrayVal, ByteVal, DecimalVal, DoubleVal, FloatVal, IntVal, LongVal, NullVal, ShortVal, StringVal, TableVal, TimestampVal}
+import dev.profunktor.fs2rabbit.model.AmqpFieldValue.{
+  ArrayVal,
+  BooleanVal,
+  ByteArrayVal,
+  ByteVal,
+  DecimalVal,
+  DoubleVal,
+  FloatVal,
+  IntVal,
+  LongVal,
+  NullVal,
+  ShortVal,
+  StringVal,
+  TableVal,
+  TimestampVal
+}
 import dev.profunktor.fs2rabbit.model.{AmqpFieldValue, ShortString, instantOrderWithSecondPrecision}
 import scodec.bits.ByteVector
 
@@ -113,19 +141,21 @@ class Fs2RabbitAmqpClient[F[_]: Async](client: RabbitClient[F], connection: mode
 
   override def declare(declarations: Iterable[decl.Declaration]): F[Unit] = {
     def argumentsFromAnyRef(arguments: Map[String, AnyRef]): Map[String, SafeArg] =
-      arguments.view.mapValues[SafeArg] {
-        case arg: String            => arg
-        case arg: BigDecimal        => arg
-        case arg: Integer           => arg.intValue()
-        case arg: java.lang.Long    => arg.longValue()
-        case arg: java.lang.Double  => arg.doubleValue()
-        case arg: java.lang.Float   => arg.floatValue()
-        case arg: java.lang.Short   => arg.shortValue()
-        case arg: java.lang.Boolean => arg.booleanValue()
-        case arg: java.lang.Byte    => arg.byteValue()
-        case arg: java.util.Date    => arg
-        case t                      => throw new IllegalArgumentException(s"Unsupported type for rabbit arguments $t")
-      }.toMap
+      arguments.view
+        .mapValues[SafeArg] {
+          case arg: String            => arg
+          case arg: BigDecimal        => arg
+          case arg: Integer           => arg.intValue()
+          case arg: java.lang.Long    => arg.longValue()
+          case arg: java.lang.Double  => arg.doubleValue()
+          case arg: java.lang.Float   => arg.floatValue()
+          case arg: java.lang.Short   => arg.shortValue()
+          case arg: java.lang.Boolean => arg.booleanValue()
+          case arg: java.lang.Byte    => arg.byteValue()
+          case arg: java.util.Date    => arg
+          case t                      => throw new IllegalArgumentException(s"Unsupported type for rabbit arguments $t")
+        }
+        .toMap
 
     def exchangeTypeToFs2ExchangeType(exchangeType: ExchangeType): model.ExchangeType =
       exchangeType match {
@@ -136,45 +166,60 @@ class Fs2RabbitAmqpClient[F[_]: Async](client: RabbitClient[F], connection: mode
       }
 
     implicit val channel: model.AMQPChannel = publishChannel
-    declarations.toList.traverse_ {
-      case decl.Exchange(name, exchangeType, isDurable, shouldAutoDelete, isInternal, arguments, bindings) =>
-        client.declareExchange(
-          DeclarationExchangeConfig
-            .default(model.ExchangeName(name.value), exchangeTypeToFs2ExchangeType(exchangeType))
-            .copy(
-              arguments = argumentsFromAnyRef(arguments),
-              durable = if (isDurable) Durable else NonDurable,
-              autoDelete = if (shouldAutoDelete) AutoDelete else NonAutoDelete,
-              internal = if (isInternal) Internal else NonInternal
-            )
-        ) *>
-          declare(bindings)
-      case decl.Binding(exchangeName, queueName, routingKey, arguments) =>
-        client.bindQueue(
-          model.QueueName(queueName.value),
-          model.ExchangeName(exchangeName.value),
-          model.RoutingKey(routingKey.value),
-          model.QueueBindingArgs(argumentsFromAnyRef(arguments))
-        )
-      case decl.ExchangeBinding(destinationExchangeName, sourceExchangeName, routingKey, arguments) =>
-        client.bindExchange(
-          model.ExchangeName(destinationExchangeName.value),
-          model.ExchangeName(sourceExchangeName.value),
-          model.RoutingKey(routingKey.value),
-          model.ExchangeBindingArgs(argumentsFromAnyRef(arguments))
-        )
-      case decl.Queue(name, isDurable, isExclusive, shouldAutoDelete, arguments) =>
-        client.declareQueue(
-          DeclarationQueueConfig
-            .default(model.QueueName(name.value))
-            .copy(
-              arguments = argumentsFromAnyRef(arguments),
-              durable = if (isDurable) Durable else NonDurable,
-              autoDelete = if (shouldAutoDelete) AutoDelete else NonAutoDelete,
-              exclusive = if (isExclusive) Exclusive else NonExclusive
-            )
-        )
-    }
+
+    declarations.toList
+      .sortBy {
+        case _: decl.Queue    => 0
+        case _: decl.Exchange => 1
+        case _                => 2
+      }
+      .map {
+        case decl.Exchange(name, exchangeType, isDurable, shouldAutoDelete, isInternal, arguments, bindings) =>
+          client.declareExchange(
+            DeclarationExchangeConfig
+              .default(model.ExchangeName(name.value), exchangeTypeToFs2ExchangeType(exchangeType))
+              .copy(
+                arguments = argumentsFromAnyRef(arguments),
+                durable = if (isDurable) Durable else NonDurable,
+                autoDelete = if (shouldAutoDelete) AutoDelete else NonAutoDelete,
+                internal = if (isInternal) Internal else NonInternal
+              )
+          ) *>
+            bindings.traverse_ { binding =>
+              client.bindQueue(
+                model.QueueName(binding.queueName.value),
+                model.ExchangeName(binding.exchangeName.value),
+                model.RoutingKey(binding.routingKey.value),
+                model.QueueBindingArgs(argumentsFromAnyRef(binding.arguments))
+              )
+            }
+        case decl.Binding(exchangeName, queueName, routingKey, arguments) =>
+          client.bindQueue(
+            model.QueueName(queueName.value),
+            model.ExchangeName(exchangeName.value),
+            model.RoutingKey(routingKey.value),
+            model.QueueBindingArgs(argumentsFromAnyRef(arguments))
+          )
+        case decl.ExchangeBinding(destinationExchangeName, sourceExchangeName, routingKey, arguments) =>
+          client.bindExchange(
+            model.ExchangeName(destinationExchangeName.value),
+            model.ExchangeName(sourceExchangeName.value),
+            model.RoutingKey(routingKey.value),
+            model.ExchangeBindingArgs(argumentsFromAnyRef(arguments))
+          )
+        case decl.Queue(name, isDurable, isExclusive, shouldAutoDelete, arguments) =>
+          client.declareQueue(
+            DeclarationQueueConfig
+              .default(model.QueueName(name.value))
+              .copy(
+                arguments = argumentsFromAnyRef(arguments),
+                durable = if (isDurable) Durable else NonDurable,
+                autoDelete = if (shouldAutoDelete) AutoDelete else NonAutoDelete,
+                exclusive = if (isExclusive) Exclusive else NonExclusive
+              )
+          )
+      }
+      .sequence_
 
   }
 
