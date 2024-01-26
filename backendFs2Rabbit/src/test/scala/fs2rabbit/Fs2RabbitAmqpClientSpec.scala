@@ -1,8 +1,9 @@
-package com.itv.bucky.backend.fs2rabbit
+package fs2rabbit
 
 import cats.effect.IO
 import cats.effect.testing.scalatest.AsyncIOSpec
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
+import com.itv.bucky.backend.fs2rabbit.Fs2RabbitAmqpClient
 import com.itv.bucky.consume.DeliveryMode
 import com.itv.bucky.publish.{MessageProperties, PublishCommandBuilder}
 import com.itv.bucky.{AmqpClientConfig, ExchangeName, QueueName, RoutingKey, consume, publish}
