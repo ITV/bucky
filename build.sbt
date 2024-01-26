@@ -44,15 +44,9 @@ pomIncludeRepository := { _ =>
 }
 releasePublishArtifactsAction := PgpKeys.publishSigned.value
 
-pgpPublicRing := file("./ci/public.asc")
-
-pgpSecretRing := file("./ci/private.asc")
-
-pgpSigningKey := Some(-5373332187933973712L)
+pgpSigningKey := Some("C2B50980F625F2AF9D3CB3AA5709530EE8FA7576")
 
 pgpPassphrase := Option(System.getenv("GPG_KEY_PASSPHRASE")).map(_.toArray)
-
-useGpg := false
 
 lazy val kernelSettings = Seq(
   crossScalaVersions := Seq(scala212, scala213),
