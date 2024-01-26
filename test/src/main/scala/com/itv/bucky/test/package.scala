@@ -81,7 +81,7 @@ package object test {
     implicit val ec: ExecutionContext
 
     def client(channel: StubChannel[F], config: AmqpClientConfig)(implicit async: Async[F]): Resource[F, AmqpClient[F]] = {
-      Dispatcher[F].flatMap { dispatcher =>
+      Dispatcher.parallel[F].flatMap { dispatcher =>
         AmqpClient[F](
           config,
           () => Resource.pure[F, Channel[F]](channel),

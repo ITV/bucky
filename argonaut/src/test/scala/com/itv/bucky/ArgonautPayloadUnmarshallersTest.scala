@@ -23,7 +23,7 @@ class ArgonautPayloadUnmarshallersTest extends AnyFunSuite with OptionValues wit
     val payload: Payload = validJson(expectedValue)
     val jsonResult: Json = unmarshallerFromDecodeJson[Json].unmarshal(payload).toOption.value
 
-    jsonResult.fieldOr("foo", fail).stringOr(fail) shouldBe expectedValue
+    jsonResult.fieldOr("foo", fail()).stringOr(fail()) shouldBe expectedValue
   }
 
   test("it should not parse an invalid json") {

@@ -27,13 +27,13 @@ class PublishIntegrationTest extends AnyFunSuite with Eventually with Integratio
   test("publisher should error if mandatory is true and there is no routing") {
     withTestFixture{
       case (builder, publisher) =>
-        publisher(builder.usingMandatory(true).toPublishCommand("Where am I going?")).attempt.map(_ shouldBe 'left)
+        publisher(builder.usingMandatory(true).toPublishCommand("Where am I going?")).attempt.map(_.isLeft shouldBe true)
     }
   }
   test("publisher should publish if mandatory is false and there is no routing") {
     withTestFixture {
       case (builder, publisher) =>
-        publisher(builder.usingMandatory(false).toPublishCommand("But seriously though, where am I going?")).attempt.map(_ shouldBe 'right)
+        publisher(builder.usingMandatory(false).toPublishCommand("But seriously though, where am I going?")).attempt.map(_.isRight shouldBe true)
     }
 
   }
