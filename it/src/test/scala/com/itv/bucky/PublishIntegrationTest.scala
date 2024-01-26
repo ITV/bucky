@@ -1,4 +1,4 @@
-package com.itv.bucky.integrationTest
+package com.itv.bucky
 
 import cats.effect.unsafe.IORuntime
 import cats.effect.{IO, Resource}
@@ -19,7 +19,7 @@ import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.DurationInt
 
-class PublishIntegrationTest extends AnyFunSuite with Eventually with IntegrationPatience {
+class PublishIntegrationTest extends AnyFunSuite with IntegrationSpec with Eventually with IntegrationPatience {
 
   implicit val ioRuntime: IORuntime = packageIORuntime
   implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(300))

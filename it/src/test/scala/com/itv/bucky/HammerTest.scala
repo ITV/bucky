@@ -1,4 +1,4 @@
-package com.itv.bucky.integrationTest
+package com.itv.bucky
 
 import cats.effect.testing.scalatest.EffectTestSupport
 import cats.effect.unsafe.IORuntime
@@ -22,7 +22,7 @@ import java.util.UUID
 import scala.collection.immutable.TreeSet
 import scala.concurrent.duration._
 
-class HammerTest extends AsyncFunSuite with EffectTestSupport with Eventually with IntegrationPatience with StrictLogging with Matchers {
+class HammerTest extends AsyncFunSuite with IntegrationSpec with EffectTestSupport with Eventually with IntegrationPatience with StrictLogging with Matchers {
 
   implicit override val ioRuntime: IORuntime = packageIORuntime
   case class TestFixture(stubHandler: RecordingHandler[IO, String], publisher: Publisher[IO, String], client: AmqpClient[IO])

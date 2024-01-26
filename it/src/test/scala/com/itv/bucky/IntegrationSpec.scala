@@ -5,7 +5,7 @@ import cats.effect.unsafe.{IORuntime, IORuntimeConfig, Scheduler}
 import java.util.concurrent.{Executors, ScheduledThreadPoolExecutor}
 import scala.concurrent.ExecutionContext
 
-package object integrationTest {
+trait IntegrationSpec {
 
   val schedulerExecutor = new ScheduledThreadPoolExecutor(
     1,

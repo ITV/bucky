@@ -1,4 +1,4 @@
-package com.itv.bucky.integrationTest
+package com.itv.bucky
 
 import cats.effect.testing.scalatest.EffectTestSupport
 import cats.effect.unsafe.IORuntime
@@ -24,7 +24,7 @@ import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
-class RequeueIntegrationTest extends AsyncFunSuite with EffectTestSupport with Eventually with IntegrationPatience {
+class RequeueIntegrationTest extends AsyncFunSuite with IntegrationSpec with EffectTestSupport with Eventually with IntegrationPatience {
 
   case class TestFixture(
       stubHandler: RecordingRequeueHandler[IO, Delivery],

@@ -1,4 +1,4 @@
-package com.itv.bucky.integrationTest
+package com.itv.bucky
 
 import cats.data.Kleisli
 import cats.effect.testing.scalatest.EffectTestSupport
@@ -26,7 +26,7 @@ import scala.collection.mutable.ListBuffer
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
-class RequeueWithExpiryActionIntegrationTest extends AsyncFunSuite with EffectTestSupport with Eventually with IntegrationPatience {
+class RequeueWithExpiryActionIntegrationTest extends AsyncFunSuite with IntegrationSpec with EffectTestSupport with Eventually with IntegrationPatience {
 
   case class TestFixture(
       stubHandler: RecordingRequeueHandler[IO, String],
