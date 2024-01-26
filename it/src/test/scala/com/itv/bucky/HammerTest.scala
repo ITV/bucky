@@ -7,6 +7,7 @@ import cats.implicits._
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
 import com.itv.bucky._
+import com.itv.bucky.backend.fs2rabbit.Fs2RabbitAmqpClient
 import com.itv.bucky.backend.javaamqp.JavaBackendAmqpClient
 import com.itv.bucky.consume.Ack
 import com.itv.bucky.decl.{Exchange, Queue}
@@ -48,7 +49,7 @@ class HammerTest extends AsyncFunSuite with IntegrationSpec with EffectTestSuppo
       Exchange(exchangeName).binding(routingKey -> queueName).autoDelete.expires(20.minutes)
     )
 
-    JavaBackendAmqpClient[IO](config).use { client =>
+    Fs2RabbitAmqpClient[IO](config).use { client =>
       val handler = StubHandlers.ackHandler[IO, String]
       val handlerResource =
         Resource.eval(client.declare(declarations)).flatMap(_ => client.registerConsumerOf(queueName, handler))

@@ -6,6 +6,7 @@ import cats.effect.{IO, Resource}
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
 import com.itv.bucky._
+import com.itv.bucky.backend.fs2rabbit.Fs2RabbitAmqpClient
 import com.itv.bucky.backend.javaamqp.JavaBackendAmqpClient
 import com.itv.bucky.consume._
 import com.itv.bucky.decl.Exchange
@@ -58,7 +59,7 @@ class RequeueIntegrationTest extends AsyncFunSuite with IntegrationSpec with Eff
       Exchange(exchangeName).binding(routingKey -> queueName)
     ) ++ requeue.requeueDeclarations(queueName, routingKey)
 
-    JavaBackendAmqpClient[IO](config).use { client =>
+    Fs2RabbitAmqpClient[IO](config).use { client =>
       val handler    = StubHandlers.requeueRequeueHandler[IO, Delivery]
       val dlqHandler = StubHandlers.ackHandler[IO, Delivery]
 
