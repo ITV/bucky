@@ -26,10 +26,14 @@ class PublishIntegrationTest extends AnyFunSuite with IntegrationSpec with Event
   implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(300))
   val requeuePolicy: RequeuePolicy = RequeuePolicy(maximumProcessAttempts = 5, requeueAfter = 2.seconds)
 
-  test("publisher should error if mandatory is true and there is no routing") {
+  test("publisher should error if mandatory is and there is no routing") {
     withTestFixture{
       case (builder, publisher) =>
-        publisher(builder.usingMandatory(true).toPublishCommand("Where am I going?")).attempt.map(_.isLeft shouldBe true)
+        publisher(builder.usingMandatory(true).toPublishCommand("Where am I going?")).attempt.map(res => {
+          println("result: " + res)
+          res.isLeft shouldBe true
+        }
+        )
     }
   }
   test("publisher should publish if mandatory is false and there is no routing") {

@@ -2,26 +2,15 @@ package com.itv.bucky.backend.fs2rabbit
 
 import cats.data.Kleisli
 import cats.effect.implicits.genSpawnOps
+import cats.effect.std.Dispatcher
 import cats.effect.{Async, Resource}
 import cats.implicits._
 import com.itv.bucky
+import com.itv.bucky.backend.fs2rabbit.Fs2RabbitAmqpClient.deliveryDecoder
 import com.itv.bucky.consume.DeliveryMode
 import com.itv.bucky.decl.ExchangeType
 import com.itv.bucky.publish.{ContentEncoding, ContentType, PublishCommand}
-import com.itv.bucky.{
-  AmqpClient,
-  AmqpClientConfig,
-  Envelope,
-  ExchangeName,
-  Handler,
-  Payload,
-  Publisher,
-  QueueName,
-  RoutingKey,
-  consume,
-  decl,
-  publish
-}
+import com.itv.bucky.{AmqpClient, AmqpClientConfig, Envelope, ExchangeName, Handler, Payload, Publisher, QueueName, RoutingKey, consume, decl, publish}
 import com.rabbitmq.client.LongString
 import dev.profunktor.fs2rabbit.arguments.SafeArg
 import dev.profunktor.fs2rabbit.config.Fs2RabbitConfig
@@ -29,113 +18,22 @@ import dev.profunktor.fs2rabbit.config.declaration._
 import dev.profunktor.fs2rabbit.effects.{EnvelopeDecoder, MessageEncoder}
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
 import dev.profunktor.fs2rabbit.model
-import dev.profunktor.fs2rabbit.model.AmqpFieldValue.{
-  ArrayVal,
-  BooleanVal,
-  ByteArrayVal,
-  ByteVal,
-  DecimalVal,
-  DoubleVal,
-  FloatVal,
-  IntVal,
-  LongVal,
-  NullVal,
-  ShortVal,
-  StringVal,
-  TableVal,
-  TimestampVal
-}
-import dev.profunktor.fs2rabbit.model.{AmqpFieldValue, ShortString, instantOrderWithSecondPrecision}
+import dev.profunktor.fs2rabbit.model.AmqpFieldValue.{ArrayVal, BooleanVal, ByteArrayVal, ByteVal, DecimalVal, DoubleVal, FloatVal, IntVal, LongVal, NullVal, ShortVal, StringVal, TableVal, TimestampVal}
+import dev.profunktor.fs2rabbit.model.{AMQPChannel, PublishingFlag, ShortString}
 import scodec.bits.ByteVector
 
 import java.util.Date
-import scala.concurrent.duration.{DurationInt, FiniteDuration}
+import scala.concurrent.duration.FiniteDuration
 import scala.jdk.CollectionConverters._
 import scala.language.higherKinds
+import Fs2RabbitAmqpClient._
 
-class Fs2RabbitAmqpClient[F[_]: Async](client: RabbitClient[F], connection: model.AMQPConnection, publishChannel: model.AMQPChannel)
-    extends AmqpClient[F] {
-
-  implicit val deliveryEncoder: MessageEncoder[F, PublishCommand] =
-    Kleisli { publishCommand =>
-      def toAmqpValue(value: AnyRef): model.AmqpFieldValue = value match {
-        case bd: java.math.BigDecimal => DecimalVal.unsafeFrom(bd)
-        case ts: java.time.Instant    => TimestampVal.from(ts)
-        case d: java.util.Date        => TimestampVal.from(d)
-        case t: java.util.Map[_, _] =>
-          TableVal(t.asScala.toMap.collect { case (key: String, v: AnyRef) => ShortString.unsafeFrom(key) -> toAmqpValue(v) })
-        case byte: java.lang.Byte     => ByteVal(byte)
-        case double: java.lang.Double => DoubleVal(double)
-        case float: java.lang.Float   => FloatVal(float)
-        case short: java.lang.Short   => ShortVal(short)
-        case byteArray: Array[Byte]   => ByteArrayVal(ByteVector(byteArray))
-        case b: java.lang.Boolean     => BooleanVal(b)
-        case i: java.lang.Integer     => IntVal(i)
-        case l: java.lang.Long        => LongVal(l)
-        case s: java.lang.String      => StringVal(s)
-        case ls: LongString           => StringVal(ls.toString)
-        case a: java.util.List[_]     => ArrayVal(a.asScala.toVector.collect { case v: AnyRef => toAmqpValue(v) })
-        case _                        => NullVal
-      }
-
-      val fs2MessageHeaders: Map[String, model.AmqpFieldValue] = publishCommand.basicProperties.headers.view.mapValues(toAmqpValue).toMap
-
-      val message = model.AmqpMessage(
-        publishCommand.body.value,
-        model.AmqpProperties(
-          contentType = publishCommand.basicProperties.contentType.map(_.value),
-          contentEncoding = publishCommand.basicProperties.contentEncoding.map(_.value),
-          priority = publishCommand.basicProperties.priority,
-          deliveryMode = publishCommand.basicProperties.deliveryMode.map(dm => model.DeliveryMode.from(dm.value)),
-          correlationId = publishCommand.basicProperties.correlationId,
-          messageId = publishCommand.basicProperties.messageId,
-          `type` = publishCommand.basicProperties.messageType,
-          userId = publishCommand.basicProperties.userId,
-          appId = publishCommand.basicProperties.appId,
-          expiration = publishCommand.basicProperties.expiration,
-          replyTo = publishCommand.basicProperties.replyTo,
-          clusterId = publishCommand.basicProperties.clusterId,
-          timestamp = publishCommand.basicProperties.timestamp.map(_.toInstant),
-          headers = fs2MessageHeaders
-        )
-      )
-
-      Async[F].pure(message)
-    }
-
-  def deliveryDecoder(queueName: QueueName): EnvelopeDecoder[F, consume.Delivery] =
-    Kleisli { amqpEnvelope =>
-      val messageProperties = publish.MessageProperties(
-        contentType = amqpEnvelope.properties.contentType.map(ContentType.apply),
-        contentEncoding = amqpEnvelope.properties.contentEncoding.map(ContentEncoding.apply),
-        headers = amqpEnvelope.properties.headers.view.mapValues(_.toValueWriterCompatibleJava).toMap,
-        deliveryMode = amqpEnvelope.properties.deliveryMode.map(dm => DeliveryMode(dm.value)),
-        priority = amqpEnvelope.properties.priority,
-        correlationId = amqpEnvelope.properties.correlationId,
-        replyTo = amqpEnvelope.properties.replyTo,
-        expiration = amqpEnvelope.properties.expiration,
-        messageId = amqpEnvelope.properties.messageId,
-        timestamp = amqpEnvelope.properties.timestamp.map(Date.from),
-        messageType = amqpEnvelope.properties.`type`,
-        userId = amqpEnvelope.properties.userId,
-        appId = amqpEnvelope.properties.appId,
-        clusterId = amqpEnvelope.properties.clusterId
-      )
-
-      Async[F].pure(
-        consume.Delivery(
-          Payload(amqpEnvelope.payload),
-          consume.ConsumerTag.create(queueName),
-          Envelope(
-            amqpEnvelope.deliveryTag.value,
-            amqpEnvelope.redelivered,
-            ExchangeName(amqpEnvelope.exchangeName.value),
-            RoutingKey(amqpEnvelope.routingKey.value)
-          ),
-          messageProperties
-        )
-      )
-    }
+class Fs2RabbitAmqpClient[F[_]: Async](
+    client: RabbitClient[F],
+    connection: model.AMQPConnection,
+//    publishChannel: model.AMQPChannel,
+    amqpClientConnectionManager: AmqpClientConnectionManager[F]
+)(implicit amqpChannel: AMQPChannel) extends AmqpClient[F] {
 
   override def declare(declarations: decl.Declaration*): F[Unit] = declare(declarations.toList)
 
@@ -165,7 +63,7 @@ class Fs2RabbitAmqpClient[F[_]: Async](client: RabbitClient[F], connection: mode
         case decl.Fanout  => model.ExchangeType.FanOut
       }
 
-    implicit val channel: model.AMQPChannel = publishChannel
+//    implicit val channel: model.AMQPChannel = publishChannel
 
     declarations.toList
       .sortBy {
@@ -223,12 +121,12 @@ class Fs2RabbitAmqpClient[F[_]: Async](client: RabbitClient[F], connection: mode
 
   }
 
-  override def publisher(): Publisher[F, publish.PublishCommand] = (publishCommand: PublishCommand) => {
-    implicit val channel: model.AMQPChannel = publishChannel
-    client
-      .createPublisher[PublishCommand](model.ExchangeName(publishCommand.exchange.value), model.RoutingKey(publishCommand.routingKey.value))
-      .flatMap(f => f(publishCommand))
+  private def publisher2(mandatory: Boolean): F[Publisher[F, publish.PublishCommand]] = {
+    amqpClientConnectionManager.publish(publishCommand)
   }
+
+  override def publisher(): Publisher[F, publish.PublishCommand] = (publishCommand: PublishCommand) =>
+    amqpClientConnectionManager.publish(publishCommand)
 
   override def registerConsumer(
       queueName: bucky.QueueName,
@@ -260,6 +158,7 @@ class Fs2RabbitAmqpClient[F[_]: Async](client: RabbitClient[F], connection: mode
 }
 
 object Fs2RabbitAmqpClient {
+
   def apply[F[_]: Async](config: AmqpClientConfig): Resource[F, Fs2RabbitAmqpClient[F]] = {
     val fs2RabbitConfig = Fs2RabbitConfig(
       config.host,
@@ -275,8 +174,98 @@ object Fs2RabbitAmqpClient {
     )
     for {
       client         <- RabbitClient.default[F](fs2RabbitConfig).resource
+      dispatcher     <- Dispatcher.parallel[F]
       connection     <- client.createConnection
       publishChannel <- client.createConnectionChannel
-    } yield new Fs2RabbitAmqpClient(client, connection, publishChannel)
+      amqpClientConnectionManager <- Resource.eval(
+        AmqpClientConnectionManager[F](
+          config = config,
+          client = client,
+          dispatcher = dispatcher,
+          amqpChannel = publishChannel
+        )
+      )
+    } yield new Fs2RabbitAmqpClient(client, connection, publishChannel, amqpClientConnectionManager)(publishChannel)
   }
+
+  implicit def deliveryEncoder[F[_]: Async]: MessageEncoder[F, PublishCommand] =
+    Kleisli { publishCommand =>
+      def toAmqpValue(value: AnyRef): model.AmqpFieldValue = value match {
+        case bd: java.math.BigDecimal => DecimalVal.unsafeFrom(bd)
+        case ts: java.time.Instant    => TimestampVal.from(ts)
+        case d: java.util.Date        => TimestampVal.from(d)
+        case t: java.util.Map[_, _] =>
+          TableVal(t.asScala.toMap.collect { case (key: String, v: AnyRef) => ShortString.unsafeFrom(key) -> toAmqpValue(v) })
+        case byte: java.lang.Byte     => ByteVal(byte)
+        case double: java.lang.Double => DoubleVal(double)
+        case float: java.lang.Float   => FloatVal(float)
+        case short: java.lang.Short   => ShortVal(short)
+        case byteArray: Array[Byte]   => ByteArrayVal(ByteVector(byteArray))
+        case b: java.lang.Boolean     => BooleanVal(b)
+        case i: java.lang.Integer     => IntVal(i)
+        case l: java.lang.Long        => LongVal(l)
+        case s: java.lang.String      => StringVal(s)
+        case ls: LongString           => StringVal(ls.toString)
+        case a: java.util.List[_]     => ArrayVal(a.asScala.toVector.collect { case v: AnyRef => toAmqpValue(v) })
+        case _                        => NullVal
+      }
+
+      val fs2MessageHeaders: Map[String, model.AmqpFieldValue] = publishCommand.basicProperties.headers.view.mapValues(toAmqpValue).toMap
+
+      val message = model.AmqpMessage(
+        publishCommand.body.value,
+        model.AmqpProperties(
+          contentType = publishCommand.basicProperties.contentType.map(_.value),
+          contentEncoding = publishCommand.basicProperties.contentEncoding.map(_.value),
+          priority = publishCommand.basicProperties.priority,
+          deliveryMode = publishCommand.basicProperties.deliveryMode.map(dm => model.DeliveryMode.from(dm.value)),
+          correlationId = publishCommand.basicProperties.correlationId,
+          messageId = publishCommand.basicProperties.messageId,
+          `type` = publishCommand.basicProperties.messageType,
+          userId = publishCommand.basicProperties.userId,
+          appId = publishCommand.basicProperties.appId,
+          expiration = publishCommand.basicProperties.expiration,
+          replyTo = publishCommand.basicProperties.replyTo,
+          clusterId = publishCommand.basicProperties.clusterId,
+          timestamp = publishCommand.basicProperties.timestamp.map(_.toInstant),
+          headers = fs2MessageHeaders
+        )
+      )
+
+      Async[F].pure(message)
+    }
+
+  def deliveryDecoder[F[_]: Async](queueName: QueueName): EnvelopeDecoder[F, consume.Delivery] =
+    Kleisli { amqpEnvelope =>
+      val messageProperties = publish.MessageProperties(
+        contentType = amqpEnvelope.properties.contentType.map(ContentType.apply),
+        contentEncoding = amqpEnvelope.properties.contentEncoding.map(ContentEncoding.apply),
+        headers = amqpEnvelope.properties.headers.view.mapValues(_.toValueWriterCompatibleJava).toMap,
+        deliveryMode = amqpEnvelope.properties.deliveryMode.map(dm => DeliveryMode(dm.value)),
+        priority = amqpEnvelope.properties.priority,
+        correlationId = amqpEnvelope.properties.correlationId,
+        replyTo = amqpEnvelope.properties.replyTo,
+        expiration = amqpEnvelope.properties.expiration,
+        messageId = amqpEnvelope.properties.messageId,
+        timestamp = amqpEnvelope.properties.timestamp.map(Date.from),
+        messageType = amqpEnvelope.properties.`type`,
+        userId = amqpEnvelope.properties.userId,
+        appId = amqpEnvelope.properties.appId,
+        clusterId = amqpEnvelope.properties.clusterId
+      )
+
+      Async[F].pure(
+        consume.Delivery(
+          Payload(amqpEnvelope.payload),
+          consume.ConsumerTag.create(queueName),
+          Envelope(
+            amqpEnvelope.deliveryTag.value,
+            amqpEnvelope.redelivered,
+            ExchangeName(amqpEnvelope.exchangeName.value),
+            RoutingKey(amqpEnvelope.routingKey.value)
+          ),
+          messageProperties
+        )
+      )
+    }
 }

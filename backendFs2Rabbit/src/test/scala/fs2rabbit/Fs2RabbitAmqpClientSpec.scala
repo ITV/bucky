@@ -80,67 +80,64 @@ class Fs2RabbitAmqpClientSpec extends AsyncWordSpec with AsyncIOSpec with Matche
       .toPublishCommand("message")
 
     "decode a basic publish command" in {
-      Fs2RabbitAmqpClient[IO](amqpClientConfig).use { amqpClient =>
-        amqpClient.deliveryEncoder(basicPublishCommand).map { amqpMessage =>
-          amqpMessage.payload shouldBe "message".getBytes
-        }
+      Fs2RabbitAmqpClient.deliveryEncoder[IO].apply(basicPublishCommand).map { amqpMessage =>
+        amqpMessage.payload shouldBe "message".getBytes
       }
+
     }
 
     "decode a publish command with all the properties, apart from headers" in {
-      Fs2RabbitAmqpClient[IO](amqpClientConfig).use { amqpClient =>
-        val publishCommand = basicPublishCommand.copy(basicProperties =
-          MessageProperties(
-            contentType = Some(publish.ContentType.textPlain),
-            contentEncoding = Some(publish.ContentEncoding.utf8),
-            headers = Map.empty,
-            deliveryMode = Some(consume.DeliveryMode.persistent),
-            priority = Some(1),
-            correlationId = Some("correlationid"),
-            replyTo = Some("replyto"),
-            expiration = Some("expiration"),
-            messageId = Some("messageId"),
-            timestamp = Some(Date.from(Instant.now())),
-            messageType = Some("messageType"),
-            userId = Some("userId"),
-            appId = Some("appId"),
-            clusterId = Some("clusterId")
-          )
+      val publishCommand = basicPublishCommand.copy(basicProperties =
+        MessageProperties(
+          contentType = Some(publish.ContentType.textPlain),
+          contentEncoding = Some(publish.ContentEncoding.utf8),
+          headers = Map.empty,
+          deliveryMode = Some(consume.DeliveryMode.persistent),
+          priority = Some(1),
+          correlationId = Some("correlationid"),
+          replyTo = Some("replyto"),
+          expiration = Some("expiration"),
+          messageId = Some("messageId"),
+          timestamp = Some(Date.from(Instant.now())),
+          messageType = Some("messageType"),
+          userId = Some("userId"),
+          appId = Some("appId"),
+          clusterId = Some("clusterId")
+        )
+      )
+
+      Fs2RabbitAmqpClient.deliveryEncoder[IO].apply(publishCommand).map { amqpMessage =>
+        amqpMessage.properties shouldBe AmqpProperties(
+          contentType = Some("text/plain"),
+          contentEncoding = Some("utf-8"),
+          priority = Some(1),
+          deliveryMode = Some(model.DeliveryMode.Persistent),
+          correlationId = Some("correlationid"),
+          messageId = Some("messageId"),
+          `type` = Some("messageType"),
+          userId = Some("userId"),
+          appId = Some("appId"),
+          expiration = Some("expiration"),
+          replyTo = Some("replyto"),
+          clusterId = Some("clusterId"),
+          timestamp = Some(publishCommand.basicProperties.timestamp.get.toInstant),
+          headers = Map.empty
         )
 
-        amqpClient.deliveryEncoder(publishCommand).map { amqpMessage =>
-          amqpMessage.properties shouldBe AmqpProperties(
-            contentType = Some("text/plain"),
-            contentEncoding = Some("utf-8"),
-            priority = Some(1),
-            deliveryMode = Some(model.DeliveryMode.Persistent),
-            correlationId = Some("correlationid"),
-            messageId = Some("messageId"),
-            `type` = Some("messageType"),
-            userId = Some("userId"),
-            appId = Some("appId"),
-            expiration = Some("expiration"),
-            replyTo = Some("replyto"),
-            clusterId = Some("clusterId"),
-            timestamp = Some(publishCommand.basicProperties.timestamp.get.toInstant),
-            headers = Map.empty
-          )
-        }
       }
     }
 
     "decode a publish command with headers" in {
-      Fs2RabbitAmqpClient[IO](amqpClientConfig).use { amqpClient =>
-        val publishCommand = basicPublishCommand.copy(basicProperties =
-          MessageProperties.basic.copy(
-            headers = messagePropertyHeaders
-          )
+      val publishCommand = basicPublishCommand.copy(basicProperties =
+        MessageProperties.basic.copy(
+          headers = messagePropertyHeaders
         )
+      )
 
-        amqpClient.deliveryEncoder(publishCommand).map { amqpMessage =>
-          amqpMessage.properties.headers shouldBe amqpMessageHeaders
-        }
+      Fs2RabbitAmqpClient.deliveryEncoder[IO].apply(publishCommand).map { amqpMessage =>
+        amqpMessage.properties.headers shouldBe amqpMessageHeaders
       }
+
     }
   }
 
@@ -156,15 +153,14 @@ class Fs2RabbitAmqpClientSpec extends AsyncWordSpec with AsyncIOSpec with Matche
     val queueName = QueueName("queue")
 
     "decode a basic AmqpEnvelope" in {
-      Fs2RabbitAmqpClient[IO](amqpClientConfig).use { amqpClient =>
-        amqpClient.deliveryDecoder(queueName).apply(basicEnvelope).map { delivery =>
-          delivery.envelope.deliveryTag shouldBe 123L
-          delivery.body.value shouldBe "payload".getBytes
-          delivery.envelope.exchangeName.value shouldBe "exchange"
-          delivery.envelope.routingKey.value shouldBe "routing"
-          delivery.envelope.redeliver shouldBe false
-        }
+      Fs2RabbitAmqpClient.deliveryDecoder[IO](queueName).apply(basicEnvelope).map { delivery =>
+        delivery.envelope.deliveryTag shouldBe 123L
+        delivery.body.value shouldBe "payload".getBytes
+        delivery.envelope.exchangeName.value shouldBe "exchange"
+        delivery.envelope.routingKey.value shouldBe "routing"
+        delivery.envelope.redeliver shouldBe false
       }
+
     }
 
     "decode an AmqpEnvelope with properties" in {
@@ -188,43 +184,42 @@ class Fs2RabbitAmqpClientSpec extends AsyncWordSpec with AsyncIOSpec with Matche
         headers = amqpMessageHeaders
       )
 
-      Fs2RabbitAmqpClient[IO](amqpClientConfig).use { amqpClient =>
-        amqpClient.deliveryDecoder(queueName).apply(basicEnvelope.copy(properties = amqpProperties)).map { delivery =>
-          delivery.properties.headers.get("bigDecimal") shouldBe Some(java.math.BigDecimal.ONE)
-          delivery.properties.headers.get("instant").value.asInstanceOf[Date].toInstant shouldBe now
-          delivery.properties.headers.get("date") shouldBe Some(Date.from(now))
-          delivery.properties.headers.get("map") shouldBe Some(
-            Map(
-              "inside" -> 1
-            ).asJava
-          )
-          delivery.properties.headers.get("byte") shouldBe Some(Byte.box('c'.toByte))
-          delivery.properties.headers.get("double") shouldBe Some(Double.box(4.5))
-          delivery.properties.headers.get("float") shouldBe Some(Float.box(Double.box(4.5).toFloat))
-          delivery.properties.headers.get("short") shouldBe Some(Short.box(1))
-          delivery.properties.headers.get("byteArray").value.asInstanceOf[Array[Byte]] shouldBe Array(0.toByte, 1.toByte)
-          delivery.properties.headers.get("int") shouldBe Some(Int.box(Integer.MIN_VALUE))
-          delivery.properties.headers.get("long") shouldBe Some(Long.box(Long.MinValue))
-          delivery.properties.headers.get("string") shouldBe Some("blah")
-          delivery.properties.headers.get("longString") shouldBe Some("blahlong")
-          delivery.properties.headers.get("list") shouldBe Some(List(1, 2, 3).asJava)
+      Fs2RabbitAmqpClient.deliveryDecoder[IO](queueName).apply(basicEnvelope.copy(properties = amqpProperties)).map { delivery =>
+        delivery.properties.headers.get("bigDecimal") shouldBe Some(java.math.BigDecimal.ONE)
+        delivery.properties.headers.get("instant").value.asInstanceOf[Date].toInstant shouldBe now
+        delivery.properties.headers.get("date") shouldBe Some(Date.from(now))
+        delivery.properties.headers.get("map") shouldBe Some(
+          Map(
+            "inside" -> 1
+          ).asJava
+        )
+        delivery.properties.headers.get("byte") shouldBe Some(Byte.box('c'.toByte))
+        delivery.properties.headers.get("double") shouldBe Some(Double.box(4.5))
+        delivery.properties.headers.get("float") shouldBe Some(Float.box(Double.box(4.5).toFloat))
+        delivery.properties.headers.get("short") shouldBe Some(Short.box(1))
+        delivery.properties.headers.get("byteArray").value.asInstanceOf[Array[Byte]] shouldBe Array(0.toByte, 1.toByte)
+        delivery.properties.headers.get("int") shouldBe Some(Int.box(Integer.MIN_VALUE))
+        delivery.properties.headers.get("long") shouldBe Some(Long.box(Long.MinValue))
+        delivery.properties.headers.get("string") shouldBe Some("blah")
+        delivery.properties.headers.get("longString") shouldBe Some("blahlong")
+        delivery.properties.headers.get("list") shouldBe Some(List(1, 2, 3).asJava)
 
-          delivery.properties.contentType.map(_.value) shouldBe amqpProperties.contentType
-          delivery.properties.contentEncoding.map(_.value) shouldBe amqpProperties.contentEncoding
-          delivery.properties.deliveryMode shouldBe Some(DeliveryMode.persistent)
-          delivery.properties.priority shouldBe Some(5)
-          delivery.properties.correlationId shouldBe Some("correlation-id")
-          delivery.properties.replyTo shouldBe Some("reply")
-          delivery.properties.expiration shouldBe Some("expiry")
-          delivery.properties.messageId shouldBe Some("message-id")
-          delivery.properties.timestamp shouldBe Some(Date.from(instant))
-          delivery.properties.messageType shouldBe Some("type")
-          delivery.properties.userId shouldBe Some("user")
-          delivery.properties.appId shouldBe Some("app")
-          delivery.properties.clusterId shouldBe Some("cluster")
-        }
+        delivery.properties.contentType.map(_.value) shouldBe amqpProperties.contentType
+        delivery.properties.contentEncoding.map(_.value) shouldBe amqpProperties.contentEncoding
+        delivery.properties.deliveryMode shouldBe Some(DeliveryMode.persistent)
+        delivery.properties.priority shouldBe Some(5)
+        delivery.properties.correlationId shouldBe Some("correlation-id")
+        delivery.properties.replyTo shouldBe Some("reply")
+        delivery.properties.expiration shouldBe Some("expiry")
+        delivery.properties.messageId shouldBe Some("message-id")
+        delivery.properties.timestamp shouldBe Some(Date.from(instant))
+        delivery.properties.messageType shouldBe Some("type")
+        delivery.properties.userId shouldBe Some("user")
+        delivery.properties.appId shouldBe Some("app")
+        delivery.properties.clusterId shouldBe Some("cluster")
       }
     }
+
   }
 
 }
