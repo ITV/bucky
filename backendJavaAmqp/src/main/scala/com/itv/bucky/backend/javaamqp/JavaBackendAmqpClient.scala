@@ -142,7 +142,9 @@ object JavaBackendAmqpClient extends StrictLogging {
           _      <- if (ended) F.unit else t.sleep(sleep) *> repeatUntil(eval)(pred)(sleep)
         } yield ()
 
-      override def publisher(): Publisher[F, PublishCommand] = cmd => connectionManager.publish(cmd).evalOn(executionContext)
+      override def publisher(mandatory: Boolean = false): F[Publisher[F, PublishCommand]] = F.pure(
+        cmd => connectionManager.publish(cmd, mandatory).evalOn(executionContext)
+      )
 
       override def registerConsumer(queueName: QueueName,
                                     handler: Handler[F, Delivery],

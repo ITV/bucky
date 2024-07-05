@@ -37,7 +37,7 @@ package object test {
 
     def publishNoAck[F[_]](implicit F: Async[F], t: Temporal[F]): StubChannel[F] =
       new StubChannel[F]() {
-        override def publish(sequenceNumber: Long, cmd: PublishCommand): F[Unit] = F.delay {
+        override def publish(sequenceNumber: Long, cmd: PublishCommand, mandatory: Boolean): F[Unit] = F.delay {
           pubSeqLock.synchronized {
             publishSeq = sequenceNumber + 1
           }

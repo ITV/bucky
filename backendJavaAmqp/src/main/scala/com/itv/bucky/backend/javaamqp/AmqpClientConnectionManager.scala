@@ -31,7 +31,7 @@ private[bucky] case class AmqpClientConnectionManager[F[_]](
       })
     }
 
-  def publish(cmd: PublishCommand): F[Unit] =
+  def publish(cmd: PublishCommand, mandatory: Boolean): F[Unit] =
     for {
       deliveryTag <- Ref.of[F, Option[Long]](None)
       _ <- (for {
@@ -41,7 +41,7 @@ private[bucky] case class AmqpClientConnectionManager[F[_]](
             nextPublishSeq <- publishChannel.getNextPublishSeqNo
             _              <- deliveryTag.set(Some(nextPublishSeq))
             _              <- pendingConfirmListener.pendingConfirmations.update(_ + (nextPublishSeq -> signal))
-            _              <- publishChannel.publish(nextPublishSeq, cmd)
+            _              <- publishChannel.publish(nextPublishSeq, cmd, mandatory)
           } yield ()
         }
         _ <- signal.get.ifM(F.unit, F.raiseError[Unit](new RuntimeException(s"Failed to publish msg: ${cmd}")))

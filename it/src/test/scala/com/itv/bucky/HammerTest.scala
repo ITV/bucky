@@ -23,7 +23,14 @@ import java.util.UUID
 import scala.collection.immutable.TreeSet
 import scala.concurrent.duration._
 
-class HammerTest extends AsyncFunSuite with IntegrationSpec with EffectTestSupport with Eventually with IntegrationPatience with StrictLogging with Matchers {
+class HammerTest
+    extends AsyncFunSuite
+    with IntegrationSpec
+    with EffectTestSupport
+    with Eventually
+    with IntegrationPatience
+    with StrictLogging
+    with Matchers {
 
   implicit override val ioRuntime: IORuntime = packageIORuntime
   case class TestFixture(stubHandler: RecordingHandler[IO, String], publisher: Publisher[IO, String], client: AmqpClient[IO])
@@ -55,9 +62,11 @@ class HammerTest extends AsyncFunSuite with IntegrationSpec with EffectTestSuppo
         Resource.eval(client.declare(declarations)).flatMap(_ => client.registerConsumerOf(queueName, handler))
 
       handlerResource.use { _ =>
-        val pub     = client.publisherOf[String](exchangeName, routingKey)
-        val fixture = TestFixture(handler, pub, client)
-        test(fixture)
+        client.publisherOf[String](exchangeName, routingKey).flatMap { pub =>
+          val fixture = TestFixture(handler, pub, client)
+
+          test(fixture)
+        }
       }
     }
   }
@@ -107,9 +116,6 @@ class HammerTest extends AsyncFunSuite with IntegrationSpec with EffectTestSuppo
 
       val order: Ref[IO, List[String]] = Ref.of[IO, List[String]](List.empty).unsafeRunSync()
 
-      val fastPublisher = testFixture.client.publisherOf[String](exchange, fastRk)
-      val slowPublisher = testFixture.client.publisherOf[String](exchange, slowRk)
-
       val fastHandler = new RecordingHandler[IO, String]((v1: String) =>
         for {
           _ <- order.update(_ :+ "fast")
@@ -134,15 +140,19 @@ class HammerTest extends AsyncFunSuite with IntegrationSpec with EffectTestSuppo
       val handlersResource =
         Resource.eval(testFixture.client.declare(declarations)).flatMap(_ => handlers)
 
-      handlersResource.use { _ =>
-        for {
-          _ <- slowPublisher("slow one")
-          _ <- IO.sleep(1.second)
-          _ <- fastPublisher("fast one")
-        } yield eventually {
-          val messages = order.get.unsafeRunSync()
-          messages should have size 2
-          messages shouldBe List("fast", "slow")
+      testFixture.client.publisherOf[String](exchange, fastRk).flatMap { fastPublisher =>
+        testFixture.client.publisherOf[String](exchange, slowRk).flatMap { slowPublisher =>
+          handlersResource.use { _ =>
+            for {
+              _ <- slowPublisher("slow one")
+              _ <- IO.sleep(1.second)
+              _ <- fastPublisher("fast one")
+            } yield eventually {
+              val messages = order.get.unsafeRunSync()
+              messages should have size 2
+              messages shouldBe List("fast", "slow")
+            }
+          }
         }
       }
     }

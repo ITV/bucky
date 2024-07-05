@@ -10,7 +10,20 @@ import com.itv.bucky.backend.fs2rabbit.Fs2RabbitAmqpClient.deliveryDecoder
 import com.itv.bucky.consume.DeliveryMode
 import com.itv.bucky.decl.ExchangeType
 import com.itv.bucky.publish.{ContentEncoding, ContentType, PublishCommand}
-import com.itv.bucky.{AmqpClient, AmqpClientConfig, Envelope, ExchangeName, Handler, Payload, Publisher, QueueName, RoutingKey, consume, decl, publish}
+import com.itv.bucky.{
+  AmqpClient,
+  AmqpClientConfig,
+  Envelope,
+  ExchangeName,
+  Handler,
+  Payload,
+  Publisher,
+  QueueName,
+  RoutingKey,
+  consume,
+  decl,
+  publish
+}
 import com.rabbitmq.client.LongString
 import dev.profunktor.fs2rabbit.arguments.SafeArg
 import dev.profunktor.fs2rabbit.config.Fs2RabbitConfig
@@ -18,7 +31,22 @@ import dev.profunktor.fs2rabbit.config.declaration._
 import dev.profunktor.fs2rabbit.effects.{EnvelopeDecoder, MessageEncoder}
 import dev.profunktor.fs2rabbit.interpreter.RabbitClient
 import dev.profunktor.fs2rabbit.model
-import dev.profunktor.fs2rabbit.model.AmqpFieldValue.{ArrayVal, BooleanVal, ByteArrayVal, ByteVal, DecimalVal, DoubleVal, FloatVal, IntVal, LongVal, NullVal, ShortVal, StringVal, TableVal, TimestampVal}
+import dev.profunktor.fs2rabbit.model.AmqpFieldValue.{
+  ArrayVal,
+  BooleanVal,
+  ByteArrayVal,
+  ByteVal,
+  DecimalVal,
+  DoubleVal,
+  FloatVal,
+  IntVal,
+  LongVal,
+  NullVal,
+  ShortVal,
+  StringVal,
+  TableVal,
+  TimestampVal
+}
 import dev.profunktor.fs2rabbit.model.{AMQPChannel, PublishingFlag, ShortString}
 import scodec.bits.ByteVector
 
@@ -31,9 +59,9 @@ import Fs2RabbitAmqpClient._
 class Fs2RabbitAmqpClient[F[_]: Async](
     client: RabbitClient[F],
     connection: model.AMQPConnection,
-//    publishChannel: model.AMQPChannel,
+    publishChannel: model.AMQPChannel,
     amqpClientConnectionManager: AmqpClientConnectionManager[F]
-)(implicit amqpChannel: AMQPChannel) extends AmqpClient[F] {
+) extends AmqpClient[F] {
 
   override def declare(declarations: decl.Declaration*): F[Unit] = declare(declarations.toList)
 
@@ -63,70 +91,78 @@ class Fs2RabbitAmqpClient[F[_]: Async](
         case decl.Fanout  => model.ExchangeType.FanOut
       }
 
-//    implicit val channel: model.AMQPChannel = publishChannel
-
-    declarations.toList
-      .sortBy {
-        case _: decl.Queue    => 0
-        case _: decl.Exchange => 1
-        case _                => 2
-      }
-      .map {
-        case decl.Exchange(name, exchangeType, isDurable, shouldAutoDelete, isInternal, arguments, bindings) =>
-          client.declareExchange(
-            DeclarationExchangeConfig
-              .default(model.ExchangeName(name.value), exchangeTypeToFs2ExchangeType(exchangeType))
-              .copy(
-                arguments = argumentsFromAnyRef(arguments),
-                durable = if (isDurable) Durable else NonDurable,
-                autoDelete = if (shouldAutoDelete) AutoDelete else NonAutoDelete,
-                internal = if (isInternal) Internal else NonInternal
-              )
-          ) *>
-            bindings.traverse_ { binding =>
-              client.bindQueue(
-                model.QueueName(binding.queueName.value),
-                model.ExchangeName(binding.exchangeName.value),
-                model.RoutingKey(binding.routingKey.value),
-                model.QueueBindingArgs(argumentsFromAnyRef(binding.arguments))
-              )
-            }
-        case decl.Binding(exchangeName, queueName, routingKey, arguments) =>
-          client.bindQueue(
-            model.QueueName(queueName.value),
-            model.ExchangeName(exchangeName.value),
-            model.RoutingKey(routingKey.value),
-            model.QueueBindingArgs(argumentsFromAnyRef(arguments))
-          )
-        case decl.ExchangeBinding(destinationExchangeName, sourceExchangeName, routingKey, arguments) =>
-          client.bindExchange(
-            model.ExchangeName(destinationExchangeName.value),
-            model.ExchangeName(sourceExchangeName.value),
-            model.RoutingKey(routingKey.value),
-            model.ExchangeBindingArgs(argumentsFromAnyRef(arguments))
-          )
-        case decl.Queue(name, isDurable, isExclusive, shouldAutoDelete, arguments) =>
-          client.declareQueue(
-            DeclarationQueueConfig
-              .default(model.QueueName(name.value))
-              .copy(
-                arguments = argumentsFromAnyRef(arguments),
-                durable = if (isDurable) Durable else NonDurable,
-                autoDelete = if (shouldAutoDelete) AutoDelete else NonAutoDelete,
-                exclusive = if (isExclusive) Exclusive else NonExclusive
-              )
-          )
-      }
-      .sequence_
+    client.createChannel(connection).use { implicit channel =>
+      declarations.toList
+        .sortBy {
+          case _: decl.Queue    => 0
+          case _: decl.Exchange => 1
+          case _                => 2
+        }
+        .map {
+          case decl.Exchange(name, exchangeType, isDurable, shouldAutoDelete, isInternal, arguments, bindings) =>
+            client.declareExchange(
+              DeclarationExchangeConfig
+                .default(model.ExchangeName(name.value), exchangeTypeToFs2ExchangeType(exchangeType))
+                .copy(
+                  arguments = argumentsFromAnyRef(arguments),
+                  durable = if (isDurable) Durable else NonDurable,
+                  autoDelete = if (shouldAutoDelete) AutoDelete else NonAutoDelete,
+                  internal = if (isInternal) Internal else NonInternal
+                )
+            ) *>
+              bindings.traverse_ { binding =>
+                client.bindQueue(
+                  model.QueueName(binding.queueName.value),
+                  model.ExchangeName(binding.exchangeName.value),
+                  model.RoutingKey(binding.routingKey.value),
+                  model.QueueBindingArgs(argumentsFromAnyRef(binding.arguments))
+                )
+              }
+          case decl.Binding(exchangeName, queueName, routingKey, arguments) =>
+            client.bindQueue(
+              model.QueueName(queueName.value),
+              model.ExchangeName(exchangeName.value),
+              model.RoutingKey(routingKey.value),
+              model.QueueBindingArgs(argumentsFromAnyRef(arguments))
+            )
+          case decl.ExchangeBinding(destinationExchangeName, sourceExchangeName, routingKey, arguments) =>
+            client.bindExchange(
+              model.ExchangeName(destinationExchangeName.value),
+              model.ExchangeName(sourceExchangeName.value),
+              model.RoutingKey(routingKey.value),
+              model.ExchangeBindingArgs(argumentsFromAnyRef(arguments))
+            )
+          case decl.Queue(name, isDurable, isExclusive, shouldAutoDelete, arguments) =>
+            client.declareQueue(
+              DeclarationQueueConfig
+                .default(model.QueueName(name.value))
+                .copy(
+                  arguments = argumentsFromAnyRef(arguments),
+                  durable = if (isDurable) Durable else NonDurable,
+                  autoDelete = if (shouldAutoDelete) AutoDelete else NonAutoDelete,
+                  exclusive = if (isExclusive) Exclusive else NonExclusive
+                )
+            )
+        }
+        .sequence_
+    }
 
   }
 
-  private def publisher2(mandatory: Boolean): F[Publisher[F, publish.PublishCommand]] = {
-    amqpClientConnectionManager.publish(publishCommand)
-  }
-
-  override def publisher(): Publisher[F, publish.PublishCommand] = (publishCommand: PublishCommand) =>
-    amqpClientConnectionManager.publish(publishCommand)
+  override def publisher(mandatory: Boolean): F[Publisher[F, publish.PublishCommand]] =
+    client
+      .createBasicPublisherWithListener[PublishCommand](
+        PublishingFlag(mandatory),
+        _ => Async[F].unit // Mandatory returns ignored here, but are handled in AmqpClientConnectionManager
+      )(publishChannel, implicitly)
+      .map { publisher => (publishCommand: PublishCommand) =>
+        publisher(
+          model.ExchangeName(publishCommand.exchange.value),
+          model.RoutingKey(publishCommand.exchange.value),
+          publishCommand
+        )
+      }
+      .map(amqpClientConnectionManager.addConfirmListeningToPublisher)
 
   override def registerConsumer(
       queueName: bucky.QueueName,
@@ -185,7 +221,7 @@ object Fs2RabbitAmqpClient {
           amqpChannel = publishChannel
         )
       )
-    } yield new Fs2RabbitAmqpClient(client, connection, publishChannel, amqpClientConnectionManager)(publishChannel)
+    } yield new Fs2RabbitAmqpClient(client, connection, publishChannel, amqpClientConnectionManager)
   }
 
   implicit def deliveryEncoder[F[_]: Async]: MessageEncoder[F, PublishCommand] =

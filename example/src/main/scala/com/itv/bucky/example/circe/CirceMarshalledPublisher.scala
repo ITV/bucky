@@ -31,9 +31,9 @@ object CirceMarshalledPublisher extends IOApp {
   override def run(args: List[String]): IO[ExitCode] =
     JavaBackendAmqpClient[IO](amqpClientConfig).use { client =>
       for {
-        _ <- client.declare(Declarations.all)
-        publisher = client.publisherOf[Person](Declarations.exchange.name, Declarations.routingKey)
-        _ <- publisher(Person("bob", 22))
+        _         <- client.declare(Declarations.all)
+        publisher <- client.publisherOf[Person](Declarations.exchange.name, Declarations.routingKey)
+        _         <- publisher(Person("bob", 22))
       } yield ExitCode.Success
     }
 

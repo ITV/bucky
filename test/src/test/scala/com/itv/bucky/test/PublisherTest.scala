@@ -41,7 +41,7 @@ class PublisherTest extends AnyFunSuite with IOAmqpClientTest with EitherValues 
     runAmqpTestIO(client(channel, Config.empty(10.seconds))) { client =>
       for {
         pubSeq <- IO(channel.publishSeq)
-        future <- IO(client.publisher()(commandBuilder).unsafeToFuture())
+        future <- IO(client.publisher().flatMap(publisher => publisher(commandBuilder)).unsafeToFuture())
         _ <- IO.sleep(3.seconds)
         _ <- IO.sleep(3.seconds)
         isCompleted1 <- IO(future.isCompleted)
@@ -56,7 +56,7 @@ class PublisherTest extends AnyFunSuite with IOAmqpClientTest with EitherValues 
     runAmqpTest(client(channel, Config.empty(10.seconds))) { client =>
       for {
         pubSeq <- IO(channel.publishSeq)
-        future <- IO(client.publisher()(commandBuilder).unsafeToFuture())
+        future <- IO(client.publisher().flatMap(publisher => publisher(commandBuilder)).unsafeToFuture())
         properties = new BasicProperties
         _          = properties.builder().build()
         _      <- IO(channel.returnListeners.foreach(_.handleReturn(400, "reply", exchange.value, rk.value, properties, message.getBytes)))
@@ -72,7 +72,7 @@ class PublisherTest extends AnyFunSuite with IOAmqpClientTest with EitherValues 
     val channel = StubChannels.publishNoAck[IO]
     runAmqpTestIO(client(channel, Config.empty(1.second))) { client =>
       for {
-        result <- client.publisher()(commandBuilder).attempt
+        result <- client.publisher().flatMap(publisher => publisher(commandBuilder)).attempt
         listeners <- IO(channel.confirmListeners.map(_.asInstanceOf[PendingConfirmListener[IO]]))
         pendingConf <- listeners.toList.map(_.pendingConfirmations.get).sequence
       } yield {
@@ -89,9 +89,9 @@ class PublisherTest extends AnyFunSuite with IOAmqpClientTest with EitherValues 
     val channel = StubChannels.publishNoAck[IO]
     runAmqpTestIO(client(channel, Config.empty(30.seconds))) { client =>
       for {
-        fiber1 <- client.publisher()(commandBuilder).start
-        fiber2 <- client.publisher()(commandBuilder).start
-        fiber3 <- client.publisher()(commandBuilder).start
+        fiber1 <- client.publisher().flatMap(publisher => publisher(commandBuilder)).start
+        fiber2 <- client.publisher().flatMap(publisher => publisher(commandBuilder)).start
+        fiber3 <- client.publisher().flatMap(publisher => publisher(commandBuilder)).start
         _ <- IO.sleep(5.seconds)
         _ <- IO(channel.confirmListeners.foreach(_.handleAck(2, true)))
         outcome1 <- fiber1.join
@@ -109,9 +109,9 @@ class PublisherTest extends AnyFunSuite with IOAmqpClientTest with EitherValues 
     val channel = StubChannels.publishNoAck[IO]
     runAmqpTestIO(client(channel, Config.empty(30.seconds))) { client =>
       for {
-        fiber1 <- client.publisher()(commandBuilder).start
-        fiber2 <- client.publisher()(commandBuilder).start
-        fiber3 <- client.publisher()(commandBuilder).start
+        fiber1 <- client.publisher().flatMap(publisher => publisher(commandBuilder)).start
+        fiber2 <- client.publisher().flatMap(publisher => publisher(commandBuilder)).start
+        fiber3 <- client.publisher().flatMap(publisher => publisher(commandBuilder)).start
         _ <- IO.sleep(5.seconds)
         _ <- IO(channel.confirmListeners.foreach(_.handleNack(2, true)))
         outcome1 <- fiber1.join
@@ -128,12 +128,12 @@ class PublisherTest extends AnyFunSuite with IOAmqpClientTest with EitherValues 
   test("Multiple messages can be published and some can be acked and some can be Nacked.") {
     val channel = StubChannels.publishNoAck[IO]
       runAmqpTestIO(client(channel, Config.empty(10.seconds))) { client =>
-        val pub: IO[Unit] = client.publisher()(commandBuilder)
+        val pub: IO[Unit] = client.publisher().flatMap(publisher => publisher(commandBuilder))
         for {
-          fiber1 <- client.publisher()(commandBuilder).start
-          fiber2 <- client.publisher()(commandBuilder).start
-          fiber3 <- client.publisher()(commandBuilder).start
-          fiber4 <- client.publisher()(commandBuilder).start
+          fiber1 <- client.publisher().flatMap(publisher => publisher(commandBuilder)).start
+          fiber2 <- client.publisher().flatMap(publisher => publisher(commandBuilder)).start
+          fiber3 <- client.publisher().flatMap(publisher => publisher(commandBuilder)).start
+          fiber4 <- client.publisher().flatMap(publisher => publisher(commandBuilder)).start
           _             <- IO.sleep(3.seconds)
           _             <- IO.sleep(3.seconds)
           _ <- IO(channel.confirmListeners.foreach(_.handleNack(0, false)))

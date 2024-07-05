@@ -14,7 +14,6 @@ import cats.effect.implicits._
 import com.itv.bucky.consume.{ConsumeAction, DeadLetter, RequeueConsumeAction}
 import com.itv.bucky.publish.PublishCommandBuilder
 
-
 final case class WiringName(value: String) extends AnyVal
 
 class Wiring[T](
@@ -81,8 +80,9 @@ class Wiring[T](
             s"requeuePolicy=$requeuePolicy"
         )
       )
-      _ <- client.declare(publisherDeclarations)
-    } yield client.publisherOf(publisherBuilder)
+      _         <- client.declare(publisherDeclarations)
+      publisher <- client.publisherOf(publisherBuilder)
+    } yield publisher
 
   def publisherWithHeaders[F[_]](client: AmqpClient[F])(implicit F: Sync[F]): F[PublisherWithHeaders[F, T]] =
     for {
@@ -96,8 +96,9 @@ class Wiring[T](
             s"requeuePolicy=$requeuePolicy"
         )
       }
-      _ <- client.declare(publisherDeclarations)
-    } yield client.publisherWithHeadersOf(publisherBuilder)
+      _         <- client.declare(publisherDeclarations)
+      publisher <- client.publisherWithHeadersOf(publisherBuilder)
+    } yield publisher
 
   def registerConsumer[F[_]](client: AmqpClient[F])(handleMessage: T => F[ConsumeAction])(implicit F: Sync[F]): Resource[F, Unit] = {
     val runDeclarations =

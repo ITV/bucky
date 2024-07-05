@@ -35,8 +35,8 @@ class RequeueIntegrationTest extends AsyncFunSuite with IntegrationSpec with Eff
   )
 
   implicit override val ioRuntime: IORuntime = packageIORuntime
-  implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(300))
-  val requeuePolicy                 = RequeuePolicy(maximumProcessAttempts = 5, requeueAfter = 2.seconds)
+  implicit val ec: ExecutionContext          = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(300))
+  val requeuePolicy                          = RequeuePolicy(maximumProcessAttempts = 5, requeueAfter = 2.seconds)
 
   def withTestFixture(test: TestFixture => IO[Unit]): IO[Unit] = {
     val rawConfig = ConfigFactory.load("bucky")
@@ -72,10 +72,11 @@ class RequeueIntegrationTest extends AsyncFunSuite with IntegrationSpec with Eff
           } yield ()
         )
         .use { _ =>
-          val pub     = client.publisher()
-          val pcb     = publishCommandBuilder[String](implicitly).using(exchangeName).using(routingKey)
-          val fixture = TestFixture(handler, dlqHandler, pcb, pub)
-          test(fixture)
+          client.publisher().flatMap { pub =>
+            val pcb     = publishCommandBuilder[String](implicitly).using(exchangeName).using(routingKey)
+            val fixture = TestFixture(handler, dlqHandler, pcb, pub)
+            test(fixture)
+          }
         }
     }
   }

@@ -34,7 +34,7 @@ class AmqpClientConnectionManager[F[_]: Async](
       })
     }
 
-  def publish(cmd: PublishCommand): F[Unit] =
+  def addConfirmListeningToPublisher(publisher: Publisher[F, PublishCommand]): Publisher[F, PublishCommand] = (cmd: PublishCommand) =>
     for {
       deliveryTag <- Ref.of[F, Option[Long]](None)
       _ <- (for {
@@ -44,7 +44,7 @@ class AmqpClientConnectionManager[F[_]: Async](
             nextPublishSeq <- Async[F].blocking(publishChannel.getNextPublishSeqNo)
             _              <- deliveryTag.set(Some(nextPublishSeq))
             _              <- pendingConfirmListener.pendingConfirmations.update(_ + (nextPublishSeq -> signal))
-            _              <- publisher()(cmd)
+            _              <- publisher(cmd)
           } yield ()
         }
         _ <- signal.get.flatMap(maybeError => maybeError.traverse(Async[F].raiseError[Unit]))
@@ -60,27 +60,6 @@ class AmqpClientConnectionManager[F[_]: Async](
             } yield ()
           }
         }
-    } yield ()
-
-  def publisher2(mandatory: Boolean): F[Publisher[F, PublishCommand]] = {
-    val publisher = client.createBasicPublisherWithListener[PublishCommand](
-      PublishingFlag(mandatory),
-      _ => Async[F].unit
-    )
-
-      publisher.map(f => (publishCommand: PublishCommand) => f(model.ExchangeName(publishCommand.exchange.value), model.RoutingKey(publishCommand.exchange.value), publishCommand))
-  }
-
-  def publisher(): Publisher[F, PublishCommand] = (publishCommand: PublishCommand) =>
-    for {
-      publisher <- client
-        .createPublisherWithListener[PublishCommand](
-          model.ExchangeName(publishCommand.exchange.value),
-          model.RoutingKey(publishCommand.routingKey.value),
-          PublishingFlag(publishCommand.mandatory),
-          _ => Async[F].unit
-        )
-      _ <- publisher(publishCommand)
     } yield ()
 
 }

@@ -135,7 +135,7 @@ abstract class StubChannel[F[_]](implicit F: Async[F]) extends Channel[F] with S
       .map(_.queueName)
       .toList)
 
-  override def publish(sequenceNumber: Long, cmd: PublishCommand): F[Unit] = {
+  override def publish(sequenceNumber: Long, cmd: PublishCommand, mandatory: Boolean): F[Unit] = {
     val queues = lookupQueues(cmd)
     val subscribedHandlers = handlers.view
       .filterKeys(queues.contains)

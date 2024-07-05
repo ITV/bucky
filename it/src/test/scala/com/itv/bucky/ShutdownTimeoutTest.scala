@@ -29,15 +29,15 @@ import scala.concurrent.duration._
 class ShutdownTimeoutTest extends AsyncFunSuite with IntegrationSpec with EffectTestSupport with Eventually with IntegrationPatience {
 
   case class TestFixture(
-                          stubHandler: RecordingRequeueHandler[IO, Delivery],
-                          dlqHandler: RecordingHandler[IO, Delivery],
-                          publishCommandBuilder: PublishCommandBuilder.Builder[String],
-                          publisher: Publisher[IO, PublishCommand]
-                        )
+      stubHandler: RecordingRequeueHandler[IO, Delivery],
+      dlqHandler: RecordingHandler[IO, Delivery],
+      publishCommandBuilder: PublishCommandBuilder.Builder[String],
+      publisher: Publisher[IO, PublishCommand]
+  )
 
   implicit override val ioRuntime: IORuntime = packageIORuntime
-  implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(300))
-  val requeuePolicy: RequeuePolicy = RequeuePolicy(maximumProcessAttempts = 5, requeueAfter = 2.seconds)
+  implicit val ec: ExecutionContext          = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(300))
+  val requeuePolicy: RequeuePolicy           = RequeuePolicy(maximumProcessAttempts = 5, requeueAfter = 2.seconds)
 
   def runTest[A](test: IO[A]): IO[A] = {
     val rawConfig = ConfigFactory.load("bucky")
@@ -67,7 +67,10 @@ class ShutdownTimeoutTest extends AsyncFunSuite with IntegrationSpec with Effect
           )
           .use { _ =>
             val pcb = publishCommandBuilder[String](implicitly).using(exchangeName).using(routingKey)
-            client.publisher()(pcb.toPublishCommand("a message")).flatMap(_ => test)
+            client.publisher().flatMap { publisher =>
+              publisher(pcb.toPublishCommand("a message"))
+                .flatMap(_ => test)
+            }
           }
       }
   }

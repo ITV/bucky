@@ -27,9 +27,9 @@ class PublishIntegrationTest extends AnyFunSuite with IntegrationSpec with Event
   val requeuePolicy: RequeuePolicy = RequeuePolicy(maximumProcessAttempts = 5, requeueAfter = 2.seconds)
 
   test("publisher should error if mandatory is and there is no routing") {
-    withTestFixture{
+    withTestFixture(mandatory = true){
       case (builder, publisher) =>
-        publisher(builder.usingMandatory(true).toPublishCommand("Where am I going?")).attempt.map(res => {
+        publisher(builder.toPublishCommand("Where am I going?")).attempt.map(res => {
           println("result: " + res)
           res.isLeft shouldBe true
         }
@@ -37,14 +37,14 @@ class PublishIntegrationTest extends AnyFunSuite with IntegrationSpec with Event
     }
   }
   test("publisher should publish if mandatory is false and there is no routing") {
-    withTestFixture {
+    withTestFixture(mandatory = false) {
       case (builder, publisher) =>
-        publisher(builder.usingMandatory(false).toPublishCommand("But seriously though, where am I going?")).attempt.map(_.isRight shouldBe true)
+        publisher(builder.toPublishCommand("But seriously though, where am I going?")).attempt.map(_.isRight shouldBe true)
     }
 
   }
 
-  def withTestFixture(test: (PublishCommandBuilder.Builder[String], Publisher[IO, PublishCommand]) => IO[Unit]): Unit = {
+  def withTestFixture(mandatory: Boolean)(test: (PublishCommandBuilder.Builder[String], Publisher[IO, PublishCommand]) => IO[Unit]): Unit = {
     val rawConfig = ConfigFactory.load("bucky")
     val config =
       AmqpClientConfig(rawConfig.getString("rmq.host"),
@@ -65,8 +65,9 @@ class PublishIntegrationTest extends AnyFunSuite with IntegrationSpec with Event
           )
           .use { _ =>
             val pcb = publishCommandBuilder[String](implicitly).using(exchangeName).using(routingKey)
-            val pub = client.publisher()
-            test(pcb, pub)
+            client.publisher(mandatory).flatMap { pub =>
+              test(pcb, pub)
+            }
           }
       }
       .unsafeRunSync()

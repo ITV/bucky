@@ -1,8 +1,8 @@
 package com.itv
 
 import java.nio.charset.{Charset, StandardCharsets}
-
 import cats.effect.{Resource, Sync}
+import cats.implicits.toFunctorOps
 import cats.{Applicative, ApplicativeError}
 import com.itv.bucky.Unmarshaller.toDeliveryUnmarshaller
 import com.itv.bucky.consume._
@@ -100,18 +100,18 @@ package object bucky {
 
   }
 
-  implicit class PublisherSugar[F[_]](amqpClient: AmqpClient[F]) {
+  implicit class PublisherSugar[F[_]: Applicative](amqpClient: AmqpClient[F]) {
 
-    def publisherOf[T](implicit publishCommandBuilder: PublishCommandBuilder[T]): Publisher[F, T] = {
-      val basePublisher = amqpClient.publisher()
-      value: T =>
-        {
+    def publisherOf[T](implicit publishCommandBuilder: PublishCommandBuilder[T]): F[Publisher[F, T]] = {
+      amqpClient.publisher().map { basePublisher =>
+        value: T => {
           val command = publishCommandBuilder.toPublishCommand(value)
           basePublisher.apply(command)
         }
+      }
     }
 
-    def publisherOf[T](exchangeName: ExchangeName, routingKey: RoutingKey)(implicit marshaller: PayloadMarshaller[T]): Publisher[F, T] = {
+    def publisherOf[T](exchangeName: ExchangeName, routingKey: RoutingKey)(implicit marshaller: PayloadMarshaller[T]): F[Publisher[F, T]] = {
       val pcb =
         PublishCommandBuilder
           .publishCommandBuilder(marshaller)
@@ -121,7 +121,7 @@ package object bucky {
     }
 
     def publisherWithHeadersOf[T](exchangeName: ExchangeName,
-                                  routingKey: RoutingKey)(implicit F: Sync[F], marshaller: PayloadMarshaller[T]): PublisherWithHeaders[F, T] = {
+                                  routingKey: RoutingKey)(implicit F: Sync[F], marshaller: PayloadMarshaller[T]): F[PublisherWithHeaders[F, T]] = {
       val pcb =
         PublishCommandBuilder
           .publishCommandBuilder(marshaller)
@@ -130,16 +130,17 @@ package object bucky {
       publisherWithHeadersOf[T](pcb)
     }
 
-    def publisherWithHeadersOf[T](commandBuilder: PublishCommandBuilder[T])(implicit F: Sync[F]): PublisherWithHeaders[F, T] =
-      (message: T, headers: Map[String, AnyRef]) =>
-        F.flatMap(F.delay {
-          val command = commandBuilder.toPublishCommand(message)
+    def publisherWithHeadersOf[T](commandBuilder: PublishCommandBuilder[T])(implicit F: Sync[F]): F[PublisherWithHeaders[F, T]] =
+      amqpClient.publisher().map { publisher =>
+        (message: T, headers: Map[String, AnyRef]) =>
+          F.flatMap(F.delay {
+            val command = commandBuilder.toPublishCommand(message)
 
-          command.copy(basicProperties = headers.foldLeft(command.basicProperties) {
-            case (props, (headerName, headerValue)) => props.withHeader(headerName -> headerValue)
-          })
-        })(amqpClient.publisher())
-
+            command.copy(basicProperties = headers.foldLeft(command.basicProperties) {
+              case (props, (headerName, headerValue)) => props.withHeader(headerName -> headerValue)
+            })
+          })(publisher)
+      }
   }
 
   implicit class DeclareSugar[F[_]](amqpClient: AmqpClient[F])(implicit a: Applicative[F]) {

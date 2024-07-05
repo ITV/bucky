@@ -40,7 +40,7 @@ object MarshallingPublisher extends IOApp {
     JavaBackendAmqpClient[IO](amqpClientConfig).use { client =>
       for {
         _ <- client.declare(Seq(Declarations.exchange))
-        publisher = client.publisherOf[Person]
+        publisher <- client.publisherOf[Person]
         _ <- publisher(Person("Bob", 67))
       } yield ExitCode.Success
     }

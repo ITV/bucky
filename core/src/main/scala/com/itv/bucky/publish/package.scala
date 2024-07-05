@@ -61,7 +61,7 @@ package object publish {
       priority = Some(0)
     )
   }
-  case class PublishCommand(exchange: ExchangeName, routingKey: RoutingKey, basicProperties: MessageProperties, body: Payload, mandatory: Boolean = false) {
+  case class PublishCommand(exchange: ExchangeName, routingKey: RoutingKey, basicProperties: MessageProperties, body: Payload) {
     def description = s"${exchange.value}:${routingKey.value} $body"
   }
 }

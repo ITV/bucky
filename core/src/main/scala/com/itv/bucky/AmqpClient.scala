@@ -11,7 +11,7 @@ import scala.concurrent.{ExecutionContext, ExecutionContextExecutorService}
 trait AmqpClient[F[_]] {
   def declare(declarations: Declaration*): F[Unit]
   def declare(declarations: Iterable[Declaration]): F[Unit]
-  def publisher(): Publisher[F, PublishCommand]
+  def publisher(mandatory: Boolean = false): F[Publisher[F, PublishCommand]]
   def registerConsumer(queueName: QueueName,
                        handler: Handler[F, Delivery],
                        exceptionalAction: ConsumeAction = DeadLetter,

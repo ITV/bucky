@@ -44,7 +44,7 @@ class PublishConsumeTest
 
       Resource.eval(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
         for {
-          _ <- client.publisher()(commandBuilder)
+          _ <- client.publisher().flatMap(publisher => publisher(commandBuilder))
         } yield handler.receivedMessages should have size 1
       }
     }
@@ -66,7 +66,7 @@ class PublishConsumeTest
 
       Resource.eval(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
         for {
-          _ <- client.publisher()(commandBuilder)
+          _ <- client.publisher().flatMap(publisher => publisher(commandBuilder))
         } yield handler.receivedMessages should have size 1
       }
     }
@@ -91,8 +91,8 @@ class PublishConsumeTest
 
       Resource.eval(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
         for {
-          _ <- client.publisher()(commandBuilder.using(rkRouted).toPublishCommand(message))
-          _ <- client.publisher()(commandBuilder.using(rkUnrouted).toPublishCommand(message))
+          _ <- client.publisher().flatMap(publisher => publisher(commandBuilder.using(rkRouted).toPublishCommand(message)))
+          _ <- client.publisher().flatMap(publisher => publisher(commandBuilder.using(rkUnrouted).toPublishCommand(message)))
         } yield handler.receivedMessages should have size 1
       }
     }
@@ -117,8 +117,8 @@ class PublishConsumeTest
 
       Resource.eval(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
         for {
-          _ <- client.publisher()(commandBuilder.using(rkRouted).toPublishCommand(message))
-          _ <- client.publisher()(commandBuilder.using(rkUnrouted).toPublishCommand(message))
+          _ <- client.publisher().flatMap(publisher => publisher(commandBuilder.using(rkRouted).toPublishCommand(message)))
+          _ <- client.publisher().flatMap(publisher => publisher(commandBuilder.using(rkUnrouted).toPublishCommand(message)))
         } yield handler.receivedMessages should have size 1
       }
     }
@@ -148,7 +148,7 @@ class PublishConsumeTest
 
       Resource.eval(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
         for {
-          _ <- client.publisher()(commandBuilder)
+          _ <- client.publisher().flatMap(publisher => publisher(commandBuilder))
         } yield handler.receivedMessages should have size 1
       }
     }
@@ -179,7 +179,7 @@ class PublishConsumeTest
 
       Resource.eval(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
         for {
-          _ <- client.publisher()(commandBuilder)
+          _ <- client.publisher().flatMap(publisher => publisher(commandBuilder))
         } yield handler.receivedMessages should have size 1
       }
     }
@@ -217,9 +217,9 @@ class PublishConsumeTest
 
       Resource.eval(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
         for {
-          _ <- client.publisher()(message1)
+          _ <- client.publisher().flatMap(publisher => publisher(message1))
           firstCount = handler.receivedMessages.size
-          _ <- client.publisher()(message2)
+          _ <- client.publisher().flatMap(publisher => publisher(message2))
           secondCount = handler.receivedMessages.size
         } yield {
           firstCount shouldBe 0
@@ -257,7 +257,7 @@ class PublishConsumeTest
 
       Resource.eval(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
         for {
-          _ <- client.publisher()(commandBuilder)
+          _ <- client.publisher().flatMap(publisher => publisher(commandBuilder))
         } yield handler.receivedMessages should have size 1
       }
     }
@@ -280,9 +280,9 @@ class PublishConsumeTest
       val headers: Map[String, AnyRef] = Map("foo" -> "bar")
 
       Resource.eval(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
-        val publisher = new PublisherSugar(client).publisherWithHeadersOf(commandBuilder)
         for {
-          _ <- publisher(message, headers)
+          publisher <- new PublisherSugar(client).publisherWithHeadersOf(commandBuilder)
+          _         <- publisher(message, headers)
         } yield {
           handler.receivedMessages should have size 1
           handler.receivedMessages.head.properties.headers shouldBe headers
@@ -307,7 +307,7 @@ class PublishConsumeTest
 
       Resource.eval(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
         for {
-          publishResult <- client.publisher()(commandBuilder).attempt
+          publishResult <- client.publisher().flatMap(publisher => publisher(commandBuilder)).attempt
         } yield {
           publishResult.left.value shouldBe a[TimeoutException]
           handler.receivedMessages should have size 0
@@ -331,9 +331,9 @@ class PublishConsumeTest
       val declarations = List(Queue(queue), Exchange(exchange).binding((rk, queue)))
 
       Resource.eval(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
-        val publisher = client.publisherOf[String]
         for {
-          _ <- publisher(message)
+          publisher <- client.publisherOf[String]
+          _         <- publisher(message)
         } yield handler.receivedMessages should have size 1
       }
     }
@@ -351,9 +351,9 @@ class PublishConsumeTest
       val declarations = List(Queue(queue), Exchange(exchange).binding((rk, queue)))
 
       Resource.eval(client.declare(declarations)).flatMap(_ => client.registerConsumer(queue, handler)).use { _ =>
-        val publisher = client.publisherOf[String](exchange, rk)
         for {
-          _ <- publisher(message)
+          publisher <- client.publisherOf[String](exchange, rk)
+          _         <- publisher(message)
         } yield handler.receivedMessages should have size 1
       }
     }
@@ -388,9 +388,9 @@ class PublishConsumeTest
           } yield ()
         )
         .use { _ =>
-          val publisher = client.publisherOf[String](exchange, rk)
           for {
-            _ <- publisher("hello")
+            publisher <- client.publisherOf[String](exchange, rk)
+            _         <- publisher("hello")
           } yield requeueHandler.receivedMessages should have size 1
         }
     }

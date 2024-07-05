@@ -25,7 +25,7 @@ trait Channel[F[_]] {
   def addConfirmListener(listener: ConfirmListener): F[Unit]
   def addReturnListener(listener: ReturnListener): F[Unit]
   def getNextPublishSeqNo: F[Long]
-  def publish(sequenceNumber: Long, cmd: PublishCommand): F[Unit]
+  def publish(sequenceNumber: Long, cmd: PublishCommand, mandatory: Boolean): F[Unit]
   def sendAction(action: ConsumeAction)(envelope: Envelope): F[Unit]
   def declareExchange(exchange: Exchange): F[Unit]
   def declareQueue(queue: Queue): F[Unit]
@@ -68,12 +68,12 @@ object Channel {
     override def addReturnListener(listener: ReturnListener): F[Unit]   = F.delay(channel.addReturnListener(listener))
     override def getNextPublishSeqNo: F[Long]                           = F.delay(channel.getNextPublishSeqNo)
 
-    override def publish(sequenceNumber: Long, cmd: PublishCommand): F[Unit] =
+    override def publish(sequenceNumber: Long, cmd: PublishCommand, mandatory: Boolean): F[Unit] =
       for {
         _ <- F.delay(logger.debug("Publishing command with exchange:{} rk: {}.", cmd.exchange, cmd.routingKey))
         _ <- F.blocking(
           channel
-            .basicPublish(cmd.exchange.value, cmd.routingKey.value, cmd.mandatory, false, MessagePropertiesConverters(cmd.basicProperties), cmd.body.value)
+            .basicPublish(cmd.exchange.value, cmd.routingKey.value, mandatory, false, MessagePropertiesConverters(cmd.basicProperties), cmd.body.value)
         )
         _ <- F.delay(logger.info("Published message: {}", cmd))
       } yield ()
