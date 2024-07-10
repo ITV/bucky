@@ -1,9 +1,9 @@
 package com.itv.bucky.backend.fs2rabbit
 
 import cats.data.Kleisli
-import cats.effect.implicits.genSpawnOps
+import cats.effect.implicits.{genSpawnOps, genTemporalOps}
 import cats.effect.std.Dispatcher
-import cats.effect.{Async, Resource}
+import cats.effect.{Async, Ref, Resource}
 import cats.implicits._
 import com.itv.bucky
 import com.itv.bucky.backend.fs2rabbit.Fs2RabbitAmqpClient.deliveryDecoder
@@ -50,13 +50,14 @@ import dev.profunktor.fs2rabbit.model.AmqpFieldValue.{
 import dev.profunktor.fs2rabbit.model.{AMQPChannel, PublishingFlag, ShortString}
 import scodec.bits.ByteVector
 
-import java.util.Date
+import java.util.{Date, UUID}
 import scala.concurrent.duration.FiniteDuration
 import scala.jdk.CollectionConverters._
 import scala.language.higherKinds
 import Fs2RabbitAmqpClient._
+import cats.effect.kernel.Temporal
 
-class Fs2RabbitAmqpClient[F[_]: Async](
+class Fs2RabbitAmqpClient[F[_]: Async: Temporal](
     client: RabbitClient[F],
     connection: model.AMQPConnection,
     publishChannel: model.AMQPChannel,
@@ -165,6 +166,13 @@ class Fs2RabbitAmqpClient[F[_]: Async](
       }
       .map(amqpClientConnectionManager.addConfirmListeningToPublisher)
 
+  private def repeatUntil[A](eval: F[A])(pred: A => Boolean)(sleep: FiniteDuration): F[Unit] =
+    for {
+      result <- eval
+      ended  <- Async[F].pure(pred(result))
+      _      <- if (ended) Async[F].unit else Temporal[F].sleep(sleep) *> repeatUntil(eval)(pred)(sleep)
+    } yield ()
+
   override def registerConsumer(
       queueName: bucky.QueueName,
       handler: Handler[F, consume.Delivery],
@@ -175,19 +183,37 @@ class Fs2RabbitAmqpClient[F[_]: Async](
   ): Resource[F, Unit] =
     client.createChannel(connection).flatMap { implicit channel =>
       implicit val decoder: EnvelopeDecoder[F, consume.Delivery] = deliveryDecoder(queueName)
-      Resource.eval(client.createAckerConsumer[consume.Delivery](model.QueueName(queueName.value))).flatMap { case (acker, consumer) =>
-        consumer
-          .evalMap(delivery => handler(delivery.payload).map(_ -> delivery.deliveryTag))
-          .evalMap {
-            case (consume.Ack, tag)                => acker(model.AckResult.Ack(tag))
-            case (consume.DeadLetter, tag)         => acker(model.AckResult.NAck(tag))
-            case (consume.RequeueImmediately, tag) => acker(model.AckResult.Reject(tag))
+      Resource
+        .make(Ref.of[F, Set[UUID]](Set.empty))(set =>
+          repeatUntil(set.get.flatTap(ids => Async[F].blocking(println(s"$ids left"))))(_.isEmpty)(shutdownRetry).timeout(shutdownTimeout)
+        )
+        .flatMap(consumptionIds =>
+          Resource.eval(client.createAckerConsumer[consume.Delivery](model.QueueName(queueName.value))).flatMap { case (acker, consumer) =>
+            consumer
+              .evalMap(delivery =>
+                for {
+                  uuid <- Async[F].delay(UUID.randomUUID())
+                  _    <- consumptionIds.update(set => set + uuid)
+                  _    <- consumptionIds.get.flatTap(ids => Async[F].blocking(println("set is: " + ids)))
+                  res  <- handler(delivery.payload).attempt
+                  _    <- Async[F].blocking(println("past the handler!"))
+                  tag = delivery.deliveryTag
+                  _      <- consumptionIds.update(set => set - uuid)
+                  _      <- consumptionIds.get.flatTap(ids => Async[F].blocking(println("set is: " + ids)))
+                  result <- Async[F].fromEither(res)
+                } yield (result, tag)
+              )
+              .evalMap {
+                case (consume.Ack, tag)                => acker(model.AckResult.Ack(tag))
+                case (consume.DeadLetter, tag)         => acker(model.AckResult.NAck(tag))
+                case (consume.RequeueImmediately, tag) => acker(model.AckResult.Reject(tag))
+              }
+              .compile
+              .drain
+              .background
+              .map(_ => ())
           }
-          .compile
-          .drain
-          .background
-          .map(_ => ())
-      }
+        )
     }
 
   override def isConnectionOpen: F[Boolean] = Async[F].pure(connection.value.isOpen)

@@ -57,7 +57,7 @@ class ShutdownTimeoutTest extends AsyncFunSuite with IntegrationSpec with Effect
 
     Fs2RabbitAmqpClient[IO](config)
       .use { client =>
-        val handler = StubHandlers.recordingHandler[IO, Delivery]((_: Delivery) => IO.sleep(3.seconds).map(_ => Ack))
+        val handler = (_: Delivery) => IO.sleep(3.seconds).map(_ => Ack)
         Resource
           .eval(client.declare(declarations))
           .flatMap(_ =>
@@ -68,14 +68,15 @@ class ShutdownTimeoutTest extends AsyncFunSuite with IntegrationSpec with Effect
           .use { _ =>
             val pcb = publishCommandBuilder[String](implicitly).using(exchangeName).using(routingKey)
             client.publisher().flatMap { publisher =>
-              publisher(pcb.toPublishCommand("a message"))
+              publisher(pcb.toPublishCommand("a message")) *> IO
+                .sleep(3.seconds)
                 .flatMap(_ => test)
             }
           }
       }
   }
 
-  test("Should wait until a handler finishes executing before shuttind down") {
+  test("Should wait until a handler finishes executing before shutting down") {
     val clock = Clock.systemUTC()
     val start = Instant.now(clock)
     runTest[Instant](IO.delay(Instant.now())).map { result =>
