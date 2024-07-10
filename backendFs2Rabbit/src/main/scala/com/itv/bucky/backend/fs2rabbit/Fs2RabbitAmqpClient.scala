@@ -183,37 +183,35 @@ class Fs2RabbitAmqpClient[F[_]: Async: Temporal](
   ): Resource[F, Unit] =
     client.createChannel(connection).flatMap { implicit channel =>
       implicit val decoder: EnvelopeDecoder[F, consume.Delivery] = deliveryDecoder(queueName)
-      Resource
-        .make(Ref.of[F, Set[UUID]](Set.empty))(set =>
-          repeatUntil(set.get.flatTap(ids => Async[F].blocking(println(s"$ids left"))))(_.isEmpty)(shutdownRetry).timeout(shutdownTimeout)
-        )
-        .flatMap(consumptionIds =>
-          Resource.eval(client.createAckerConsumer[consume.Delivery](model.QueueName(queueName.value))).flatMap { case (acker, consumer) =>
-            consumer
-              .evalMap(delivery =>
-                for {
-                  uuid <- Async[F].delay(UUID.randomUUID())
-                  _    <- consumptionIds.update(set => set + uuid)
-                  _    <- consumptionIds.get.flatTap(ids => Async[F].blocking(println("set is: " + ids)))
-                  res  <- handler(delivery.payload).attempt
-                  _    <- Async[F].blocking(println("past the handler!"))
-                  tag = delivery.deliveryTag
-                  _      <- consumptionIds.update(set => set - uuid)
-                  _      <- consumptionIds.get.flatTap(ids => Async[F].blocking(println("set is: " + ids)))
-                  result <- Async[F].fromEither(res)
-                } yield (result, tag)
+      Resource.eval(Ref.of[F, Set[UUID]](Set.empty)).flatMap { consumptionIds =>
+        Resource.eval(client.createAckerConsumer[consume.Delivery](model.QueueName(queueName.value))).flatMap { case (acker, consumer) =>
+          consumer
+            .evalMap(delivery =>
+              for {
+                uuid <- Async[F].delay(UUID.randomUUID())
+                _    <- consumptionIds.update(set => set + uuid)
+                res  <- handler(delivery.payload).attempt
+                tag = delivery.deliveryTag
+                _      <- consumptionIds.update(set => set - uuid)
+                result <- Async[F].fromEither(res)
+              } yield (result, tag)
+            )
+            .evalMap {
+              case (consume.Ack, tag)                => acker(model.AckResult.Ack(tag))
+              case (consume.DeadLetter, tag)         => acker(model.AckResult.NAck(tag))
+              case (consume.RequeueImmediately, tag) => acker(model.AckResult.Reject(tag))
+            }
+            .compile
+            .drain
+            .background
+            .flatMap { _ =>
+              Resource.onFinalize(
+                repeatUntil(consumptionIds.get)(_.isEmpty)(shutdownRetry).timeout(shutdownTimeout)
               )
-              .evalMap {
-                case (consume.Ack, tag)                => acker(model.AckResult.Ack(tag))
-                case (consume.DeadLetter, tag)         => acker(model.AckResult.NAck(tag))
-                case (consume.RequeueImmediately, tag) => acker(model.AckResult.Reject(tag))
-              }
-              .compile
-              .drain
-              .background
-              .map(_ => ())
-          }
-        )
+            }
+            .map(_ => ())
+        }
+      }
     }
 
   override def isConnectionOpen: F[Boolean] = Async[F].pure(connection.value.isOpen)
