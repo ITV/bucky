@@ -59,7 +59,7 @@ package object requeue {
                   onRequeueExpiryAction: Delivery => F[ConsumeAction] = (_: Delivery) => F.point[ConsumeAction](DeadLetter),
                   prefetchCount: Int = defaultPreFetchCount): Resource[F, Unit] = {
       val requeueExchange = ExchangeName(s"${queueName.value}.requeue")
-      Resource.eval(amqpClient.publisher()).flatMap { requeuePublish =>
+      Resource.eval(amqpClient.publisher(mandatory = true)).flatMap { requeuePublish =>
         amqpClient.registerConsumer(queueName,
           RequeueTransformer(requeuePublish, requeueExchange, requeuePolicy, onHandlerException, onRequeueExpiryAction)(handler),
           prefetchCount = prefetchCount)

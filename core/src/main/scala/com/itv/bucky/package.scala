@@ -32,21 +32,21 @@ package object bucky {
 
   implicit class ConsumerSugar[F[_]](amqpClient: AmqpClient[F])(implicit val F: Sync[F]) {
 
-    def registerConsumerOf[T](queueName: QueueName,
-                              handler: Handler[F, T],
-                              exceptionalAction: ConsumeAction = DeadLetter,
-                              prefetchCount: Int = defaultPreFetchCount)(implicit payloadUnmarshaller: PayloadUnmarshaller[T],
-                                                                         ae: ApplicativeError[F, Throwable]): Resource[F, Unit] =
+    def registerConsumerOf[T](
+        queueName: QueueName,
+        handler: Handler[F, T],
+        exceptionalAction: ConsumeAction = DeadLetter,
+        prefetchCount: Int = defaultPreFetchCount
+    )(implicit payloadUnmarshaller: PayloadUnmarshaller[T], ae: ApplicativeError[F, Throwable]): Resource[F, Unit] =
       amqpClient.registerConsumer(
         queueName,
-        (delivery: Delivery) => {
+        (delivery: Delivery) =>
           payloadUnmarshaller.unmarshal(delivery.body) match {
             case Right(value) =>
               handler.apply(value)
             case Left(e) =>
               ae.raiseError(e)
-          }
-        },
+          },
         exceptionalAction,
         prefetchCount
       )
@@ -58,7 +58,8 @@ package object bucky {
         onHandlerException: RequeueConsumeAction = Requeue,
         unmarshalFailureAction: RequeueConsumeAction = DeadLetter,
         onRequeueExpiryAction: T => F[ConsumeAction] = (_: T) => F.point[ConsumeAction](DeadLetter),
-        prefetchCount: Int = defaultPreFetchCount)(implicit unmarshaller: PayloadUnmarshaller[T], F: Sync[F]): Resource[F, Unit] =
+        prefetchCount: Int = defaultPreFetchCount
+    )(implicit unmarshaller: PayloadUnmarshaller[T], F: Sync[F]): Resource[F, Unit] =
       new RequeueOps(amqpClient).requeueDeliveryHandlerOf[T](
         queueName = queueName,
         handler = handler,
@@ -77,7 +78,8 @@ package object bucky {
         onHandlerException: RequeueConsumeAction = Requeue,
         unmarshalFailureAction: RequeueConsumeAction = DeadLetter,
         onRequeueExpiryAction: T => F[ConsumeAction] = (_: T) => F.point[ConsumeAction](DeadLetter),
-        prefetchCount: Int = defaultPreFetchCount)(implicit unmarshaller: DeliveryUnmarshaller[T], F: Sync[F]): Resource[F, Unit] =
+        prefetchCount: Int = defaultPreFetchCount
+    )(implicit unmarshaller: DeliveryUnmarshaller[T], F: Sync[F]): Resource[F, Unit] =
       new RequeueOps(amqpClient).requeueDeliveryHandlerOf[T](
         queueName = queueName,
         handler = handler,
@@ -102,45 +104,65 @@ package object bucky {
 
   implicit class PublisherSugar[F[_]: Applicative](amqpClient: AmqpClient[F]) {
 
-    def publisherOf[T](implicit publishCommandBuilder: PublishCommandBuilder[T]): F[Publisher[F, T]] = {
-      amqpClient.publisher().map { basePublisher =>
-        value: T => {
+    def publisherOf[T](mandatory: Boolean)(implicit publishCommandBuilder: PublishCommandBuilder[T]): F[Publisher[F, T]] =
+      amqpClient.publisher(mandatory).map { basePublisher => value: T =>
+        {
           val command = publishCommandBuilder.toPublishCommand(value)
           basePublisher.apply(command)
         }
       }
-    }
 
-    def publisherOf[T](exchangeName: ExchangeName, routingKey: RoutingKey)(implicit marshaller: PayloadMarshaller[T]): F[Publisher[F, T]] = {
+    def publisherOf[T](implicit publishCommandBuilder: PublishCommandBuilder[T]): F[Publisher[F, T]] =
+      publisherOf(mandatory = false)
+
+    def publisherOf[T](exchangeName: ExchangeName, routingKey: RoutingKey, mandatory: Boolean)(implicit
+        marshaller: PayloadMarshaller[T]
+    ): F[Publisher[F, T]] = {
       val pcb =
         PublishCommandBuilder
           .publishCommandBuilder(marshaller)
           .using(exchangeName)
           .using(routingKey)
-      publisherOf[T](pcb)
+      publisherOf[T](mandatory)(pcb)
     }
 
-    def publisherWithHeadersOf[T](exchangeName: ExchangeName,
-                                  routingKey: RoutingKey)(implicit F: Sync[F], marshaller: PayloadMarshaller[T]): F[PublisherWithHeaders[F, T]] = {
+    def publisherOf[T](exchangeName: ExchangeName, routingKey: RoutingKey)(implicit
+        marshaller: PayloadMarshaller[T]
+    ): F[Publisher[F, T]] =
+      publisherOf(exchangeName, routingKey, mandatory = false)
+
+    def publisherWithHeadersOf[T](exchangeName: ExchangeName, routingKey: RoutingKey, mandatory: Boolean)(implicit
+        F: Sync[F],
+        marshaller: PayloadMarshaller[T]
+    ): F[PublisherWithHeaders[F, T]] = {
       val pcb =
         PublishCommandBuilder
           .publishCommandBuilder(marshaller)
           .using(exchangeName)
           .using(routingKey)
-      publisherWithHeadersOf[T](pcb)
+      publisherWithHeadersOf[T](pcb, mandatory)
     }
+
+    def publisherWithHeadersOf[T](exchangeName: ExchangeName, routingKey: RoutingKey)(implicit
+        F: Sync[F],
+        marshaller: PayloadMarshaller[T]
+    ): F[PublisherWithHeaders[F, T]] =
+      publisherWithHeadersOf[T](exchangeName, routingKey, mandatory = false)
+
+    def publisherWithHeadersOf[T](commandBuilder: PublishCommandBuilder[T], mandatory: Boolean)(implicit F: Sync[F]): F[PublisherWithHeaders[F, T]] =
+      amqpClient.publisher(mandatory).map { publisher => (message: T, headers: Map[String, AnyRef]) =>
+        F.flatMap(F.delay {
+          val command = commandBuilder.toPublishCommand(message)
+
+          command.copy(basicProperties = headers.foldLeft(command.basicProperties) { case (props, (headerName, headerValue)) =>
+            props.withHeader(headerName -> headerValue)
+          })
+        })(publisher)
+      }
 
     def publisherWithHeadersOf[T](commandBuilder: PublishCommandBuilder[T])(implicit F: Sync[F]): F[PublisherWithHeaders[F, T]] =
-      amqpClient.publisher().map { publisher =>
-        (message: T, headers: Map[String, AnyRef]) =>
-          F.flatMap(F.delay {
-            val command = commandBuilder.toPublishCommand(message)
+      publisherWithHeadersOf(commandBuilder, mandatory = false)
 
-            command.copy(basicProperties = headers.foldLeft(command.basicProperties) {
-              case (props, (headerName, headerValue)) => props.withHeader(headerName -> headerValue)
-            })
-          })(publisher)
-      }
   }
 
   implicit class DeclareSugar[F[_]](amqpClient: AmqpClient[F])(implicit a: Applicative[F]) {

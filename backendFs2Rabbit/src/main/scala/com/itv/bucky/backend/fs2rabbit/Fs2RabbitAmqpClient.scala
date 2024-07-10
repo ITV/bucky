@@ -158,7 +158,7 @@ class Fs2RabbitAmqpClient[F[_]: Async](
       .map { publisher => (publishCommand: PublishCommand) =>
         publisher(
           model.ExchangeName(publishCommand.exchange.value),
-          model.RoutingKey(publishCommand.exchange.value),
+          model.RoutingKey(publishCommand.routingKey.value),
           publishCommand
         )
       }
