@@ -246,7 +246,9 @@ object Fs2RabbitAmqpClient {
         case _                        => NullVal
       }
 
-      val fs2MessageHeaders: Map[String, model.AmqpFieldValue] = publishCommand.basicProperties.headers.view.mapValues(toAmqpValue).toMap
+      val fs2MessageHeaders: Map[String, model.AmqpFieldValue] = publishCommand.basicProperties.headers.map { case (key, headerValue) =>
+        key -> toAmqpValue(headerValue)
+      }
 
       val message = model.AmqpMessage(
         publishCommand.body.value,
@@ -276,7 +278,7 @@ object Fs2RabbitAmqpClient {
       val messageProperties = publish.MessageProperties(
         contentType = amqpEnvelope.properties.contentType.map(ContentType.apply),
         contentEncoding = amqpEnvelope.properties.contentEncoding.map(ContentEncoding.apply),
-        headers = amqpEnvelope.properties.headers.view.mapValues(_.toValueWriterCompatibleJava).toMap,
+        headers = amqpEnvelope.properties.headers.map { case (key, headerValue) => key -> headerValue.toValueWriterCompatibleJava },
         deliveryMode = amqpEnvelope.properties.deliveryMode.map(dm => DeliveryMode(dm.value)),
         priority = amqpEnvelope.properties.priority,
         correlationId = amqpEnvelope.properties.correlationId,
