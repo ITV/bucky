@@ -48,7 +48,7 @@ pgpPassphrase := Option(System.getenv("GPG_KEY_PASSPHRASE")).map(_.toArray)
 
 lazy val kernelSettings = Seq(
   crossScalaVersions := Seq(scala212, scala213),
-  scalaVersion       := scala213,
+  scalaVersion       := scala212,
   organization       := "com.itv",
   scalacOptions ++= Seq("-feature", "-deprecation", "-Xfatal-warnings", "-language:higherKinds"),
   publishTo := {

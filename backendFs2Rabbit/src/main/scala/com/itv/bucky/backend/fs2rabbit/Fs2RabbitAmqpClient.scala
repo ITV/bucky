@@ -66,21 +66,23 @@ class Fs2RabbitAmqpClient[F[_]: Async](
   override def declare(declarations: decl.Declaration*): F[Unit] = declare(declarations.toList)
 
   override def declare(declarations: Iterable[decl.Declaration]): F[Unit] = {
+
+    def mapToSafeArg(kv: (String, AnyRef)): (String, SafeArg) = kv match {
+      case (k, arg: String)            => k -> arg
+      case (k, arg: BigDecimal)        => k -> arg
+      case (k, arg: Integer)           => k -> arg.intValue()
+      case (k, arg: java.lang.Long)    => k -> arg.longValue()
+      case (k, arg: java.lang.Double)  => k -> arg.doubleValue()
+      case (k, arg: java.lang.Float)   => k -> arg.floatValue()
+      case (k, arg: java.lang.Short)   => k -> arg.shortValue()
+      case (k, arg: java.lang.Boolean) => k -> arg.booleanValue()
+      case (k, arg: java.lang.Byte)    => k -> arg.byteValue()
+      case (k, arg: java.util.Date)    => k -> arg
+      case t                           => throw new IllegalArgumentException(s"Unsupported type for rabbit arguments $t")
+    }
+
     def argumentsFromAnyRef(arguments: Map[String, AnyRef]): Map[String, SafeArg] =
-      arguments
-        .map[String, SafeArg] {
-          case (k, arg: String)            => k -> arg
-          case (k, arg: BigDecimal)        => k -> arg
-          case (k, arg: Integer)           => k -> arg.intValue()
-          case (k, arg: java.lang.Long)    => k -> arg.longValue()
-          case (k, arg: java.lang.Double)  => k -> arg.doubleValue()
-          case (k, arg: java.lang.Float)   => k -> arg.floatValue()
-          case (k, arg: java.lang.Short)   => k -> arg.shortValue()
-          case (k, arg: java.lang.Boolean) => k -> arg.booleanValue()
-          case (k, arg: java.lang.Byte)    => k -> arg.byteValue()
-          case (k, arg: java.util.Date)    => k -> arg
-          case t                           => throw new IllegalArgumentException(s"Unsupported type for rabbit arguments $t")
-        }
+      arguments.map(mapToSafeArg)
 
     def exchangeTypeToFs2ExchangeType(exchangeType: ExchangeType): model.ExchangeType =
       exchangeType match {
