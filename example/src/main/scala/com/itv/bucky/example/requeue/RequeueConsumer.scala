@@ -2,18 +2,16 @@ package com.itv.bucky.example.requeue
 
 import cats.effect.{ExitCode, IO, IOApp, Resource}
 import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
-import com.itv.bucky.decl._
 import com.itv.bucky._
+import com.itv.bucky.backend.javaamqp.JavaBackendAmqpClient
 import com.itv.bucky.consume._
+import com.itv.bucky.decl._
 import com.itv.bucky.pattern.requeue._
 import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.StrictLogging
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-
-import cats.effect._
-import cats.implicits._
 
 object RequeueConsumer extends IOApp with StrictLogging {
 
@@ -28,7 +26,7 @@ object RequeueConsumer extends IOApp with StrictLogging {
   val stringToLogRequeueHandler: RequeueHandler[IO, String] =
     RequeueHandler[IO, String] { message: String =>
       IO.delay {
-        logger.info(message)
+        println(message)
 
         message match {
           case "requeue"    => Requeue
@@ -40,9 +38,9 @@ object RequeueConsumer extends IOApp with StrictLogging {
 
   override def run(args: List[String]): IO[ExitCode] =
     (for {
-        amqpClient <- AmqpClient[IO](amqpClientConfig)
-        _ <- Resource.eval(amqpClient.declare(Declarations.all))
-        _ <- amqpClient.registerRequeueConsumerOf(Declarations.queue.name,
-          stringToLogRequeueHandler)
-      } yield ()).use(_ => IO.never *> IO(ExitCode.Success))
+      amqpClient <- JavaBackendAmqpClient[IO](amqpClientConfig)
+      _ <- Resource.eval(amqpClient.declare(Declarations.all))
+      _ <- amqpClient.registerRequeueConsumerOf(Declarations.queue.name,
+        stringToLogRequeueHandler, requeuePolicy = RequeuePolicy(10, 5.seconds))
+    } yield ()).use(_ => IO.never *> IO(ExitCode.Success))
 }

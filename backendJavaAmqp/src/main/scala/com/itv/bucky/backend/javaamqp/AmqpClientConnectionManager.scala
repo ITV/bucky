@@ -1,21 +1,19 @@
-package com.itv.bucky
+package com.itv.bucky.backend.javaamqp
 
 import cats.effect._
 import cats.effect.implicits._
 import cats.effect.std.Dispatcher
 import cats.implicits._
+import com.itv.bucky.backend.javaamqp.publish.PendingConfirmListener
 import com.itv.bucky.consume._
-import com.itv.bucky.publish._
 import com.itv.bucky.decl.Declaration
-import com.itv.bucky.publish.PendingConfirmListener
+import com.itv.bucky.publish._
+import com.itv.bucky.{AmqpClientConfig, Handler, QueueName}
 import com.typesafe.scalalogging.StrictLogging
 
 import scala.collection.immutable.TreeMap
-import scala.util.Try
-import cats.effect.{Deferred, Ref, Temporal}
-
-import java.util.concurrent.Executors
 import scala.concurrent.ExecutionContext
+import scala.util.Try
 
 private[bucky] case class AmqpClientConnectionManager[F[_]](
     amqpConfig: AmqpClientConfig,
@@ -33,7 +31,7 @@ private[bucky] case class AmqpClientConnectionManager[F[_]](
       })
     }
 
-  def publish(cmd: PublishCommand): F[Unit] =
+  def publish(cmd: PublishCommand, mandatory: Boolean): F[Unit] =
     for {
       deliveryTag <- Ref.of[F, Option[Long]](None)
       _ <- (for {
@@ -43,7 +41,7 @@ private[bucky] case class AmqpClientConnectionManager[F[_]](
             nextPublishSeq <- publishChannel.getNextPublishSeqNo
             _              <- deliveryTag.set(Some(nextPublishSeq))
             _              <- pendingConfirmListener.pendingConfirmations.update(_ + (nextPublishSeq -> signal))
-            _              <- publishChannel.publish(nextPublishSeq, cmd)
+            _              <- publishChannel.publish(nextPublishSeq, cmd, mandatory)
           } yield ()
         }
         _ <- signal.get.ifM(F.unit, F.raiseError[Unit](new RuntimeException(s"Failed to publish msg: ${cmd}")))
@@ -89,7 +87,7 @@ private[bucky] object AmqpClientConnectionManager extends StrictLogging {
       pendingConfirmations <- Ref.of[F, TreeMap[Long, Deferred[F, Boolean]]](TreeMap.empty)
       pendingReturn        <- Ref.of[F, Boolean](false)
       _                    <- publishChannel.confirmSelect
-      confirmListener      <- F.blocking(publish.PendingConfirmListener(pendingConfirmations, pendingReturn, dispatcher))
+      confirmListener      <- F.blocking(PendingConfirmListener(pendingConfirmations, pendingReturn, dispatcher))
       _                    <- publishChannel.addConfirmListener(confirmListener)
       _                    <- publishChannel.addReturnListener(confirmListener)
     } yield AmqpClientConnectionManager(config, publishChannel, confirmListener, dispatcher, executionContext)

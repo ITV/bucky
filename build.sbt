@@ -50,7 +50,7 @@ lazy val kernelSettings = Seq(
   crossScalaVersions := Seq(scala212, scala213),
   scalaVersion       := scala213,
   organization       := "com.itv",
-  scalacOptions ++= Seq("-feature", "-deprecation", "-Xfatal-warnings", "-language:higherKinds"),
+  scalacOptions ++= Seq("-feature", "-deprecation", "-language:higherKinds"),
   publishTo := {
     val nexus = "https://oss.sonatype.org/"
     if (isSnapshot.value)
@@ -141,9 +141,45 @@ lazy val core = project
       "org.scalatest"              %% "scalatest"                     % scalaTestVersion           % "test",
       "org.typelevel"              %% "cats-effect-testing-scalatest" % catsEffectScalaTestVersion % "test",
       "org.typelevel"              %% "cats-effect"                   % catsEffectVersion,
-      "com.rabbitmq"                % "amqp-client"                   % amqpClientVersion,
       "ch.qos.logback"              % "logback-classic"               % logbackVersion             % "test",
-      "org.scala-lang.modules"     %% "scala-collection-compat"       % "2.11.0"
+      "org.scala-lang.modules"     %% "scala-collection-compat"       % "2.5.0"
+    )
+  )
+
+lazy val backendJavaAmqp = project
+  .settings(name := "com.itv")
+  .settings(moduleName := "bucky-backend-java-amqp")
+  .settings(kernelSettings: _*)
+  .dependsOn(core)
+  .aggregate(core)
+  .settings(
+    libraryDependencies ++= Seq(
+      "com.rabbitmq"                % "amqp-client"                   % amqpClientVersion,
+      "com.typesafe.scala-logging" %% "scala-logging"                 % scalaLoggingVersion,
+      "org.scalatest"              %% "scalatest"                     % scalaTestVersion           % "test",
+      "org.typelevel"              %% "cats-effect-testing-scalatest" % catsEffectScalaTestVersion % "test",
+      "org.typelevel"              %% "cats-effect"                   % catsEffectVersion,
+      "ch.qos.logback"              % "logback-classic"               % logbackVersion             % "test",
+      "org.scala-lang.modules"     %% "scala-collection-compat"       % "2.5.0"
+    )
+  )
+
+lazy val backendFs2Rabbit = project
+  .settings(name := "com.itv")
+  .settings(moduleName := "bucky-backend-fs2-rabbit")
+  .settings(kernelSettings)
+  .dependsOn(core)
+  .aggregate(core)
+  .settings(
+    libraryDependencies ++= Seq(
+      "com.typesafe.scala-logging" %% "scala-logging"                 % scalaLoggingVersion,
+      "org.scalatest"              %% "scalatest"                     % scalaTestVersion           % "test",
+      "org.typelevel"              %% "cats-effect-testing-scalatest" % catsEffectScalaTestVersion % "test",
+      "org.typelevel"              %% "cats-effect"                   % catsEffectVersion,
+      "dev.profunktor"             %% "fs2-rabbit"                    % "5.0.0",
+      "dev.profunktor"             %% "fs2-rabbit-circe"              % "5.0.0",
+      "ch.qos.logback"              % "logback-classic"               % logbackVersion             % "test",
+      "org.scala-lang.modules"     %% "scala-collection-compat"       % "2.5.0"
     )
   )
 
@@ -151,7 +187,7 @@ lazy val test = project
   .settings(name := "com.itv")
   .settings(moduleName := "bucky-test")
   .settings(kernelSettings)
-  .dependsOn(core)
+  .dependsOn(core, backendJavaAmqp)
   .aggregate(core)
   .settings(
     libraryDependencies ++= Seq(
@@ -168,7 +204,7 @@ lazy val it = project
   .settings(name := "com.itv")
   .settings(moduleName := "bucky-it")
   .settings(kernelSettings)
-  .dependsOn(core, test)
+  .dependsOn(core, test, backendFs2Rabbit)
   .aggregate(core)
   .settings(
     libraryDependencies ++= Seq(
@@ -194,7 +230,10 @@ lazy val example = project
       "com.typesafe.scala-logging" %% "scala-logging"                 % scalaLoggingVersion,
       "org.scalatest"              %% "scalatest"                     % scalaTestVersion,
       "org.typelevel"              %% "cats-effect-testing-scalatest" % catsEffectScalaTestVersion % "test",
-      "com.typesafe"                % "config"                        % typeSafeVersion
+      "com.typesafe"                % "config"                        % typeSafeVersion,
+      "ch.qos.logback" % "logback-classic" % logbackVersion,
+      "dev.profunktor" %% "fs2-rabbit" % "5.0.0",
+      "dev.profunktor" %% "fs2-rabbit-circe" % "5.0.0"
     )
   )
 
@@ -246,5 +285,5 @@ lazy val xml = project
   )
 
 lazy val root = (project in file("."))
-  .aggregate(xml, circe, argonaut, example, test, core)
+  .aggregate(xml, circe, argonaut, example, test, backendJavaAmqp, backendFs2Rabbit, core)
   .settings(publishArtifact := false)

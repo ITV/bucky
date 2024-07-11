@@ -1,4 +1,4 @@
-package com.itv.bucky.integrationTest
+package com.itv.bucky
 
 import cats.data.Kleisli
 import cats.effect.testing.scalatest.EffectTestSupport
@@ -7,6 +7,8 @@ import cats.effect.{IO, Resource}
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
 import com.itv.bucky._
+import com.itv.bucky.backend.fs2rabbit.Fs2RabbitAmqpClient
+import com.itv.bucky.backend.javaamqp.JavaBackendAmqpClient
 import com.itv.bucky.consume._
 import com.itv.bucky.decl.Exchange
 import com.itv.bucky.pattern.requeue
@@ -25,7 +27,12 @@ import scala.collection.mutable.ListBuffer
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
-class RequeueWithExpiryActionIntegrationTest extends AsyncFunSuite with EffectTestSupport with Eventually with IntegrationPatience {
+class RequeueWithExpiryActionIntegrationTest
+    extends AsyncFunSuite
+    with IntegrationSpec
+    with EffectTestSupport
+    with Eventually
+    with IntegrationPatience {
 
   case class TestFixture(
       stubHandler: RecordingRequeueHandler[IO, String],
@@ -35,8 +42,8 @@ class RequeueWithExpiryActionIntegrationTest extends AsyncFunSuite with EffectTe
   )
 
   implicit override val ioRuntime: IORuntime = packageIORuntime
-  implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(300))
-  val requeuePolicy: RequeuePolicy = RequeuePolicy(maximumProcessAttempts = 5, requeueAfter = 2.seconds)
+  implicit val ec: ExecutionContext          = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(300))
+  val requeuePolicy: RequeuePolicy           = RequeuePolicy(maximumProcessAttempts = 5, requeueAfter = 2.seconds)
 
   def withTestFixture[F[_]](onRequeueExpiryAction: String => IO[ConsumeAction], handlerAction: String => IO[Unit] = _ => IO.unit)(
       test: TestFixture => IO[Unit]
@@ -63,7 +70,7 @@ class RequeueWithExpiryActionIntegrationTest extends AsyncFunSuite with EffectTe
       Exchange(exchangeName).binding(routingKey -> queueName)
     ) ++ requeue.requeueDeclarations(queueName, routingKey)
 
-    AmqpClient[IO](config).use { client =>
+    Fs2RabbitAmqpClient[IO](config).use { client =>
       val handler    = new RecordingRequeueHandler[IO, String](Kleisli(handlerAction).andThen(_ => IO(Requeue)).run)
       val dlqHandler = StubHandlers.ackHandler[IO, String]
 
@@ -81,10 +88,11 @@ class RequeueWithExpiryActionIntegrationTest extends AsyncFunSuite with EffectTe
           } yield ()
         )
         .use { _ =>
-          val pub     = client.publisher()
-          val pcb     = publishCommandBuilder[String](implicitly).using(exchangeName).using(routingKey)
-          val fixture = TestFixture(handler, dlqHandler, pcb, pub)
-          test(fixture)
+          client.publisher().flatMap { pub =>
+            val pcb     = publishCommandBuilder[String](implicitly).using(exchangeName).using(routingKey)
+            val fixture = TestFixture(handler, dlqHandler, pcb, pub)
+            test(fixture)
+          }
         }
     }
   }

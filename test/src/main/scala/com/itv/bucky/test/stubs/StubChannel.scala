@@ -5,12 +5,13 @@ import java.util.concurrent.atomic.AtomicLong
 import com.itv.bucky
 import com.itv.bucky.consume._
 import com.itv.bucky.publish._
-import com.itv.bucky.{Channel, Envelope, ExchangeName, Handler, QueueName, RoutingKey}
+import com.itv.bucky.{Envelope, ExchangeName, Handler, QueueName, RoutingKey}
 import com.itv.bucky.decl.{Binding, Direct, Exchange, ExchangeBinding, ExchangeType, Headers, Queue, Topic}
 import com.rabbitmq.client.{ConfirmListener, ReturnListener}
 import cats._
 import cats.effect._
 import cats.implicits._
+import com.itv.bucky.backend.javaamqp.Channel
 import com.typesafe.scalalogging.StrictLogging
 
 import scala.collection.mutable
@@ -134,7 +135,7 @@ abstract class StubChannel[F[_]](implicit F: Async[F]) extends Channel[F] with S
       .map(_.queueName)
       .toList)
 
-  override def publish(sequenceNumber: Long, cmd: PublishCommand): F[Unit] = {
+  override def publish(sequenceNumber: Long, cmd: PublishCommand, mandatory: Boolean): F[Unit] = {
     val queues = lookupQueues(cmd)
     val subscribedHandlers = handlers.view
       .filterKeys(queues.contains)

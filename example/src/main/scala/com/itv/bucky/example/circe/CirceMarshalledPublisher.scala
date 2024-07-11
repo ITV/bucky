@@ -2,6 +2,7 @@ package com.itv.bucky.example.circe
 
 import cats.effect.{ExitCode, IO, IOApp}
 import com.itv.bucky._
+import com.itv.bucky.backend.javaamqp.JavaBackendAmqpClient
 import com.itv.bucky.circe.auto._
 import com.itv.bucky.decl._
 import com.itv.bucky.example.circe.Shared.Person
@@ -28,11 +29,11 @@ object CirceMarshalledPublisher extends IOApp {
   val amqpClientConfig: AmqpClientConfig = AmqpClientConfig(config.getString("rmq.host"), 5672, "guest", "guest")
 
   override def run(args: List[String]): IO[ExitCode] =
-    AmqpClient[IO](amqpClientConfig).use { client =>
+    JavaBackendAmqpClient[IO](amqpClientConfig).use { client =>
       for {
-        _ <- client.declare(Declarations.all)
-        publisher = client.publisherOf[Person](Declarations.exchange.name, Declarations.routingKey)
-        _ <- publisher(Person("bob", 22))
+        _         <- client.declare(Declarations.all)
+        publisher <- client.publisherOf[Person](Declarations.exchange.name, Declarations.routingKey)
+        _         <- publisher(Person("bob", 22))
       } yield ExitCode.Success
     }
 

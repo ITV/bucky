@@ -1,6 +1,8 @@
-package com.itv.bucky.consume
+package com.itv.bucky.backend.javaamqp.consume
 
-import com.itv.bucky.{MessagePropertiesConverters, Payload}
+import com.itv.bucky.Payload
+import com.itv.bucky.backend.javaamqp.MessagePropertiesConverters
+import com.itv.bucky.consume.{ConsumerTag, Delivery}
 import com.rabbitmq.client.AMQP.BasicProperties
 import com.rabbitmq.client.Envelope
 import com.typesafe.scalalogging.StrictLogging

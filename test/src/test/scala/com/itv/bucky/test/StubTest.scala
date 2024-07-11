@@ -23,7 +23,7 @@ class StubTest extends AnyFunSuite with IOAmqpClientTest {
       val consumer = StubHandlers.ackHandler[IO, String]
       Resource.eval(client.declare(declarations)).flatMap(_ => client.registerConsumerOf(queue, consumer)).use { _ =>
         for {
-          publisher <- IO(client.publisherOf[String](exchange, rk))
+          publisher <- client.publisherOf[String](exchange, rk)
           _         <- (1 to 10).toList.map(_ => publisher(message)).sequence
         } yield {
           all(consumer.receivedMessages) should be(message)
@@ -35,10 +35,11 @@ class StubTest extends AnyFunSuite with IOAmqpClientTest {
 
   test("Should not suffer from deadlock") {
     runAmqpTestAllAck { client =>
-      val publisher = client.publisherOf[String](ExchangeName("x"), RoutingKey("y"))
       val handler = new Handler[IO, String] {
         override def apply(delivery: String): IO[consume.ConsumeAction] =
-          publisher("publish from handler").map(_ => Ack)
+          client.publisherOf[String](ExchangeName("x"), RoutingKey("y")).flatMap { publisher =>
+            publisher("publish from handler").map(_ => Ack)
+          }
       }
 
       Resource
@@ -47,8 +48,9 @@ class StubTest extends AnyFunSuite with IOAmqpClientTest {
           client.registerConsumerOf(queue, handler)
         }
         .use { _ =>
-          val publisher = client.publisherOf[String](exchange, rk)
-          publisher(message)
+          client.publisherOf[String](exchange, rk).flatMap { publisher =>
+            publisher(message)
+          }
         }
     }
   }
@@ -66,7 +68,7 @@ class StubTest extends AnyFunSuite with IOAmqpClientTest {
       } yield ())
         .use { _ =>
           for {
-            publisher <- IO(client.publisherOf[String](exchange, rk))
+            publisher <- client.publisherOf[String](exchange, rk)
             _         <- publisher(message)
           } yield stubPubslisher.recordedMessages shouldBe List(message)
         }
@@ -84,7 +86,7 @@ class StubTest extends AnyFunSuite with IOAmqpClientTest {
         _ <- client.registerConsumerOf(queue2, consumer2)
       } yield ()).use { _ =>
         for {
-          publisher <- IO(client.publisherOf[String](exchange, rk))
+          publisher <- client.publisherOf[String](exchange, rk)
           _         <- (1 to 10).toList.map(_ => publisher(message)).sequence
         } yield {
           all(consumer1.receivedMessages) should be(message)
@@ -104,7 +106,7 @@ class StubTest extends AnyFunSuite with IOAmqpClientTest {
         _ <- client.registerConsumerOf(queue, consumer)
       } yield ()).use { _ =>
         for {
-          publisher  <- IO(client.publisherOf[String](exchange, rk))
+          publisher  <- client.publisherOf[String](exchange, rk)
           publishRes <- publisher(message).attempt
         } yield {
           consumer.receivedMessages shouldBe List(message)
@@ -123,7 +125,7 @@ class StubTest extends AnyFunSuite with IOAmqpClientTest {
         _ <- client.registerConsumerOf(queue, consumer)
       } yield ()).use { _ =>
         for {
-          publisher  <- IO(client.publisherOf[String](exchange, rk))
+          publisher  <- client.publisherOf[String](exchange, rk)
           publishRes <- publisher(message).attempt
         } yield {
           consumer.receivedMessages shouldBe List(message)
@@ -142,7 +144,7 @@ class StubTest extends AnyFunSuite with IOAmqpClientTest {
         _ <- client.registerConsumerOf(queue, consumer)
       } yield ()).use { _ =>
         for {
-          publisher  <- IO(client.publisherOf[String](exchange, rk))
+          publisher  <- client.publisherOf[String](exchange, rk)
           publishRes <- publisher(message).attempt
         } yield {
           consumer.receivedMessages shouldBe List(message)
@@ -161,7 +163,7 @@ class StubTest extends AnyFunSuite with IOAmqpClientTest {
 
       } yield ()).use { _ =>
         for {
-          publisher  <- IO(client.publisherOf[String](exchange, rk))
+          publisher  <- client.publisherOf[String](exchange, rk)
           publishRes <- publisher(message).attempt
         } yield {
           consumer.receivedMessages shouldBe List(message)
@@ -179,7 +181,7 @@ class StubTest extends AnyFunSuite with IOAmqpClientTest {
         _ <- client.registerConsumerOf(queue, consumer)
       } yield ()).use { _ =>
         for {
-          publisher  <- IO(client.publisherOf[String](exchange, rk))
+          publisher  <- client.publisherOf[String](exchange, rk)
           publishRes <- publisher(message).attempt
         } yield {
           consumer.receivedMessages shouldBe List(message)
@@ -199,7 +201,7 @@ class StubTest extends AnyFunSuite with IOAmqpClientTest {
 
       } yield ()).use { _ =>
         for {
-          publisher  <- IO(client.publisherOf[String](exchange, rk))
+          publisher  <- client.publisherOf[String](exchange, rk)
           publishRes <- publisher(message).attempt
         } yield {
           consumer.receivedMessages shouldBe List(message)

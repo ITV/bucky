@@ -1,7 +1,7 @@
-package com.itv.bucky.publish
+package com.itv.bucky.backend.javaamqp.publish
 
 import cats.effect.std.Dispatcher
-import cats.effect.{Deferred, Ref, _}
+import cats.effect._
 import cats.implicits._
 import com.rabbitmq.client.{AMQP, ConfirmListener, ReturnListener}
 import com.typesafe.scalalogging.StrictLogging

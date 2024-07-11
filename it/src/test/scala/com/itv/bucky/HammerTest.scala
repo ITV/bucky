@@ -1,4 +1,4 @@
-package com.itv.bucky.integrationTest
+package com.itv.bucky
 
 import cats.effect.testing.scalatest.EffectTestSupport
 import cats.effect.unsafe.IORuntime
@@ -7,6 +7,8 @@ import cats.implicits._
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
 import com.itv.bucky._
+import com.itv.bucky.backend.fs2rabbit.Fs2RabbitAmqpClient
+import com.itv.bucky.backend.javaamqp.JavaBackendAmqpClient
 import com.itv.bucky.consume.Ack
 import com.itv.bucky.decl.{Exchange, Queue}
 import com.itv.bucky.test.StubHandlers
@@ -21,7 +23,14 @@ import java.util.UUID
 import scala.collection.immutable.TreeSet
 import scala.concurrent.duration._
 
-class HammerTest extends AsyncFunSuite with EffectTestSupport with Eventually with IntegrationPatience with StrictLogging with Matchers {
+class HammerTest
+    extends AsyncFunSuite
+    with IntegrationSpec
+    with EffectTestSupport
+    with Eventually
+    with IntegrationPatience
+    with StrictLogging
+    with Matchers {
 
   implicit override val ioRuntime: IORuntime = packageIORuntime
   case class TestFixture(stubHandler: RecordingHandler[IO, String], publisher: Publisher[IO, String], client: AmqpClient[IO])
@@ -47,15 +56,17 @@ class HammerTest extends AsyncFunSuite with EffectTestSupport with Eventually wi
       Exchange(exchangeName).binding(routingKey -> queueName).autoDelete.expires(20.minutes)
     )
 
-    AmqpClient[IO](config).use { client =>
+    Fs2RabbitAmqpClient[IO](config).use { client =>
       val handler = StubHandlers.ackHandler[IO, String]
       val handlerResource =
         Resource.eval(client.declare(declarations)).flatMap(_ => client.registerConsumerOf(queueName, handler))
 
       handlerResource.use { _ =>
-        val pub     = client.publisherOf[String](exchangeName, routingKey)
-        val fixture = TestFixture(handler, pub, client)
-        test(fixture)
+        client.publisherOf[String](exchangeName, routingKey).flatMap { pub =>
+          val fixture = TestFixture(handler, pub, client)
+
+          test(fixture)
+        }
       }
     }
   }
@@ -105,9 +116,6 @@ class HammerTest extends AsyncFunSuite with EffectTestSupport with Eventually wi
 
       val order: Ref[IO, List[String]] = Ref.of[IO, List[String]](List.empty).unsafeRunSync()
 
-      val fastPublisher = testFixture.client.publisherOf[String](exchange, fastRk)
-      val slowPublisher = testFixture.client.publisherOf[String](exchange, slowRk)
-
       val fastHandler = new RecordingHandler[IO, String]((v1: String) =>
         for {
           _ <- order.update(_ :+ "fast")
@@ -132,15 +140,19 @@ class HammerTest extends AsyncFunSuite with EffectTestSupport with Eventually wi
       val handlersResource =
         Resource.eval(testFixture.client.declare(declarations)).flatMap(_ => handlers)
 
-      handlersResource.use { _ =>
-        for {
-          _ <- slowPublisher("slow one")
-          _ <- IO.sleep(1.second)
-          _ <- fastPublisher("fast one")
-        } yield eventually {
-          val messages = order.get.unsafeRunSync()
-          messages should have size 2
-          messages shouldBe List("fast", "slow")
+      testFixture.client.publisherOf[String](exchange, fastRk).flatMap { fastPublisher =>
+        testFixture.client.publisherOf[String](exchange, slowRk).flatMap { slowPublisher =>
+          handlersResource.use { _ =>
+            for {
+              _ <- slowPublisher("slow one")
+              _ <- IO.sleep(1.second)
+              _ <- fastPublisher("fast one")
+            } yield eventually {
+              val messages = order.get.unsafeRunSync()
+              messages should have size 2
+              messages shouldBe List("fast", "slow")
+            }
+          }
         }
       }
     }

@@ -1,11 +1,13 @@
-package com.itv.bucky.integrationTest
+package com.itv.bucky
 
-import cats.effect.testing.scalatest.EffectTestSupport
+import cats.effect.testing.scalatest.{AsyncIOSpec, EffectTestSupport}
 import cats.effect.unsafe.IORuntime
-import cats.effect.{IO, Resource}
+import cats.effect.{Deferred, IO, Ref, Resource}
 import com.itv.bucky.PayloadMarshaller.StringPayloadMarshaller
 import com.itv.bucky.Unmarshaller.StringPayloadUnmarshaller
 import com.itv.bucky._
+import com.itv.bucky.backend.fs2rabbit.Fs2RabbitAmqpClient
+import com.itv.bucky.backend.javaamqp.JavaBackendAmqpClient
 import com.itv.bucky.consume._
 import com.itv.bucky.decl.Exchange
 import com.itv.bucky.pattern.requeue
@@ -20,21 +22,17 @@ import org.scalatest.matchers.should.Matchers._
 
 import java.time.{Clock, Instant, LocalDateTime, ZoneOffset}
 import java.util.UUID
-import java.util.concurrent.Executors
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 
-class ShutdownTimeoutTest extends AsyncFunSuite with EffectTestSupport with Eventually with IntegrationPatience {
+class ShutdownTimeoutTest extends AsyncFunSuite with AsyncIOSpec with Eventually with IntegrationPatience {
 
   case class TestFixture(
-                          stubHandler: RecordingRequeueHandler[IO, Delivery],
-                          dlqHandler: RecordingHandler[IO, Delivery],
-                          publishCommandBuilder: PublishCommandBuilder.Builder[String],
-                          publisher: Publisher[IO, PublishCommand]
-                        )
+      stubHandler: RecordingRequeueHandler[IO, Delivery],
+      dlqHandler: RecordingHandler[IO, Delivery],
+      publishCommandBuilder: PublishCommandBuilder.Builder[String],
+      publisher: Publisher[IO, PublishCommand]
+  )
 
-  implicit override val ioRuntime: IORuntime = packageIORuntime
-  implicit val ec: ExecutionContext = ExecutionContext.fromExecutor(Executors.newFixedThreadPool(300))
   val requeuePolicy: RequeuePolicy = RequeuePolicy(maximumProcessAttempts = 5, requeueAfter = 2.seconds)
 
   def runTest[A](test: IO[A]): IO[A] = {
@@ -53,24 +51,26 @@ class ShutdownTimeoutTest extends AsyncFunSuite with EffectTestSupport with Even
     val queueName                                                 = QueueName(UUID.randomUUID().toString)
     val declarations = List(Exchange(exchangeName).binding(routingKey -> queueName)) ++ requeue.requeueDeclarations(queueName, routingKey)
 
-    AmqpClient[IO](config)
-      .use { client =>
-        val handler = StubHandlers.recordingHandler[IO, Delivery]((_: Delivery) => IO.sleep(3.seconds).map(_ => Ack))
-        Resource
-          .eval(client.declare(declarations))
-          .flatMap(_ =>
-            for {
-              _ <- client.registerConsumer(queueName, handler)
-            } yield ()
-          )
-          .use { _ =>
-            val pcb = publishCommandBuilder[String](implicitly).using(exchangeName).using(routingKey)
-            client.publisher()(pcb.toPublishCommand("a message")).flatMap(_ => test)
-          }
-      }
+    Deferred[IO, Boolean].flatMap { consumingMessage =>
+      Fs2RabbitAmqpClient[IO](config)
+        .use { client =>
+          val handler = (_: Delivery) => consumingMessage.complete(true) *> IO.sleep(3.seconds).as(Ack)
+          Resource
+            .eval(client.declare(declarations))
+            .flatMap(_ => client.registerConsumer(queueName, handler))
+            .use { _ =>
+              val pcb = publishCommandBuilder[String](implicitly).using(exchangeName).using(routingKey)
+              client.publisher().flatMap { publisher =>
+                publisher(pcb.toPublishCommand("a message")) *>
+                  consumingMessage.get
+                    .flatMap(_ => test)
+              }
+            }
+        }
+    }
   }
 
-  test("Should wait until a handler finishes executing before shuttind down") {
+  test("Should wait until a handler finishes executing before shutting down") {
     val clock = Clock.systemUTC()
     val start = Instant.now(clock)
     runTest[Instant](IO.delay(Instant.now())).map { result =>
