@@ -14,6 +14,7 @@ import org.scalatest.concurrent.{Eventually, IntegrationPatience, ScalaFutures}
 import org.scalatest.funsuite.AsyncFunSuite
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.matchers.should.Matchers._
+import com.itv.bucky.ConsumerSugar
 
 import scala.language.reflectiveCalls
 import cats.effect.unsafe.IORuntime

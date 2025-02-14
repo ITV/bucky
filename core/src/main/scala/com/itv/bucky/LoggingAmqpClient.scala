@@ -74,7 +74,7 @@ object LoggingAmqpClient extends StrictLogging {
 
       override def publisher(mandatory: Boolean): F[Publisher[F, PublishCommand]] =
         amqpClient.publisher().map { originalPublisher =>
-          cmd: PublishCommand =>
+          (cmd: PublishCommand) =>
           (for {
             result <- originalPublisher(cmd).attempt
             _      <- result.fold[F[Unit]](logFailedPublishMessage(_, charset, cmd), _ => logSuccessfullPublishMessage(charset, cmd))
