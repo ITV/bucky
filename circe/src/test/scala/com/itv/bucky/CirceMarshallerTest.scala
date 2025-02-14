@@ -21,7 +21,7 @@ class CirceMarshallerTest extends AnyFunSuite {
   test("Can marshall a json") {
     val json: Json = Foo("bar").asJson
 
-    val marshaller = implicitly[PayloadMarshaller[Json]]
+    val marshaller:  PayloadMarshaller[Json] = marshallerFromEncodeJson
     marshaller(json) shouldBe Payload.from(json)
   }
 

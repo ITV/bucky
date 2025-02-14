@@ -6,6 +6,7 @@ name := "bucky"
 
 lazy val scala212 = "2.12.18"
 lazy val scala213 = "2.13.12"
+lazy val scalav3  = "3.3.5"
 
 scalaVersion := scala213
 scalacOptions += "-Ypartial-unification"
@@ -46,9 +47,14 @@ pgpSigningKey := Some("C2B50980F625F2AF9D3CB3AA5709530EE8FA7576")
 
 pgpPassphrase := Option(System.getenv("GPG_KEY_PASSPHRASE")).map(_.toArray)
 
+lazy val scala2Only = Seq(
+  crossScalaVersions := Seq(),
+  scalaVersion       := scala213
+)
+
 lazy val kernelSettings = Seq(
-  crossScalaVersions := Seq(scala212, scala213),
-  scalaVersion       := scala213,
+  crossScalaVersions := Seq(scala213, scalav3),
+  scalaVersion       := scalav3,
   organization       := "com.itv",
   scalacOptions ++= Seq("-feature", "-deprecation", "-language:higherKinds"),
   publishTo := {
@@ -222,6 +228,7 @@ lazy val example = project
   .settings(name := "com.itv")
   .settings(moduleName := "bucky-example")
   .settings(kernelSettings)
+  .settings(scala2Only)
   .aggregate(core, argonaut, circe, test)
   .dependsOn(core, argonaut, circe, test)
   .settings(
@@ -231,9 +238,9 @@ lazy val example = project
       "org.scalatest"              %% "scalatest"                     % scalaTestVersion,
       "org.typelevel"              %% "cats-effect-testing-scalatest" % catsEffectScalaTestVersion % "test",
       "com.typesafe"                % "config"                        % typeSafeVersion,
-      "ch.qos.logback" % "logback-classic" % logbackVersion,
-      "dev.profunktor" %% "fs2-rabbit" % "5.0.0",
-      "dev.profunktor" %% "fs2-rabbit-circe" % "5.0.0"
+      "ch.qos.logback"              % "logback-classic"               % logbackVersion,
+      "dev.profunktor"             %% "fs2-rabbit"                    % "5.0.0",
+      "dev.profunktor"             %% "fs2-rabbit-circe"              % "5.0.0"
     )
   )
 
@@ -241,6 +248,7 @@ lazy val argonaut = project
   .settings(name := "com.itv")
   .settings(moduleName := "bucky-argonaut")
   .settings(kernelSettings)
+  .settings(scala2Only)
   .aggregate(core, test)
   .dependsOn(core, test % "test")
   .settings(

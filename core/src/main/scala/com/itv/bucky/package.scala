@@ -105,7 +105,7 @@ package object bucky {
   implicit class PublisherSugar[F[_]: Applicative](amqpClient: AmqpClient[F]) {
 
     def publisherOf[T](mandatory: Boolean)(implicit publishCommandBuilder: PublishCommandBuilder[T]): F[Publisher[F, T]] =
-      amqpClient.publisher(mandatory).map { basePublisher => value: T =>
+      amqpClient.publisher(mandatory).map { basePublisher => (value: T) =>
         {
           val command = publishCommandBuilder.toPublishCommand(value)
           basePublisher.apply(command)
