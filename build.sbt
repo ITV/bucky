@@ -55,11 +55,11 @@ lazy val kernelSettings = Seq(
   organization       := "com.itv",
   scalacOptions ++= Seq("-feature", "-deprecation", "-language:higherKinds"),
   publishTo := {
-    val nexus = "https://oss.sonatype.org/"
+    val centralUri = "https://central.sonatype.com/publishing"
     if (isSnapshot.value)
-      Some("snapshots" at nexus + "content/repositories/snapshots")
+      Some("snapshots" at centralUri + "/repositories/snapshots")
     else
-      Some("releases" at nexus + "service/local/staging/deploy/maven2")
+      Some("releases" at centralUri + "/repositories/releases")
   },
   publishConfiguration      := publishConfiguration.value.withOverwrite(isSnapshot.value),
   publishLocalConfiguration := publishLocalConfiguration.value.withOverwrite(isSnapshot.value),
@@ -67,7 +67,7 @@ lazy val kernelSettings = Seq(
   credentials ++= (for {
     username <- Option(System.getenv().get("SONATYPE_USER"))
     password <- Option(System.getenv().get("SONATYPE_PASS"))
-  } yield Credentials("Sonatype Nexus Repository Manager", "oss.sonatype.org", username, password)).toSeq,
+  } yield Credentials("Sonatype Central Repository Manager", "central.sonatype.com", username, password)).toSeq,
   pomExtra :=
     <url>https://github.com/ITV/bucky</url>
       <licenses>
