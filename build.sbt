@@ -24,6 +24,20 @@ val scalaCollectionCompatVersion = "2.14.0"
 val fs2RabbitVersion             = "5.5.0"
 val fs2RabbitCirceVersion        = "5.5.0"
 
+lazy val fs2RabbitVersionByBinary = Def.setting {
+  scalaBinaryVersion.value match {
+    case "2.12" => "5.3.0"
+    case _      => fs2RabbitVersion
+  }
+}
+
+lazy val fs2RabbitCirceVersionByBinary = Def.setting {
+  scalaBinaryVersion.value match {
+    case "2.12" => "5.3.0"
+    case _      => fs2RabbitCirceVersion
+  }
+}
+
 releaseProcess := Seq[ReleaseStep](
   checkSnapshotDependencies,
   inquireVersions,
@@ -179,8 +193,8 @@ lazy val backendFs2Rabbit = project
       "org.scalatest"              %% "scalatest"                     % scalaTestVersion           % "test",
       "org.typelevel"              %% "cats-effect-testing-scalatest" % catsEffectScalaTestVersion % "test",
       "org.typelevel"              %% "cats-effect"                   % catsEffectVersion,
-      "dev.profunktor"             %% "fs2-rabbit"                    % fs2RabbitVersion,
-      "dev.profunktor"             %% "fs2-rabbit-circe"              % fs2RabbitCirceVersion,
+      "dev.profunktor"             %% "fs2-rabbit"                    % fs2RabbitVersionByBinary.value,
+      "dev.profunktor"             %% "fs2-rabbit-circe"              % fs2RabbitCirceVersionByBinary.value,
       "ch.qos.logback"              % "logback-classic"               % logbackVersion             % "test",
       "org.scala-lang.modules"     %% "scala-collection-compat"       % scalaCollectionCompatVersion
     )
@@ -235,8 +249,8 @@ lazy val example = project
       "org.typelevel"              %% "cats-effect-testing-scalatest" % catsEffectScalaTestVersion % "test",
       "com.typesafe"                % "config"                        % typeSafeVersion,
       "ch.qos.logback"              % "logback-classic"               % logbackVersion,
-      "dev.profunktor"             %% "fs2-rabbit"                    % fs2RabbitVersion,
-      "dev.profunktor"             %% "fs2-rabbit-circe"              % fs2RabbitCirceVersion
+      "dev.profunktor"             %% "fs2-rabbit"                    % fs2RabbitVersionByBinary.value,
+      "dev.profunktor"             %% "fs2-rabbit-circe"              % fs2RabbitCirceVersionByBinary.value
     )
   )
 
