@@ -9,7 +9,7 @@ import com.itv.bucky.publish.{MessageProperties, PublishCommandBuilder}
 import com.itv.bucky.{AmqpClientConfig, ExchangeName, QueueName, RoutingKey, consume, publish}
 import com.rabbitmq.client.impl.LongStringHelper
 import dev.profunktor.fs2rabbit.model
-import dev.profunktor.fs2rabbit.model.{AmqpEnvelope, AmqpProperties, DeliveryTag, ShortString}
+import dev.profunktor.fs2rabbit.model.{AmqpEnvelope, AmqpProperties, DeliveryTag, HeaderKey, Headers, ShortString}
 import org.scalatest.OptionValues
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AsyncWordSpec
@@ -26,32 +26,32 @@ class Fs2RabbitAmqpClientSpec extends AsyncWordSpec with AsyncIOSpec with Matche
 
   val now: Instant = Instant.now().truncatedTo(ChronoUnit.SECONDS)
 
-  val amqpMessageHeaders: Map[String, model.AmqpFieldValue] = Map(
-    "bigDecimal" -> model.AmqpFieldValue.DecimalVal.unsafeFrom(1),
-    "instant"    -> model.AmqpFieldValue.TimestampVal.from(now),
-    "date"       -> model.AmqpFieldValue.TimestampVal.from(Date.from(now)),
-    "map" -> model.AmqpFieldValue.TableVal(
+  val amqpMessageHeaders: Headers = Headers(Map(
+    HeaderKey("bigDecimal") -> model.AmqpFieldValue.DecimalVal.unsafeFrom(1),
+    HeaderKey("instant")    -> model.AmqpFieldValue.TimestampVal.from(now),
+    HeaderKey("date")       -> model.AmqpFieldValue.TimestampVal.from(Date.from(now)),
+    HeaderKey("map") -> model.AmqpFieldValue.TableVal(
       Map(
         ShortString.unsafeFrom("inside") -> model.AmqpFieldValue.IntVal(1)
       )
     ),
-    "byte"       -> model.AmqpFieldValue.ByteVal('c'.toByte),
-    "double"     -> model.AmqpFieldValue.DoubleVal(Double.box(4.5)),
-    "float"      -> model.AmqpFieldValue.FloatVal(Double.box(4.5).toFloat),
-    "short"      -> model.AmqpFieldValue.ShortVal(Short.box(1)),
-    "byteArray"  -> model.AmqpFieldValue.ByteArrayVal(ByteVector(0.toByte, 1.toByte)),
-    "int"        -> model.AmqpFieldValue.IntVal(Integer.MIN_VALUE),
-    "long"       -> model.AmqpFieldValue.LongVal(Long.MinValue),
-    "string"     -> model.AmqpFieldValue.StringVal("blah"),
-    "longString" -> model.AmqpFieldValue.StringVal("blahlong"),
-    "list" -> model.AmqpFieldValue.ArrayVal(
+    HeaderKey("byte")       -> model.AmqpFieldValue.ByteVal('c'.toByte),
+    HeaderKey("double")     -> model.AmqpFieldValue.DoubleVal(Double.box(4.5)),
+    HeaderKey("float")      -> model.AmqpFieldValue.FloatVal(Double.box(4.5).toFloat),
+    HeaderKey("short")      -> model.AmqpFieldValue.ShortVal(Short.box(1)),
+    HeaderKey("byteArray")  -> model.AmqpFieldValue.ByteArrayVal(ByteVector(0.toByte, 1.toByte)),
+    HeaderKey("int")        -> model.AmqpFieldValue.IntVal(Integer.MIN_VALUE),
+    HeaderKey("long")       -> model.AmqpFieldValue.LongVal(Long.MinValue),
+    HeaderKey("string")     -> model.AmqpFieldValue.StringVal("blah"),
+    HeaderKey("longString") -> model.AmqpFieldValue.StringVal("blahlong"),
+    HeaderKey("list") -> model.AmqpFieldValue.ArrayVal(
       Vector(
         model.AmqpFieldValue.IntVal(1),
         model.AmqpFieldValue.IntVal(2),
         model.AmqpFieldValue.IntVal(3)
       )
     )
-  )
+  ))
 
   val messagePropertyHeaders: Map[String, AnyRef] = Map(
     "bigDecimal" -> java.math.BigDecimal.ONE,
@@ -80,7 +80,7 @@ class Fs2RabbitAmqpClientSpec extends AsyncWordSpec with AsyncIOSpec with Matche
       .toPublishCommand("message")
 
     "decode a basic publish command" in {
-      Fs2RabbitAmqpClient.deliveryEncoder[IO].apply(basicPublishCommand).map { amqpMessage =>
+      Fs2RabbitAmqpClient.deliveryEncoder[IO].apply(basicPublishCommand).asserting { amqpMessage =>
         amqpMessage.payload shouldBe "message".getBytes
       }
 
@@ -106,7 +106,7 @@ class Fs2RabbitAmqpClientSpec extends AsyncWordSpec with AsyncIOSpec with Matche
         )
       )
 
-      Fs2RabbitAmqpClient.deliveryEncoder[IO].apply(publishCommand).map { amqpMessage =>
+      Fs2RabbitAmqpClient.deliveryEncoder[IO].apply(publishCommand).asserting { amqpMessage =>
         amqpMessage.properties shouldBe AmqpProperties(
           contentType = Some("text/plain"),
           contentEncoding = Some("utf-8"),
@@ -121,7 +121,7 @@ class Fs2RabbitAmqpClientSpec extends AsyncWordSpec with AsyncIOSpec with Matche
           replyTo = Some("replyto"),
           clusterId = Some("clusterId"),
           timestamp = Some(publishCommand.basicProperties.timestamp.get.toInstant),
-          headers = Map.empty
+          headers = Headers.empty
         )
 
       }
@@ -134,7 +134,7 @@ class Fs2RabbitAmqpClientSpec extends AsyncWordSpec with AsyncIOSpec with Matche
         )
       )
 
-      Fs2RabbitAmqpClient.deliveryEncoder[IO].apply(publishCommand).map { amqpMessage =>
+      Fs2RabbitAmqpClient.deliveryEncoder[IO].apply(publishCommand).asserting { amqpMessage =>
         amqpMessage.properties.headers shouldBe amqpMessageHeaders
       }
 
@@ -184,8 +184,8 @@ class Fs2RabbitAmqpClientSpec extends AsyncWordSpec with AsyncIOSpec with Matche
         headers = amqpMessageHeaders
       )
 
-      Fs2RabbitAmqpClient.deliveryDecoder[IO](queueName).apply(basicEnvelope.copy(properties = amqpProperties)).map { delivery =>
-        delivery.properties.headers.get("bigDecimal") shouldBe Some(java.math.BigDecimal.ONE)
+      Fs2RabbitAmqpClient.deliveryDecoder[IO](queueName).apply(basicEnvelope.copy(properties = amqpProperties)).asserting { delivery =>
+        delivery.properties.headers.get("bigDecimal").map(_.toString) shouldBe Some(java.math.BigDecimal.ONE.toString)
         delivery.properties.headers.get("instant").value.asInstanceOf[Date].toInstant shouldBe now
         delivery.properties.headers.get("date") shouldBe Some(Date.from(now))
         delivery.properties.headers.get("map") shouldBe Some(

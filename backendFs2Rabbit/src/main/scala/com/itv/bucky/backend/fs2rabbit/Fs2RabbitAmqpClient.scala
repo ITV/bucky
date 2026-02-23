@@ -47,7 +47,7 @@ import dev.profunktor.fs2rabbit.model.AmqpFieldValue.{
   TableVal,
   TimestampVal
 }
-import dev.profunktor.fs2rabbit.model.{AMQPChannel, PublishingFlag, ShortString}
+import dev.profunktor.fs2rabbit.model.{AMQPChannel, HeaderKey, Headers, PublishingFlag, ShortString}
 import scodec.bits.ByteVector
 
 import java.util.{Date, UUID}
@@ -271,9 +271,9 @@ object Fs2RabbitAmqpClient {
         case _                        => NullVal
       }
 
-      val fs2MessageHeaders: Map[String, model.AmqpFieldValue] = publishCommand.basicProperties.headers.map { case (key, headerValue) =>
-        key -> toAmqpValue(headerValue)
-      }
+      val fs2MessageHeaders: Headers = Headers(publishCommand.basicProperties.headers.map { case (key, headerValue) =>
+        HeaderKey(key) -> toAmqpValue(headerValue)
+      })
 
       val message = model.AmqpMessage(
         publishCommand.body.value,
@@ -281,7 +281,7 @@ object Fs2RabbitAmqpClient {
           contentType = publishCommand.basicProperties.contentType.map(_.value),
           contentEncoding = publishCommand.basicProperties.contentEncoding.map(_.value),
           priority = publishCommand.basicProperties.priority,
-          deliveryMode = publishCommand.basicProperties.deliveryMode.map(dm => model.DeliveryMode.from(dm.value)),
+          deliveryMode = publishCommand.basicProperties.deliveryMode.map(dm => model.DeliveryMode.unsafeFromInt(dm.value)),
           correlationId = publishCommand.basicProperties.correlationId,
           messageId = publishCommand.basicProperties.messageId,
           `type` = publishCommand.basicProperties.messageType,
@@ -300,10 +300,29 @@ object Fs2RabbitAmqpClient {
 
   def deliveryDecoder[F[_]: Async](queueName: QueueName): EnvelopeDecoder[F, consume.Delivery] =
     Kleisli { amqpEnvelope =>
+      def shortStringToString(ss: ShortString): String = ss.toString.stripPrefix("ShortString(").stripSuffix(")")
+
+      def fromAmqpValue(value: model.AmqpFieldValue): AnyRef = value match {
+        case DecimalVal(d)       => d
+        case TimestampVal(t)     => Date.from(t)
+        case TableVal(t)         => t.map { case (k, v) => shortStringToString(k) -> fromAmqpValue(v) }.asJava
+        case ByteVal(b)          => java.lang.Byte.valueOf(b)
+        case DoubleVal(d)        => java.lang.Double.valueOf(d)
+        case FloatVal(f)         => java.lang.Float.valueOf(f)
+        case ShortVal(s)         => java.lang.Short.valueOf(s)
+        case ByteArrayVal(ba)    => ba.toArray
+        case BooleanVal(b)       => java.lang.Boolean.valueOf(b)
+        case IntVal(i)           => java.lang.Integer.valueOf(i)
+        case LongVal(l)          => java.lang.Long.valueOf(l)
+        case StringVal(s)        => s
+        case ArrayVal(a)         => a.map(fromAmqpValue).asJava
+        case NullVal             => null
+      }
+
       val messageProperties = publish.MessageProperties(
         contentType = amqpEnvelope.properties.contentType.map(ContentType.apply),
         contentEncoding = amqpEnvelope.properties.contentEncoding.map(ContentEncoding.apply),
-        headers = amqpEnvelope.properties.headers.map { case (key, headerValue) => key -> headerValue.toValueWriterCompatibleJava },
+        headers = amqpEnvelope.properties.headers.toMap.map { case (key, headerValue) => key.toString -> fromAmqpValue(headerValue) },
         deliveryMode = amqpEnvelope.properties.deliveryMode.map(dm => DeliveryMode(dm.value)),
         priority = amqpEnvelope.properties.priority,
         correlationId = amqpEnvelope.properties.correlationId,
