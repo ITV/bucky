@@ -300,29 +300,10 @@ object Fs2RabbitAmqpClient {
 
   def deliveryDecoder[F[_]: Async](queueName: QueueName): EnvelopeDecoder[F, consume.Delivery] =
     Kleisli { amqpEnvelope =>
-      def shortStringToString(ss: ShortString): String = ss.toString.stripPrefix("ShortString(").stripSuffix(")")
-
-      def fromAmqpValue(value: model.AmqpFieldValue): AnyRef = value match {
-        case DecimalVal(d)       => d
-        case TimestampVal(t)     => Date.from(t)
-        case TableVal(t)         => t.map { case (k, v) => shortStringToString(k) -> fromAmqpValue(v) }.asJava
-        case ByteVal(b)          => java.lang.Byte.valueOf(b)
-        case DoubleVal(d)        => java.lang.Double.valueOf(d)
-        case FloatVal(f)         => java.lang.Float.valueOf(f)
-        case ShortVal(s)         => java.lang.Short.valueOf(s)
-        case ByteArrayVal(ba)    => ba.toArray
-        case BooleanVal(b)       => java.lang.Boolean.valueOf(b)
-        case IntVal(i)           => java.lang.Integer.valueOf(i)
-        case LongVal(l)          => java.lang.Long.valueOf(l)
-        case StringVal(s)        => s
-        case ArrayVal(a)         => a.map(fromAmqpValue).asJava
-        case NullVal             => null
-      }
-
       val messageProperties = publish.MessageProperties(
         contentType = amqpEnvelope.properties.contentType.map(ContentType.apply),
         contentEncoding = amqpEnvelope.properties.contentEncoding.map(ContentEncoding.apply),
-        headers = amqpEnvelope.properties.headers.toMap.map { case (key, headerValue) => key.toString -> fromAmqpValue(headerValue) },
+        headers = amqpEnvelope.properties.headers.toMap.map { case (key, headerValue) => key -> headerValue.toValueWriterCompatibleJava },
         deliveryMode = amqpEnvelope.properties.deliveryMode.map(dm => DeliveryMode(dm.value)),
         priority = amqpEnvelope.properties.priority,
         correlationId = amqpEnvelope.properties.correlationId,

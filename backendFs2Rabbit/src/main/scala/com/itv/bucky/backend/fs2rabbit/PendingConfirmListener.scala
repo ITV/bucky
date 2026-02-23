@@ -20,7 +20,7 @@ private[bucky] case class PendingConfirmListener[F[_]](
   def pop[T](deliveryTag: Long, multiple: Boolean): F[List[Deferred[F, Option[Throwable]]]] =
     pendingConfirmations.modify { x =>
       if (multiple) {
-        val entries = x.rangeUntil(deliveryTag + 1).toList
+        val entries = x.until(deliveryTag + 1).toList
         (x -- entries.map { case (key, _) => key }, entries.map { case (_, value) => value })
       } else {
         (x - deliveryTag, x.get(deliveryTag).toList)

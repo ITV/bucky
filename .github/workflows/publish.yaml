@@ -13,6 +13,11 @@ on:
 jobs:
   build:
     timeout-minutes: 60
+
+    permissions:
+      id-token: write
+      contents: write
+
     runs-on: ubuntu-latest
 
     steps:
@@ -33,7 +38,7 @@ jobs:
           key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
 
       - name: Run the docker-compose integration test dependencies
-        run: docker-compose up -d
+        run: docker compose up -d
 
       - name: Run tests
         run: sbt +test +it/test
