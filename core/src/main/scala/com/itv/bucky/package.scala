@@ -112,8 +112,13 @@ package object bucky {
         }
       }
 
-    def publisherOf[T](implicit publishCommandBuilder: PublishCommandBuilder[T]): F[Publisher[F, T]] =
-      publisherOf(mandatory = false)
+    def publisherOf[T](implicit publishCommandBuilder: PublishCommandBuilder[T]): F[Publisher[F, T]] = {
+      val mandatory = publishCommandBuilder match {
+        case b: PublishCommandBuilder.Builder[_] => b.mandatory
+        case _                                   => false
+      }
+      publisherOf(mandatory)
+    }
 
     def publisherOf[T](exchangeName: ExchangeName, routingKey: RoutingKey, mandatory: Boolean)(implicit
         marshaller: PayloadMarshaller[T]
@@ -160,8 +165,13 @@ package object bucky {
         })(publisher)
       }
 
-    def publisherWithHeadersOf[T](commandBuilder: PublishCommandBuilder[T])(implicit F: Sync[F]): F[PublisherWithHeaders[F, T]] =
-      publisherWithHeadersOf(commandBuilder, mandatory = false)
+    def publisherWithHeadersOf[T](commandBuilder: PublishCommandBuilder[T])(implicit F: Sync[F]): F[PublisherWithHeaders[F, T]] = {
+      val mandatory = commandBuilder match {
+        case b: PublishCommandBuilder.Builder[_] => b.mandatory
+        case _                                   => false
+      }
+      publisherWithHeadersOf(commandBuilder, mandatory)
+    }
 
   }
 

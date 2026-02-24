@@ -1,9 +1,8 @@
-version: '2'
 services:
 
   some-rabbit:
-    image: rabbitmq:3.8.17-management
+    image: rabbitmq:4.2.4-management
     ports:
-         - 5672:5672
-         - 15672:15672
+         - "5672:5672"
+         - "15672:15672"
     hostname: "my-rabbit"

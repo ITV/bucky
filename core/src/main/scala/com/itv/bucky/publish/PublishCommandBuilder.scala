@@ -13,10 +13,10 @@ object PublishCommandBuilder {
   case class NothingSet[T](marshaller: PayloadMarshaller[T], properties: Option[MessageProperties] = None, mandatory: Boolean = false) {
 
     def using(routingKey: RoutingKey): WithoutExchange[T] =
-      WithoutExchange(routingKey, properties, marshaller)
+      WithoutExchange(routingKey, properties, marshaller, mandatory)
 
     def using(exchange: ExchangeName): WithoutRoutingKey[T] =
-      WithoutRoutingKey(exchange, properties, marshaller)
+      WithoutRoutingKey(exchange, properties, marshaller, mandatory)
 
     def using(basicProperties: MessageProperties): NothingSet[T] =
       copy(properties = Some(basicProperties))
@@ -32,7 +32,7 @@ object PublishCommandBuilder {
                                   mandatory: Boolean = false) {
 
     def using(routingKey: RoutingKey): Builder[T] =
-      Builder(exchange, routingKey, properties, marshaller)
+      Builder(exchange, routingKey, properties, marshaller, mandatory)
 
     def using(basicProperties: MessageProperties): WithoutRoutingKey[T] =
       copy(properties = Some(basicProperties))
@@ -48,7 +48,7 @@ object PublishCommandBuilder {
                                 mandatory: Boolean = false) {
 
     def using(exchange: ExchangeName): Builder[T] =
-      Builder(exchange, routingKey, properties, marshaller)
+      Builder(exchange, routingKey, properties, marshaller, mandatory)
 
     def using(basicProperties: MessageProperties): WithoutExchange[T] =
       copy(properties = Some(basicProperties))
@@ -60,7 +60,8 @@ object PublishCommandBuilder {
   case class Builder[T](exchange: ExchangeName,
                         routingKey: RoutingKey,
                         properties: Option[MessageProperties],
-                        marshaller: PayloadMarshaller[T])
+                        marshaller: PayloadMarshaller[T],
+                        mandatory: Boolean = false)
       extends PublishCommandBuilder[T] {
 
     override def toPublishCommand(t: T): PublishCommand =
@@ -68,6 +69,9 @@ object PublishCommandBuilder {
 
     def using(basicProperties: MessageProperties): Builder[T] =
       copy(properties = Some(basicProperties))
+
+    def usingMandatory(mandatory: Boolean): Builder[T] =
+      copy(mandatory = mandatory)
   }
 
 }

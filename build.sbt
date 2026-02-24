@@ -4,22 +4,39 @@ import sbtrelease.ReleasePlugin.autoImport.ReleaseTransformations._
 
 name := "bucky"
 
-lazy val scala212 = "2.12.18"
-lazy val scala213 = "2.13.12"
+lazy val scala212 = "2.12.21"
+lazy val scala213 = "2.13.18"
 
 scalaVersion := scala213
 scalacOptions += "-Ypartial-unification"
 
-val amqpClientVersion          = "5.20.0"
-val scalaLoggingVersion        = "3.9.5"
-val scalaTestVersion           = "3.2.17"
-val argonautVersion            = "6.3.9"
-val circeVersion               = "0.14.6"
-val typeSafeVersion            = "1.4.3"
-val catsEffectVersion          = "3.5.3"
-val scalaXmlVersion            = "2.2.0"
-val logbackVersion             = "1.4.14"
-val catsEffectScalaTestVersion = "1.5.0"
+val amqpClientVersion            = "5.28.0"
+val scalaLoggingVersion          = "3.9.6"
+val scalaTestVersion             = "3.2.19"
+val argonautVersion              = "6.3.10"
+val circeVersion                 = "0.14.15"
+val typeSafeVersion              = "1.4.5"
+val catsEffectVersion            = "3.6.3"
+val scalaXmlVersion              = "2.4.0"
+val logbackVersion               = "1.5.32"
+val catsEffectScalaTestVersion   = "1.7.0"
+val scalaCollectionCompatVersion = "2.14.0"
+val fs2RabbitVersion             = "5.5.0"
+val fs2RabbitCirceVersion        = "5.5.0"
+
+lazy val fs2RabbitVersionByBinary = Def.setting {
+  scalaBinaryVersion.value match {
+    case "2.12" => "5.3.0"
+    case _      => fs2RabbitVersion
+  }
+}
+
+lazy val fs2RabbitCirceVersionByBinary = Def.setting {
+  scalaBinaryVersion.value match {
+    case "2.12" => "5.3.0"
+    case _      => fs2RabbitCirceVersion
+  }
+}
 
 releaseProcess := Seq[ReleaseStep](
   checkSnapshotDependencies,
@@ -52,11 +69,11 @@ lazy val kernelSettings = Seq(
   organization       := "com.itv",
   scalacOptions ++= Seq("-feature", "-deprecation", "-language:higherKinds"),
   publishTo := {
-    val nexus = "https://oss.sonatype.org/"
+    val centralUri = "https://central.sonatype.com/publishing"
     if (isSnapshot.value)
-      Some("snapshots" at nexus + "content/repositories/snapshots")
+      Some("snapshots" at centralUri + "/repositories/snapshots")
     else
-      Some("releases" at nexus + "service/local/staging/deploy/maven2")
+      Some("releases" at centralUri + "/repositories/releases")
   },
   publishConfiguration      := publishConfiguration.value.withOverwrite(isSnapshot.value),
   publishLocalConfiguration := publishLocalConfiguration.value.withOverwrite(isSnapshot.value),
@@ -64,7 +81,7 @@ lazy val kernelSettings = Seq(
   credentials ++= (for {
     username <- Option(System.getenv().get("SONATYPE_USER"))
     password <- Option(System.getenv().get("SONATYPE_PASS"))
-  } yield Credentials("Sonatype Nexus Repository Manager", "oss.sonatype.org", username, password)).toSeq,
+  } yield Credentials("Sonatype Central Repository Manager", "central.sonatype.com", username, password)).toSeq,
   pomExtra :=
     <url>https://github.com/ITV/bucky</url>
       <licenses>
@@ -142,7 +159,7 @@ lazy val core = project
       "org.typelevel"              %% "cats-effect-testing-scalatest" % catsEffectScalaTestVersion % "test",
       "org.typelevel"              %% "cats-effect"                   % catsEffectVersion,
       "ch.qos.logback"              % "logback-classic"               % logbackVersion             % "test",
-      "org.scala-lang.modules"     %% "scala-collection-compat"       % "2.5.0"
+      "org.scala-lang.modules"     %% "scala-collection-compat"       % scalaCollectionCompatVersion
     )
   )
 
@@ -160,7 +177,7 @@ lazy val backendJavaAmqp = project
       "org.typelevel"              %% "cats-effect-testing-scalatest" % catsEffectScalaTestVersion % "test",
       "org.typelevel"              %% "cats-effect"                   % catsEffectVersion,
       "ch.qos.logback"              % "logback-classic"               % logbackVersion             % "test",
-      "org.scala-lang.modules"     %% "scala-collection-compat"       % "2.5.0"
+      "org.scala-lang.modules"     %% "scala-collection-compat"       % scalaCollectionCompatVersion
     )
   )
 
@@ -176,10 +193,10 @@ lazy val backendFs2Rabbit = project
       "org.scalatest"              %% "scalatest"                     % scalaTestVersion           % "test",
       "org.typelevel"              %% "cats-effect-testing-scalatest" % catsEffectScalaTestVersion % "test",
       "org.typelevel"              %% "cats-effect"                   % catsEffectVersion,
-      "dev.profunktor"             %% "fs2-rabbit"                    % "5.0.0",
-      "dev.profunktor"             %% "fs2-rabbit-circe"              % "5.0.0",
+      "dev.profunktor"             %% "fs2-rabbit"                    % fs2RabbitVersionByBinary.value,
+      "dev.profunktor"             %% "fs2-rabbit-circe"              % fs2RabbitCirceVersionByBinary.value,
       "ch.qos.logback"              % "logback-classic"               % logbackVersion             % "test",
-      "org.scala-lang.modules"     %% "scala-collection-compat"       % "2.5.0"
+      "org.scala-lang.modules"     %% "scala-collection-compat"       % scalaCollectionCompatVersion
     )
   )
 
@@ -231,9 +248,9 @@ lazy val example = project
       "org.scalatest"              %% "scalatest"                     % scalaTestVersion,
       "org.typelevel"              %% "cats-effect-testing-scalatest" % catsEffectScalaTestVersion % "test",
       "com.typesafe"                % "config"                        % typeSafeVersion,
-      "ch.qos.logback" % "logback-classic" % logbackVersion,
-      "dev.profunktor" %% "fs2-rabbit" % "5.0.0",
-      "dev.profunktor" %% "fs2-rabbit-circe" % "5.0.0"
+      "ch.qos.logback"              % "logback-classic"               % logbackVersion,
+      "dev.profunktor"             %% "fs2-rabbit"                    % fs2RabbitVersionByBinary.value,
+      "dev.profunktor"             %% "fs2-rabbit-circe"              % fs2RabbitCirceVersionByBinary.value
     )
   )
 
