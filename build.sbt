@@ -49,7 +49,14 @@ releaseProcess := Seq[ReleaseStep](
   commitNextVersion,
   pushChanges
 )
-ThisBuild / publish / skip := true
+ThisBuild / publish / skip             := true
+ThisBuild / sonatypeCredentialHost     := "central.sonatype.com"
+ThisBuild / versionScheme              := Some("early-semver")
+ThisBuild / publishMavenStyle          := true
+ThisBuild / credentials ++= (for {
+  username <- Option(System.getenv().get("SONATYPE_USER"))
+  password <- Option(System.getenv().get("SONATYPE_PASS"))
+} yield Credentials("Sonatype Central", "central.sonatype.com", username, password)).toSeq
 
 releaseCrossBuild      := true
 Test / publishArtifact := false
@@ -67,18 +74,11 @@ lazy val kernelSettings = Seq(
   scalaVersion       := scala213,
   organization       := "com.itv",
   scalacOptions ++= Seq("-feature", "-deprecation", "-language:higherKinds"),
-  sonatypeCredentialHost := "central.sonatype.com",
   publishTo := sonatypePublishToBundle.value,
   publishConfiguration      := publishConfiguration.value.withOverwrite(isSnapshot.value),
   publishLocalConfiguration := publishLocalConfiguration.value.withOverwrite(isSnapshot.value),
   publish / skip            := false,
-  publishMavenStyle         := true,
   publish / parallelExecution := false,
-  versionScheme             := Some("early-semver"),
-  credentials ++= (for {
-    username <- Option(System.getenv().get("SONATYPE_USER"))
-    password <- Option(System.getenv().get("SONATYPE_PASS"))
-  } yield Credentials("Sonatype Central", "central.sonatype.com", username, password)).toSeq,
   pomExtra :=
     <url>https://github.com/ITV/bucky</url>
       <licenses>
