@@ -52,7 +52,6 @@ releaseProcess := Seq[ReleaseStep](
 ThisBuild / publish / skip := true
 
 releaseCrossBuild      := true
-publishMavenStyle      := true
 Test / publishArtifact := false
 pomIncludeRepository := { _ =>
   false
@@ -68,20 +67,18 @@ lazy val kernelSettings = Seq(
   scalaVersion       := scala213,
   organization       := "com.itv",
   scalacOptions ++= Seq("-feature", "-deprecation", "-language:higherKinds"),
-  publishTo := {
-    val centralUri = "https://central.sonatype.com/publishing"
-    if (isSnapshot.value)
-      Some("snapshots" at centralUri + "/repositories/snapshots")
-    else
-      Some("releases" at centralUri + "/repositories/releases")
-  },
+  sonatypeCredentialHost := "central.sonatype.com",
+  publishTo := sonatypePublishToBundle.value,
   publishConfiguration      := publishConfiguration.value.withOverwrite(isSnapshot.value),
   publishLocalConfiguration := publishLocalConfiguration.value.withOverwrite(isSnapshot.value),
   publish / skip            := false,
+  publishMavenStyle         := true,
+  publish / parallelExecution := false,
+  versionScheme             := Some("early-semver"),
   credentials ++= (for {
     username <- Option(System.getenv().get("SONATYPE_USER"))
     password <- Option(System.getenv().get("SONATYPE_PASS"))
-  } yield Credentials("Sonatype Central Repository Manager", "central.sonatype.com", username, password)).toSeq,
+  } yield Credentials("Sonatype Central", "central.sonatype.com", username, password)).toSeq,
   pomExtra :=
     <url>https://github.com/ITV/bucky</url>
       <licenses>
@@ -168,7 +165,6 @@ lazy val backendJavaAmqp = project
   .settings(moduleName := "bucky-backend-java-amqp")
   .settings(kernelSettings: _*)
   .dependsOn(core)
-  .aggregate(core)
   .settings(
     libraryDependencies ++= Seq(
       "com.rabbitmq"                % "amqp-client"                   % amqpClientVersion,
@@ -186,7 +182,6 @@ lazy val backendFs2Rabbit = project
   .settings(moduleName := "bucky-backend-fs2-rabbit")
   .settings(kernelSettings)
   .dependsOn(core)
-  .aggregate(core)
   .settings(
     libraryDependencies ++= Seq(
       "com.typesafe.scala-logging" %% "scala-logging"                 % scalaLoggingVersion,
@@ -205,7 +200,6 @@ lazy val test = project
   .settings(moduleName := "bucky-test")
   .settings(kernelSettings)
   .dependsOn(core, backendJavaAmqp)
-  .aggregate(core)
   .settings(
     libraryDependencies ++= Seq(
       "com.typesafe.scala-logging" %% "scala-logging"                 % scalaLoggingVersion,
@@ -221,8 +215,8 @@ lazy val it = project
   .settings(name := "com.itv")
   .settings(moduleName := "bucky-it")
   .settings(kernelSettings)
+  .settings(publish / skip := true)
   .dependsOn(core, test, backendFs2Rabbit)
-  .aggregate(core)
   .settings(
     libraryDependencies ++= Seq(
       "com.typesafe.scala-logging" %% "scala-logging"                 % scalaLoggingVersion,
@@ -239,7 +233,7 @@ lazy val example = project
   .settings(name := "com.itv")
   .settings(moduleName := "bucky-example")
   .settings(kernelSettings)
-  .aggregate(core, argonaut, circe, test)
+  .settings(publish / skip := true)
   .dependsOn(core, argonaut, circe, test)
   .settings(
     libraryDependencies ++= Seq(
@@ -258,7 +252,6 @@ lazy val argonaut = project
   .settings(name := "com.itv")
   .settings(moduleName := "bucky-argonaut")
   .settings(kernelSettings)
-  .aggregate(core, test)
   .dependsOn(core, test % "test")
   .settings(
     libraryDependencies ++= Seq(
@@ -273,7 +266,6 @@ lazy val circe = project
   .settings(name := "com.itv")
   .settings(moduleName := "bucky-circe")
   .settings(kernelSettings)
-  .aggregate(core, test)
   .dependsOn(core, test % "test")
   .settings(
     libraryDependencies ++= Seq(
@@ -290,7 +282,6 @@ lazy val xml = project
   .settings(name := "com.itv")
   .settings(moduleName := "bucky-xml")
   .settings(kernelSettings)
-  .aggregate(core, test)
   .dependsOn(core, test % "test")
   .settings(
     libraryDependencies ++= Seq(

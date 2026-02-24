@@ -49,7 +49,7 @@ jobs:
 
       - name: Publish
         if: ${{ startsWith(github.ref, 'refs/tags/') }}
-        run: sbt +publishSigned
+        run: sbt clean +publishSigned sonatypeCentralRelease
         env:
           SONATYPE_USER: ${{ secrets.SONATYPE_USER }}
           SONATYPE_PASS: ${{ secrets.SONATYPE_PASS }}
