@@ -51,12 +51,13 @@ releaseProcess := Seq[ReleaseStep](
 )
 ThisBuild / publish / skip             := true
 ThisBuild / sonatypeCredentialHost     := "central.sonatype.com"
+ThisBuild / sonatypeProfileName        := "com.itv"
 ThisBuild / versionScheme              := Some("early-semver")
 ThisBuild / publishMavenStyle          := true
 ThisBuild / credentials ++= (for {
   username <- Option(System.getenv().get("SONATYPE_USER"))
   password <- Option(System.getenv().get("SONATYPE_PASS"))
-} yield Credentials("Sonatype Central", "central.sonatype.com", username, password)).toSeq
+} yield Credentials("Sonatype Central Repository Manager", "central.sonatype.com", username, password)).toSeq
 
 releaseCrossBuild      := true
 Test / publishArtifact := false
