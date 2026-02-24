@@ -150,44 +150,6 @@ client.publisherOf[T](mandatory = true)
 client.publisherOf[T](exchangeName, routingKey, mandatory = true)
 ```
 
-**⚠️ GOTCHA: `usingMandatory` Method Order Matters on v4.0.0-M1 only**
-
-If you're using `PublishCommandBuilder` directly and need mandatory publishing, you **must** call `.usingMandatory(true)` **before** completing both the exchange and routing key. Once both are set, the builder returns a type that lacks the `usingMandatory` method.
-
-This is fixed in v4.0.0-M2 and later, but if you're on M1, be mindful of the order:
-
-```scala
-// ❌ THIS WILL NOT COMPILE in v4.0.0-M1
-val builder = PublishCommandBuilder
-  .publishCommandBuilder(marshaller)
-  .using(exchangeName)
-  .using(routingKey)
-  .usingMandatory(true)  // ERROR: Builder[T] doesn't have usingMandatory method!
-
-// ✅ CORRECT - Call usingMandatory BEFORE both exchange and routingKey are set
-val builder = PublishCommandBuilder
-  .publishCommandBuilder(marshaller)
-  .usingMandatory(true)  // Call this early!
-  .using(exchangeName)
-  .using(routingKey)
-
-// ✅ ALSO CORRECT - Call after exchange but before routingKey
-val builder = PublishCommandBuilder
-  .publishCommandBuilder(marshaller)
-  .using(exchangeName)
-  .usingMandatory(true)  // Still works here
-  .using(routingKey)
-
-// ✅ ALSO CORRECT - Call after routingKey but before exchange
-val builder = PublishCommandBuilder
-  .publishCommandBuilder(marshaller)
-  .using(routingKey)
-  .usingMandatory(true)  // Still works here
-  .using(exchangeName)
-```
-
-**Note:** This was a change from v3.1.5 where `usingMandatory` could be called at any point in the builder chain. In v4.0.0-M1, the final `Builder` type (after both exchange and routingKey are set) no longer has this method.
-
 ## Migration Checklist
 
 1. ✅ Update your dependencies in `build.sbt` to include the appropriate backend module
@@ -195,8 +157,7 @@ val builder = PublishCommandBuilder
 3. ✅ Update imports to use the backend-specific client
 4. ✅ Wrap publisher usage in `for-comprehension` or `flatMap` to handle `F[Publisher[F, T]]` return type
 5. ✅ If using `Wiring`, update publisher creation to handle `F[Publisher[F, T]]`
-6. ✅ If using `PublishCommandBuilder` with `.usingMandatory()`, ensure it's called **before** both exchange and routing key are set if using v4.0.0-M1. This is fixed in M2 onwards.
-7. ✅ Test your application thoroughly
+6. ✅ Test your application thoroughly
 
 ## Example Migration
 
