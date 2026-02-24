@@ -150,9 +150,11 @@ client.publisherOf[T](mandatory = true)
 client.publisherOf[T](exchangeName, routingKey, mandatory = true)
 ```
 
-**⚠️ GOTCHA: `usingMandatory` Method Order Matters**
+**⚠️ GOTCHA: `usingMandatory` Method Order Matters on v4.0.0-M1 only**
 
 If you're using `PublishCommandBuilder` directly and need mandatory publishing, you **must** call `.usingMandatory(true)` **before** completing both the exchange and routing key. Once both are set, the builder returns a type that lacks the `usingMandatory` method.
+
+This is fixed in v4.0.0-M2 and later, but if you're on M1, be mindful of the order:
 
 ```scala
 // ❌ THIS WILL NOT COMPILE in v4.0.0-M1
@@ -193,7 +195,7 @@ val builder = PublishCommandBuilder
 3. ✅ Update imports to use the backend-specific client
 4. ✅ Wrap publisher usage in `for-comprehension` or `flatMap` to handle `F[Publisher[F, T]]` return type
 5. ✅ If using `Wiring`, update publisher creation to handle `F[Publisher[F, T]]`
-6. ✅ If using `PublishCommandBuilder` with `.usingMandatory()`, ensure it's called **before** both exchange and routing key are set
+6. ✅ If using `PublishCommandBuilder` with `.usingMandatory()`, ensure it's called **before** both exchange and routing key are set if using v4.0.0-M1. This is fixed in M2 onwards.
 7. ✅ Test your application thoroughly
 
 ## Example Migration
