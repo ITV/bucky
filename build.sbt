@@ -6,6 +6,7 @@ name := "bucky"
 
 lazy val scala212 = "2.12.21"
 lazy val scala213 = "2.13.18"
+lazy val scala3   = "3.3.7"
 
 scalaVersion := scala213
 scalacOptions += "-Ypartial-unification"
@@ -49,11 +50,11 @@ releaseProcess := Seq[ReleaseStep](
   commitNextVersion,
   pushChanges
 )
-ThisBuild / publish / skip             := true
-ThisBuild / sonatypeCredentialHost     := "central.sonatype.com"
-ThisBuild / sonatypeProfileName        := "com.itv"
-ThisBuild / versionScheme              := Some("early-semver")
-ThisBuild / publishMavenStyle          := true
+ThisBuild / publish / skip         := true
+ThisBuild / sonatypeCredentialHost := "central.sonatype.com"
+ThisBuild / sonatypeProfileName    := "com.itv"
+ThisBuild / versionScheme          := Some("early-semver")
+ThisBuild / publishMavenStyle      := true
 ThisBuild / credentials ++= (for {
   username <- Option(System.getenv().get("SONATYPE_USER"))
   password <- Option(System.getenv().get("SONATYPE_PASS"))
@@ -75,10 +76,10 @@ lazy val kernelSettings = Seq(
   scalaVersion       := scala213,
   organization       := "com.itv",
   scalacOptions ++= Seq("-feature", "-deprecation", "-language:higherKinds"),
-  publishTo := sonatypePublishToBundle.value,
-  publishConfiguration      := publishConfiguration.value.withOverwrite(isSnapshot.value),
-  publishLocalConfiguration := publishLocalConfiguration.value.withOverwrite(isSnapshot.value),
-  publish / skip            := false,
+  publishTo                   := sonatypePublishToBundle.value,
+  publishConfiguration        := publishConfiguration.value.withOverwrite(isSnapshot.value),
+  publishLocalConfiguration   := publishLocalConfiguration.value.withOverwrite(isSnapshot.value),
+  publish / skip              := false,
   publish / parallelExecution := false,
   pomExtra :=
     <url>https://github.com/ITV/bucky</url>
@@ -293,6 +294,19 @@ lazy val xml = project
     )
   )
 
+lazy val docs = project
+  .in(file("mdoc"))
+  .enablePlugins(MdocPlugin)
+  .settings(
+    scalaVersion := scala213,
+    mdocVariables := Map(
+      "VERSION" -> version.value
+    ),
+    publish / skip  := true,
+    publishArtifact := false
+  )
+  .dependsOn(core, xml, circe, argonaut, test, backendFs2Rabbit, backendJavaAmqp)
+
 lazy val root = (project in file("."))
-  .aggregate(xml, circe, argonaut, example, test, backendJavaAmqp, backendFs2Rabbit, core)
+  .aggregate(xml, circe, argonaut, example, test, backendJavaAmqp, backendFs2Rabbit, core, docs)
   .settings(publishArtifact := false)
