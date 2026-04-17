@@ -2,8 +2,8 @@
 
 In order to get started with bucky, add the following to you `build.sbt`:
 
- 
-```scala 
+
+```scala
 val buckyVersion = "2.0.0-M10"
 libraryDependencies ++= Seq(
     "com.itv"                    %% "bucky-core"              % buckyVersion,
@@ -15,12 +15,12 @@ libraryDependencies ++= Seq(
 
 or for ammonite:
 ```scala
-import $ivy.`com.itv::bucky-core:2.0.0-M10` 
+import $ivy.`com.itv::bucky-core:2.0.0-M10`
 import $ivy.`com.itv::bucky-circe:2.0.0-M10`
 ```
 
 Imports, implicits and config:
-```scala 
+```scala
 import cats._
 import cats.implicits._
 import cats.effect._
@@ -87,6 +87,6 @@ object MyApp extends IOApp {
 }
 ```
 
-For easiness of use, bucky supports the creation of [Wirings](./wiring). A [Wiring](./wiring) centralizes the definition
+For easiness of use, bucky supports the creation of [Wirings](./wiring.md). A [Wiring](./wiring.md) centralizes the definition
 of both ends of the communication (consumer/publisher) as well as the declarations of queues and exchanges
-in a single place. 
+in a single place.
