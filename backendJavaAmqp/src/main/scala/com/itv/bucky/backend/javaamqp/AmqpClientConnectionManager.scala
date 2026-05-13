@@ -25,11 +25,9 @@ private[bucky] case class AmqpClientConnectionManager[F[_]](
     extends StrictLogging {
 
   private def runWithChannelSync[T](action: F[T]): F[T] =
-    publishChannel.synchroniseIfNeeded {
-      F.fromTry(Try {
-        dispatcher.unsafeRunSync(action)
-      })
-    }
+    F.fromTry(Try {
+      dispatcher.unsafeRunSync(action)
+    })
 
   def publish(cmd: PublishCommand, mandatory: Boolean): F[Unit] =
     for {
@@ -47,24 +45,25 @@ private[bucky] case class AmqpClientConnectionManager[F[_]](
         _ <- signal.get.ifM(F.unit, F.raiseError[Unit](new RuntimeException(s"Failed to publish msg: ${cmd}")))
       } yield ())
         .timeout(amqpConfig.publishingTimeout)
-        .recoverWith {
-          case e =>
-            runWithChannelSync {
-              for {
-                dl          <- deliveryTag.get
-                deliveryTag <- F.fromOption(dl, new RuntimeException("Timeout occurred before a delivery tag could be obtained.", e))
-                _           <- pendingConfirmListener.pop(deliveryTag, multiple = false)
-                _           <- F.raiseError[Unit](e)
-              } yield ()
-            }
+        .recoverWith { case e =>
+          runWithChannelSync {
+            for {
+              dl          <- deliveryTag.get
+              deliveryTag <- F.fromOption(dl, new RuntimeException("Timeout occurred before a delivery tag could be obtained.", e))
+              _           <- pendingConfirmListener.pop(deliveryTag, multiple = false)
+              _           <- F.raiseError[Unit](e)
+            } yield ()
+          }
         }
     } yield ()
 
-  def registerConsumer(channel: Channel[F],
-                       queueName: QueueName,
-                       handler: Handler[F, Delivery],
-                       onHandlerException: ConsumeAction,
-                       prefetchCount: Int): F[Unit] =
+  def registerConsumer(
+      channel: Channel[F],
+      queueName: QueueName,
+      handler: Handler[F, Delivery],
+      onHandlerException: ConsumeAction,
+      prefetchCount: Int
+  ): F[Unit] =
     (for {
       consumerTag <- F.delay(ConsumerTag.create(queueName))
       _           <- F.delay(logger.debug("Registering consumer for queue: {} with tag {}.", queueName.value, consumerTag.value))

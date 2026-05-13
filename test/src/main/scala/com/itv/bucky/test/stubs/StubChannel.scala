@@ -205,7 +205,5 @@ abstract class StubChannel[F[_]](implicit F: Async[F]) extends Channel[F] with S
     }
   }
 
-  override def synchroniseIfNeeded[T](f: => T): T = f
-
   override def isConnectionOpen: F[Boolean] = F.pure(true)
 }

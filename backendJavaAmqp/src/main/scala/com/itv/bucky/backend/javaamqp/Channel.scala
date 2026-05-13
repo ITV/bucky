@@ -17,7 +17,6 @@ import scala.concurrent.ExecutionContext
 
 trait Channel[F[_]] {
   def isConnectionOpen: F[Boolean]
-  def synchroniseIfNeeded[T](f: => T): T
   def close(): F[Unit]
   def purgeQueue(name: QueueName): F[Unit]
   def basicQos(prefetchCount: Int): F[Unit]
@@ -150,8 +149,6 @@ object Channel {
       }
       F.blocking(channel.basicConsume(queue.value, false, consumerTag.value, deliveryCallback)).void
     }
-
-    override def synchroniseIfNeeded[T](f: => T): T = this.synchronized(f)
 
     override def isConnectionOpen: F[Boolean] = F.blocking(channel.getConnection.isOpen)
   }

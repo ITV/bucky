@@ -26,13 +26,10 @@ class AmqpClientConnectionManager[F[_]: Async](
 
   val publishChannel: Channel = amqpChannel.value
 
-  private def synchroniseIfNeeded[T](f: => T): T = publishChannel.synchronized(f)
   private def runWithChannelSync[T](action: F[T]): F[T] =
-    synchroniseIfNeeded {
-      Async[F].fromTry(Try {
-        dispatcher.unsafeRunSync(action)
-      })
-    }
+    Async[F].fromTry(Try {
+      dispatcher.unsafeRunSync(action)
+    })
 
   def addConfirmListeningToPublisher(publisher: Publisher[F, PublishCommand]): Publisher[F, PublishCommand] = (cmd: PublishCommand) =>
     for {
