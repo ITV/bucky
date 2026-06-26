@@ -196,21 +196,21 @@ class Fs2RabbitAmqpClient[F[_]: Async: Temporal](
           client.createAckerConsumer[consume.Delivery](model.QueueName(queueName.value)).flatMap { case (acker, consumer) =>
             consumer
               .evalMap { delivery =>
-                for {
-                  uuid <- Async[F].delay(UUID.randomUUID())
-                  _    <- consumptionIds.update(_ + uuid)
-                  res  <- handler(delivery.payload).attempt
-                  tag = delivery.deliveryTag
-                  _      <- consumptionIds.update(_ - uuid)
-                  // Use exceptionalAction for handler errors rather than propagating
-                  // them through the stream (which would kill it unnecessarily).
-                  result <- res match {
-                    case Right(action) => Async[F].pure(action)
-                    case Left(e) =>
-                      Async[F].delay(logger.error(s"Handler exception for queue ${queueName.value}: ${e.getMessage}", e)) *>
-                        Async[F].pure(exceptionalAction)
+                val tag = delivery.deliveryTag
+
+                Async[F]
+                  .bracket {
+                    Async[F].delay(UUID.randomUUID()).flatTap(uuid => consumptionIds.update(_ + uuid))
+                  } { uuid =>
+                    handler(delivery.payload).attempt.flatMap {
+                      case Right(action) => Async[F].pure((action, tag))
+                      case Left(e) =>
+                        Async[F].delay(logger.error(s"Handler exception for queue ${queueName.value}: ${e.getMessage}", e)) *>
+                          Async[F].pure((exceptionalAction, tag))
+                    }
+                  } { uuid =>
+                    consumptionIds.update(_ - uuid)
                   }
-                } yield (result, tag)
               }
               .evalMap {
                 case (consume.Ack, tag)                => acker(model.AckResult.Ack(tag))
