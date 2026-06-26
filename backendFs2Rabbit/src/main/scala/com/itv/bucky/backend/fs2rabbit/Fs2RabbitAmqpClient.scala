@@ -25,6 +25,7 @@ import com.itv.bucky.{
   publish
 }
 import com.rabbitmq.client.LongString
+import com.typesafe.scalalogging.StrictLogging
 import dev.profunktor.fs2rabbit.arguments.SafeArg
 import dev.profunktor.fs2rabbit.config.Fs2RabbitConfig
 import dev.profunktor.fs2rabbit.config.declaration._
@@ -51,18 +52,20 @@ import dev.profunktor.fs2rabbit.model.{AMQPChannel, HeaderKey, Headers, Publishi
 import scodec.bits.ByteVector
 
 import java.util.{Date, UUID}
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
 import scala.language.higherKinds
 import Fs2RabbitAmqpClient._
 import cats.effect.kernel.Temporal
 
 class Fs2RabbitAmqpClient[F[_]: Async: Temporal](
+    config: AmqpClientConfig,
     client: RabbitClient[F],
     connection: model.AMQPConnection,
     publishChannel: model.AMQPChannel,
     amqpClientConnectionManager: AmqpClientConnectionManager[F]
-) extends AmqpClient[F] {
+) extends AmqpClient[F]
+    with StrictLogging {
 
   override def declare(declarations: decl.Declaration*): F[Unit] = declare(declarations.toList)
 
@@ -181,37 +184,65 @@ class Fs2RabbitAmqpClient[F[_]: Async: Temporal](
       shutdownTimeout: FiniteDuration,
       shutdownRetry: FiniteDuration
   ): Resource[F, Unit] =
-    client.createChannel(connection).flatMap { implicit channel =>
-      implicit val decoder: EnvelopeDecoder[F, consume.Delivery] = deliveryDecoder(queueName)
-      Resource.eval(Ref.of[F, Set[UUID]](Set.empty)).flatMap { consumptionIds =>
-        Resource.eval(client.createAckerConsumer[consume.Delivery](model.QueueName(queueName.value))).flatMap { case (acker, consumer) =>
-          consumer
-            .evalMap(delivery =>
-              for {
-                uuid <- Async[F].delay(UUID.randomUUID())
-                _    <- consumptionIds.update(set => set + uuid)
-                res  <- handler(delivery.payload).attempt
-                tag = delivery.deliveryTag
-                _      <- consumptionIds.update(set => set - uuid)
-                result <- Async[F].fromEither(res)
-              } yield (result, tag)
-            )
-            .evalMap {
-              case (consume.Ack, tag)                => acker(model.AckResult.Ack(tag))
-              case (consume.DeadLetter, tag)         => acker(model.AckResult.NAck(tag))
-              case (consume.RequeueImmediately, tag) => acker(model.AckResult.Reject(tag))
-            }
-            .compile
-            .drain
-            .background
-            .flatMap { _ =>
-              Resource.onFinalize(
-                repeatUntil(consumptionIds.get)(_.isEmpty)(shutdownRetry).timeout(shutdownTimeout)
-              )
-            }
-            .map(_ => ())
+    Resource.eval(Ref.of[F, Set[UUID]](Set.empty)).flatMap { consumptionIds =>
+
+      // Create a fresh channel and consumer for each run. This ensures that after
+      // an auto-recovery the old (dead) fs2-rabbit stream is discarded and a new
+      // one is registered on the recovered channel rather than relying on the
+      // channel's internal queue which nobody is draining.
+      def runConsumer: F[Unit] =
+        client.createChannel(connection).use { implicit channel =>
+          implicit val decoder: EnvelopeDecoder[F, consume.Delivery] = deliveryDecoder(queueName)
+          client.createAckerConsumer[consume.Delivery](model.QueueName(queueName.value)).flatMap { case (acker, consumer) =>
+            consumer
+              .evalMap { delivery =>
+                for {
+                  uuid <- Async[F].delay(UUID.randomUUID())
+                  _    <- consumptionIds.update(_ + uuid)
+                  res  <- handler(delivery.payload).attempt
+                  tag = delivery.deliveryTag
+                  _      <- consumptionIds.update(_ - uuid)
+                  // Use exceptionalAction for handler errors rather than propagating
+                  // them through the stream (which would kill it unnecessarily).
+                  result <- res match {
+                    case Right(action) => Async[F].pure(action)
+                    case Left(e) =>
+                      Async[F].delay(logger.error(s"Handler exception for queue ${queueName.value}: ${e.getMessage}", e)) *>
+                        Async[F].pure(exceptionalAction)
+                  }
+                } yield (result, tag)
+              }
+              .evalMap {
+                case (consume.Ack, tag)                => acker(model.AckResult.Ack(tag))
+                case (consume.DeadLetter, tag)         => acker(model.AckResult.NAck(tag))
+                case (consume.RequeueImmediately, tag) => acker(model.AckResult.Reject(tag))
+              }
+              .compile
+              .drain
+          }
         }
-      }
+
+      // The delay between retry attempts. Aligned with the Java AMQP client's
+      // automatic-recovery interval so we wait long enough for the connection
+      // to be re-established before trying to open a new channel.
+      val recoveryDelay: FiniteDuration = config.networkRecoveryInterval.getOrElse(3.seconds)
+
+      // Retry the consumer indefinitely on failure.  This mirrors the
+      // AutorecoveringChannel behaviour of the v3 Java backend: when a network
+      // blip closes the channel, the consumer is re-registered automatically
+      // after the connection is recovered.
+      def consumerWithRecovery: F[Unit] =
+        runConsumer.handleErrorWith { error =>
+          Async[F].delay(logger.warn(s"Consumer for queue ${queueName.value} failed, will retry after $recoveryDelay: ${error.getMessage}")) *>
+            Temporal[F].sleep(recoveryDelay) *>
+            consumerWithRecovery
+        }
+
+      consumerWithRecovery.background.flatMap { _ =>
+        Resource.onFinalize(
+          repeatUntil(consumptionIds.get)(_.isEmpty)(shutdownRetry).timeout(shutdownTimeout)
+        )
+      }.map(_ => ())
     }
 
   override def isConnectionOpen: F[Boolean] = Async[F].pure(connection.value.isOpen)
@@ -246,7 +277,7 @@ object Fs2RabbitAmqpClient {
           amqpChannel = publishChannel
         )
       )
-    } yield new Fs2RabbitAmqpClient(client, connection, publishChannel, amqpClientConnectionManager)
+    } yield new Fs2RabbitAmqpClient(config, client, connection, publishChannel, amqpClientConnectionManager)
   }
 
   implicit def deliveryEncoder[F[_]: Async]: MessageEncoder[F, PublishCommand] =
