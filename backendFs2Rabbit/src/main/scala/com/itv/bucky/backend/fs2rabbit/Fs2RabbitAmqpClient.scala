@@ -49,6 +49,7 @@ import dev.profunktor.fs2rabbit.model.AmqpFieldValue.{
   TimestampVal
 }
 import dev.profunktor.fs2rabbit.model.{AMQPChannel, HeaderKey, Headers, PublishingFlag, ShortString}
+import fs2.Stream
 import scodec.bits.ByteVector
 
 import java.util.{Date, UUID}
@@ -176,6 +177,18 @@ class Fs2RabbitAmqpClient[F[_]: Async: Temporal](
       _      <- if (ended) Async[F].unit else Temporal[F].sleep(sleep) *> repeatUntil(eval)(pred)(sleep)
     } yield ()
 
+  /** Creates a fresh channel and registers a consumer on it.  Extracted as a
+    * protected method so tests can override it with a controlled stream without
+    * needing a real RabbitMQ connection.
+    */
+  protected def acquireConsumerStream(
+      queueName: bucky.QueueName
+  ): Resource[F, (model.AckResult => F[Unit], Stream[F, model.AmqpEnvelope[consume.Delivery]])] =
+    client.createChannel(connection).evalMap { implicit channel =>
+      implicit val decoder: EnvelopeDecoder[F, consume.Delivery] = deliveryDecoder(queueName)
+      client.createAckerConsumer[consume.Delivery](model.QueueName(queueName.value))
+    }
+
   override def registerConsumer(
       queueName: bucky.QueueName,
       handler: Handler[F, consume.Delivery],
@@ -191,35 +204,32 @@ class Fs2RabbitAmqpClient[F[_]: Async: Temporal](
       // one is registered on the recovered channel rather than relying on the
       // channel's internal queue which nobody is draining.
       def runConsumer: F[Unit] =
-        client.createChannel(connection).use { implicit channel =>
-          implicit val decoder: EnvelopeDecoder[F, consume.Delivery] = deliveryDecoder(queueName)
-          client.createAckerConsumer[consume.Delivery](model.QueueName(queueName.value)).flatMap { case (acker, consumer) =>
-            consumer
-              .evalMap { delivery =>
-                val tag = delivery.deliveryTag
+        acquireConsumerStream(queueName).use { case (acker, consumer) =>
+          consumer
+            .evalMap { delivery =>
+              val tag = delivery.deliveryTag
 
-                Async[F]
-                  .bracket {
-                    Async[F].delay(UUID.randomUUID()).flatTap(uuid => consumptionIds.update(_ + uuid))
-                  } { uuid =>
-                    handler(delivery.payload).attempt.flatMap {
-                      case Right(action) => Async[F].pure((action, tag))
-                      case Left(e) =>
-                        Async[F].delay(logger.error(s"Handler exception for queue ${queueName.value}: ${e.getMessage}", e)) *>
-                          Async[F].pure((exceptionalAction, tag))
-                    }
-                  } { uuid =>
-                    consumptionIds.update(_ - uuid)
+              Async[F]
+                .bracket {
+                  Async[F].delay(UUID.randomUUID()).flatTap(uuid => consumptionIds.update(_ + uuid))
+                } { uuid =>
+                  handler(delivery.payload).attempt.flatMap {
+                    case Right(action) => Async[F].pure((action, tag))
+                    case Left(e) =>
+                      Async[F].delay(logger.error(s"Handler exception for queue ${queueName.value}: ${e.getMessage}", e)) *>
+                        Async[F].pure((exceptionalAction, tag))
                   }
-              }
-              .evalMap {
-                case (consume.Ack, tag)                => acker(model.AckResult.Ack(tag))
-                case (consume.DeadLetter, tag)         => acker(model.AckResult.NAck(tag))
-                case (consume.RequeueImmediately, tag) => acker(model.AckResult.Reject(tag))
-              }
-              .compile
-              .drain
-          }
+                } { uuid =>
+                  consumptionIds.update(_ - uuid)
+                }
+            }
+            .evalMap {
+              case (consume.Ack, tag)                => acker(model.AckResult.Ack(tag))
+              case (consume.DeadLetter, tag)         => acker(model.AckResult.NAck(tag))
+              case (consume.RequeueImmediately, tag) => acker(model.AckResult.Reject(tag))
+            }
+            .compile
+            .drain
         }
 
       // The delay between retry attempts. Aligned with the Java AMQP client's
