@@ -210,6 +210,36 @@ object Example extends IOApp {
 
 Both backends implement the same `AmqpClient[F]` trait, so switching between them should only require changing the client creation and imports.
 
+# Migrating to 4.0.3 and above — connection recovery fix (fs2-rabbit backend)
+
+Versions **4.0.0-M1 through 4.0.2** contain a connection-recovery bug that affects **`Fs2RabbitAmqpClient` only**. The `JavaBackendAmqpClient` is not affected.
+
+## What went wrong
+
+The fs2-rabbit backend ran each consumer as an fs2 `Stream` inside a `.background` fiber, but silently ignored the fiber outcome. When a network blip caused the underlying AMQP channel to close, the stream terminated with an error that was swallowed — no restart was ever attempted. After the Java AMQP client automatically recovered the connection, messages were delivered to the channel's internal buffer but nobody was draining it, so the consumer appeared permanently stuck.
+
+The v3 Java backend (and `JavaBackendAmqpClient` in v4) use a `DefaultConsumer` callback on an `AutorecoveringChannel`, which the AMQP Java client automatically re-registers after recovery. The fs2-rabbit backend had no equivalent mechanism.
+
+A secondary issue in the same code path: handler exceptions propagated through the stream and also killed it, rather than being resolved via `exceptionalAction`.
+
+## Fix in 4.0.3
+
+- The consumer loop now wraps each run in a retry: on any failure it logs a warning, waits for `networkRecoveryInterval` (default 3 seconds, matching the Java AMQP client's recovery interval), then creates a **fresh channel and consumer** before resuming. A fresh channel is required because the auto-recovered channel's dead internal fs2-rabbit queue would otherwise accumulate un-acked messages indefinitely.
+- Handler exceptions are now caught and resolved via `exceptionalAction` rather than terminating the stream.
+
+## Action required
+
+If you are using **`Fs2RabbitAmqpClient`** on any 4.x release prior to 4.0.3, upgrade to **4.0.3**:
+
+```scala
+// For fs2-rabbit Backend
+libraryDependencies += "com.itv" %% "bucky-backend-fs2-rabbit" % "4.0.3"
+```
+
+No code changes are required — the fix is entirely internal to `registerConsumer`.
+
+If you are using **`JavaBackendAmqpClient`** you are not affected and no action is needed.
+
 # Releasing a new version
 
 1. Merge your change into master
