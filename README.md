@@ -246,3 +246,4 @@ If you are using **`JavaBackendAmqpClient`** you are not affected and no action 
 2. Merge your change into master
 3. perform an `sbt release` setting the new version when prompted
 4. Release in Sonatype
+5. Merge the released version change to version.sbt into main
